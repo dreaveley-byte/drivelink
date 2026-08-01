@@ -5,11 +5,15 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type JobType = { id: string; name: string }
+type Organization = { id: string; name: string }
 
 export default function PostJobPage() {
   const router = useRouter()
   const [jobTypes, setJobTypes] = useState<JobType[]>([])
   const [jobTypeId, setJobTypeId] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [selectedOrgId, setSelectedOrgId] = useState('')
   const [pickupAddress, setPickupAddress] = useState('')
   const [dropoffAddress, setDropoffAddress] = useState('')
   const [recipientName, setRecipientName] = useState('')
@@ -32,6 +36,22 @@ export default function PostJobPage() {
         setJobTypes(data ?? [])
         if (data?.[0]) setJobTypeId(data[0].id)
       })
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role === 'platform_admin') {
+        setIsAdmin(true)
+        const { data: orgs } = await supabase.from('organizations').select('id, name').order('name')
+        setOrganizations(orgs ?? [])
+        if (orgs?.[0]) setSelectedOrgId(orgs[0].id)
+      }
+    })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -49,18 +69,24 @@ export default function PostJobPage() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('organization_id')
+      .select('organization_id, role')
       .eq('id', user.id)
       .single()
 
-    if (!profile?.organization_id) {
-      setError('Your account is not linked to an organization yet.')
+    const orgIdToUse = profile?.role === 'platform_admin' ? selectedOrgId : profile?.organization_id
+
+    if (!orgIdToUse) {
+      setError(
+        profile?.role === 'platform_admin'
+          ? 'Please select a dealer to post this job for.'
+          : 'Your account is not linked to an organization yet.'
+      )
       setLoading(false)
       return
     }
 
     const { error } = await supabase.from('jobs').insert({
-      organization_id: profile.organization_id,
+      organization_id: orgIdToUse,
       job_type_id: jobTypeId,
       created_by: user.id,
       pickup_address: pickupAddress,
@@ -92,6 +118,21 @@ export default function PostJobPage() {
 
       <main className="max-w-lg mx-auto px-6 py-8">
         <form onSubmit={handleSubmit} className="space-y-5">
+          {isAdmin && (
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Posting for dealer</label>
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>{org.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm text-gray-700 mb-1">Job type</label>
             <select
