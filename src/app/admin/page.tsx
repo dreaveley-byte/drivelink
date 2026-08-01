@@ -48,7 +48,12 @@ export default async function AdminPage() {
           <h1 className="text-lg font-semibold text-gray-900">DriveLink — Admin</h1>
           <p className="text-xs text-gray-500">All dealers, all jobs</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
+            Applications
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8">
