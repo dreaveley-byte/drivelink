@@ -16,31 +16,36 @@ export async function POST(req: NextRequest) {
   const destination = addresses[addresses.length - 1]
   const waypoints = addresses.slice(1, -1)
 
-  const params = new URLSearchParams({
-    origin,
-    destination,
-    key: apiKey,
-    units: 'metric',
-  })
-  if (waypoints.length > 0) {
-    params.set('waypoints', waypoints.join('|'))
+  const body = {
+    origin: { address: origin },
+    destination: { address: destination },
+    intermediates: waypoints.map((address: string) => ({ address })),
+    travelMode: 'DRIVE',
+    units: 'METRIC',
   }
 
   try {
-    const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?${params}`)
+    const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+      },
+      body: JSON.stringify(body),
+    })
     const data = await res.json()
 
-    if (data.status !== 'OK' || !data.routes?.[0]) {
-      return NextResponse.json({ error: data.error_message || data.status || 'Route not found' }, { status: 400 })
+    if (!res.ok || !data.routes?.[0]) {
+      return NextResponse.json({ error: data.error?.message || 'Route not found' }, { status: 400 })
     }
 
-    const legs = data.routes[0].legs
-    const totalMeters = legs.reduce((sum: number, leg: { distance: { value: number } }) => sum + leg.distance.value, 0)
-    const totalSeconds = legs.reduce((sum: number, leg: { duration: { value: number } }) => sum + leg.duration.value, 0)
+    const route = data.routes[0]
+    const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10)
 
     return NextResponse.json({
-      distanceKm: Math.round((totalMeters / 1000) * 10) / 10,
-      durationMinutes: Math.round(totalSeconds / 60),
+      distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
+      durationMinutes: Math.round(durationSeconds / 60),
     })
   } catch {
     return NextResponse.json({ error: 'Failed to reach mapping service' }, { status: 500 })
