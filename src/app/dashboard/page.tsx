@@ -21,11 +21,23 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('*, organizations(name)')
+    .select('*')
     .eq('id', user.id)
     .single()
+
+  if (profileError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong loading your profile</h1>
+          <p className="text-sm text-red-600 mb-6 font-mono">{profileError.message}</p>
+          <SignOutButton />
+        </div>
+      </div>
+    )
+  }
 
   if (!profile?.organization_id) {
     return (
@@ -41,6 +53,12 @@ export default async function DashboardPage() {
     )
   }
 
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('id', profile.organization_id)
+    .single()
+
   if (profile.role === 'driver') {
     redirect('/driver')
   }
@@ -55,7 +73,7 @@ export default async function DashboardPage() {
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">DriveLink</h1>
-          <p className="text-xs text-gray-500">{profile.organizations?.name}</p>
+          <p className="text-xs text-gray-500">{org?.name}</p>
         </div>
         <SignOutButton />
       </header>
