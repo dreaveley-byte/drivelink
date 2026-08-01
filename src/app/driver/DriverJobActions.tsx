@@ -4,12 +4,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+import { formatCents } from '@/lib/pricing'
+
 type Job = {
   id: string
   status: string
   pickup_address: string
   dropoff_address: string
   recipient_name: string | null
+  estimated_driver_pay_cents: number | null
   job_types: { name: string } | null
 }
 
@@ -96,6 +99,11 @@ export default function DriverJobActions({
         </p>
         {job.recipient_name && (
           <p className="text-xs text-gray-400 mt-0.5">Recipient: {job.recipient_name}</p>
+        )}
+        {job.estimated_driver_pay_cents != null && (
+          <p className="text-xs text-green-700 font-medium mt-0.5">
+            Est. pay: {formatCents(job.estimated_driver_pay_cents)}
+          </p>
         )}
       </div>
 

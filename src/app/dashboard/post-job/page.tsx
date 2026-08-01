@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -15,15 +16,29 @@ export default function PostJobPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrgId, setSelectedOrgId] = useState('')
   const [newDealerName, setNewDealerName] = useState('')
-  const [pickupAddress, setPickupAddress] = useState('')
-  const [dropoffAddress, setDropoffAddress] = useState('')
+
+  const [stops, setStops] = useState<string[]>(['', ''])
+
   const [recipientName, setRecipientName] = useState('')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [scheduledFor, setScheduledFor] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
+  const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
+  const [usedOwnVehicle, setUsedOwnVehicle] = useState(false)
+  const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
+  const [registryVisit, setRegistryVisit] = useState(false)
+  const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
   const [notes, setNotes] = useState('')
+
+  const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
+  const [calculating, setCalculating] = useState(false)
+  const [calcError, setCalcError] = useState('')
+  const [pricing, setPricing] = useState<PricingResult | null>(null)
+
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -37,6 +52,10 @@ export default function PostJobPage() {
         setJobTypes(data ?? [])
         if (data?.[0]) setJobTypeId(data[0].id)
       })
+
+    supabase.from('pricing_settings').select('*').eq('id', 1).single().then(({ data }) => {
+      if (data) setPricingSettings(data)
+    })
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
@@ -55,9 +74,89 @@ export default function PostJobPage() {
     })
   }, [])
 
+  function updateStop(index: number, value: string) {
+    setStops((prev) => prev.map((s, i) => (i === index ? value : s)))
+  }
+
+  function addStop() {
+    setStops((prev) => [...prev.slice(0, -1), '', prev[prev.length - 1]])
+  }
+
+  function removeStop(index: number) {
+    setStops((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function addCharge() {
+    setAdditionalCharges((prev) => [...prev, { description: '', dealerAmountCents: 0, hoursAdded: 0, paidToDriver: false }])
+  }
+
+  function updateCharge(index: number, patch: Partial<AdditionalCharge>) {
+    setAdditionalCharges((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
+  }
+
+  function removeCharge(index: number) {
+    setAdditionalCharges((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const runCalculation = useCallback(async () => {
+    setCalcError('')
+    const filledStops = stops.map((s) => s.trim()).filter(Boolean)
+    if (filledStops.length < 2) {
+      setCalcError('Enter at least a pickup and dropoff address.')
+      return
+    }
+    if (!pricingSettings) {
+      setCalcError('Pricing settings not loaded yet.')
+      return
+    }
+
+    setCalculating(true)
+    try {
+      const res = await fetch('/api/distance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: filledStops }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCalcError(data.error || 'Could not calculate distance.')
+        setCalculating(false)
+        return
+      }
+
+      setDistanceKm(data.distanceKm)
+      setDurationMinutes(data.durationMinutes)
+
+      const result = calculatePricing(
+        {
+          distanceKm: data.distanceKm,
+          durationMinutes: data.durationMinutes,
+          vehicleMode,
+          numDrivers: secondDriver ? 2 : 1,
+          usedOwnVehicle,
+          outOfProvinceInspection,
+          registryVisit,
+          additionalCharges,
+        },
+        pricingSettings
+      )
+      setPricing(result)
+    } catch {
+      setCalcError('Something went wrong reaching the mapping service.')
+    }
+    setCalculating(false)
+  }, [stops, vehicleMode, secondDriver, usedOwnVehicle, outOfProvinceInspection, registryVisit, additionalCharges, pricingSettings])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    const filledStops = stops.map((s) => s.trim()).filter(Boolean)
+    if (filledStops.length < 2) {
+      setError('Enter at least a pickup and dropoff address.')
+      return
+    }
+
     setLoading(true)
     const supabase = createClient()
 
@@ -106,26 +205,44 @@ export default function PostJobPage() {
       return
     }
 
-    const { error } = await supabase.from('jobs').insert({
+    const { data: newJob, error: jobError } = await supabase.from('jobs').insert({
       organization_id: orgIdToUse,
       job_type_id: jobTypeId,
       created_by: user.id,
-      pickup_address: pickupAddress,
-      dropoff_address: dropoffAddress,
+      pickup_address: filledStops[0],
+      dropoff_address: filledStops[filledStops.length - 1],
       recipient_name: recipientName || null,
       recipient_phone: recipientPhone || null,
       scheduled_for: scheduledFor || null,
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
+      vehicle_mode: vehicleMode,
+      used_own_vehicle: usedOwnVehicle,
+      out_of_province_inspection: outOfProvinceInspection,
+      registry_visit: registryVisit,
+      additional_charges: additionalCharges,
+      overnight_required: pricing?.overnightRequired ?? false,
+      estimated_distance_km: distanceKm,
+      estimated_duration_minutes: durationMinutes,
+      estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
+      estimated_driver_pay_cents: pricing?.estimatedDriverPayCents ?? null,
       notes: notes || null,
-    })
+    }).select('id').single()
 
-    if (error) {
-      setError(error.message)
+    if (jobError) {
+      setError(jobError.message)
       setLoading(false)
       return
     }
+
+    const stopRows = filledStops.map((address, i) => ({
+      job_id: newJob.id,
+      stop_order: i,
+      address,
+      stop_type: i === 0 ? 'pickup' : i === filledStops.length - 1 ? 'dropoff' : 'waypoint',
+    }))
+    await supabase.from('job_stops').insert(stopRows)
 
     router.push('/dashboard')
     router.refresh()
@@ -138,7 +255,7 @@ export default function PostJobPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {isAdmin && (
             <div>
               <label className="block text-sm text-gray-700 mb-1">Posting for dealer</label>
@@ -152,7 +269,6 @@ export default function PostJobPage() {
                 ))}
                 <option value="__new__">+ Add a new dealer...</option>
               </select>
-
               {selectedOrgId === '__new__' && (
                 <input
                   autoFocus
@@ -178,53 +294,61 @@ export default function PostJobPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">Pickup address</label>
-            <input
-              required
-              value={pickupAddress}
-              onChange={(e) => setPickupAddress(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">Dropoff address</label>
-            <input
-              required
-              value={dropoffAddress}
-              onChange={(e) => setDropoffAddress(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
+          <div className="space-y-2">
+            {stops.map((stop, i) => (
+              <div key={i}>
+                <label className="block text-sm text-gray-700 mb-1">
+                  {i === 0 ? 'Pickup address' : i === stops.length - 1 ? 'Dropoff address' : `Stop ${i}`}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    required={i === 0 || i === stops.length - 1}
+                    value={stop}
+                    onChange={(e) => updateStop(i, e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  {i !== 0 && i !== stops.length - 1 && (
+                    <button type="button" onClick={() => removeStop(i)} className="text-xs text-gray-400 hover:text-red-600 px-2">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={addStop} className="text-xs text-gray-600 hover:text-gray-900 underline">
+              + Add a stop
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-700 mb-1">Recipient name</label>
-              <input
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
+              <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Recipient phone</label>
-              <input
-                value={recipientPhone}
-                onChange={(e) => setRecipientPhone(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
+              <input value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Scheduled for</label>
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
+            <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Is the vehicle driven or towed?</label>
+            <select
+              value={vehicleMode}
+              onChange={(e) => setVehicleMode(e.target.value as 'driven' | 'towed')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
+            >
+              <option value="driven">Driven</option>
+              <option value="towed">Towed (trailer)</option>
+            </select>
           </div>
 
           <div className="space-y-2 border border-gray-200 rounded-lg p-4">
@@ -234,26 +358,112 @@ export default function PostJobPage() {
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={secondDriver} onChange={(e) => setSecondDriver(e.target.checked)} />
-              Second driver required <span className="text-gray-400">(extra charge)</span>
+              Second driver required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={chaseVehicle} onChange={(e) => setChaseVehicle(e.target.checked)} />
-              Chase vehicle required <span className="text-gray-400">(extra charge)</span>
+              Chase vehicle required
             </label>
-            <p className="text-xs text-gray-400 pt-1">
-              Additional charges may apply for ferries, flights, out-of-province inspections, registry visits, or insurance arrangements.
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={usedOwnVehicle} onChange={(e) => setUsedOwnVehicle(e.target.checked)} />
+              Driver will use their own vehicle
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => setOutOfProvinceInspection(e.target.checked)} />
+              Out-of-province inspection required
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={registryVisit} onChange={(e) => setRegistryVisit(e.target.checked)} />
+              Registry visit required
+            </label>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-700">Additional time & charges</label>
+              <button type="button" onClick={addCharge} className="text-xs text-gray-600 hover:text-gray-900 underline">
+                + Add
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">
+              Use this for flights, ferries, Ubers, or anything else that adds cost or time.
             </p>
+            {additionalCharges.map((charge, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Description (e.g. Flight home)"
+                    value={charge.description}
+                    onChange={(e) => updateCharge(i, { description: e.target.value })}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <button type="button" onClick={() => removeCharge(i)} className="text-xs text-gray-400 hover:text-red-600 px-2">
+                    Remove
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Cost to bill dealer ($)</label>
+                    <input
+                      type="number" step="0.01"
+                      value={charge.dealerAmountCents / 100}
+                      onChange={(e) => updateCharge(i, { dealerAmountCents: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Hours to add</label>
+                    <input
+                      type="number" step="0.5"
+                      value={charge.hoursAdded}
+                      onChange={(e) => updateCharge(i, { hoursAdded: parseFloat(e.target.value || '0') })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input type="checkbox" checked={charge.paidToDriver} onChange={(e) => updateCharge(i, { paidToDriver: e.target.checked })} />
+                  Pay this to the driver too (e.g. reimbursed fare)
+                </label>
+              </div>
+            ))}
           </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
+
+          <button
+            type="button"
+            onClick={runCalculation}
+            disabled={calculating}
+            className="w-full border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            {calculating ? 'Calculating...' : 'Calculate distance & cost'}
+          </button>
+          {calcError && <p className="text-sm text-red-600">{calcError}</p>}
+
+          {pricing && (
+            <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
+              <p className="text-xs text-gray-500">
+                {distanceKm} km one-way {durationMinutes ? '· ' + (Math.round(durationMinutes / 60 * 10) / 10) + ' hrs drive time' : ''}
+                {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
+              </p>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <span className="text-sm text-gray-700">Estimated dealer cost</span>
+                <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDealerCostCents)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">Estimated driver pay</span>
+                <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDriverPayCents)}</span>
+              </div>
+              <p className="text-xs text-gray-400 pt-1">
+                Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
+              </p>
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -265,11 +475,7 @@ export default function PostJobPage() {
             >
               {loading ? 'Posting...' : 'Post job'}
             </button>
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="text-sm text-gray-500 px-3 py-2.5"
-            >
+            <button type="button" onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 px-3 py-2.5">
               Cancel
             </button>
           </div>

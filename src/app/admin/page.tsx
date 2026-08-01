@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,13 @@ export default async function AdminPage() {
                 <p className="text-xs text-gray-400 mt-0.5">
                   Driver: {job.driver?.full_name ?? 'Unassigned'}
                 </p>
+                {(job.estimated_dealer_cost_cents != null || job.estimated_driver_pay_cents != null) && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {job.estimated_dealer_cost_cents != null && `Cost: ${formatCents(job.estimated_dealer_cost_cents)}`}
+                    {job.estimated_dealer_cost_cents != null && job.estimated_driver_pay_cents != null && ' · '}
+                    {job.estimated_driver_pay_cents != null && `Pay: ${formatCents(job.estimated_driver_pay_cents)}`}
+                  </p>
+                )}
               </div>
               <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                 {statusLabels[job.status] ?? job.status}
