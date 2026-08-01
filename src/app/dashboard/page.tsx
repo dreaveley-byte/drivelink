@@ -39,6 +39,14 @@ export default async function DashboardPage() {
     )
   }
 
+  if (profile?.role === 'driver') {
+    redirect('/driver')
+  }
+
+  if (profile?.role === 'platform_admin') {
+    redirect('/admin')
+  }
+
   if (!profile?.organization_id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
@@ -58,10 +66,6 @@ export default async function DashboardPage() {
     .select('name')
     .eq('id', profile.organization_id)
     .single()
-
-  if (profile.role === 'driver') {
-    redirect('/driver')
-  }
 
   const { data: jobs } = await supabase
     .from('jobs')
