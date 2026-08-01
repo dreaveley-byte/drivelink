@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DriverPage() {
   const supabase = await createClient()
 

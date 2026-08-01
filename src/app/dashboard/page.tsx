@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 
+export const dynamic = 'force-dynamic'
+
 const statusLabels: Record<string, string> = {
   awaiting_driver: 'Awaiting Driver',
   assigned: 'Assigned',
