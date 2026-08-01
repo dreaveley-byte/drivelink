@@ -14,6 +14,7 @@ export default function PostJobPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrgId, setSelectedOrgId] = useState('')
+  const [newDealerName, setNewDealerName] = useState('')
   const [pickupAddress, setPickupAddress] = useState('')
   const [dropoffAddress, setDropoffAddress] = useState('')
   const [recipientName, setRecipientName] = useState('')
@@ -73,7 +74,27 @@ export default function PostJobPage() {
       .eq('id', user.id)
       .single()
 
-    const orgIdToUse = profile?.role === 'platform_admin' ? selectedOrgId : profile?.organization_id
+    let orgIdToUse = profile?.role === 'platform_admin' ? selectedOrgId : profile?.organization_id
+
+    if (profile?.role === 'platform_admin' && selectedOrgId === '__new__') {
+      if (!newDealerName.trim()) {
+        setError('Please enter a name for the new dealer.')
+        setLoading(false)
+        return
+      }
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
+        .insert({ name: newDealerName.trim(), org_type: 'dealer_customer' })
+        .select('id')
+        .single()
+
+      if (orgError) {
+        setError(orgError.message)
+        setLoading(false)
+        return
+      }
+      orgIdToUse = newOrg.id
+    }
 
     if (!orgIdToUse) {
       setError(
@@ -129,7 +150,18 @@ export default function PostJobPage() {
                 {organizations.map((org) => (
                   <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
+                <option value="__new__">+ Add a new dealer...</option>
               </select>
+
+              {selectedOrgId === '__new__' && (
+                <input
+                  autoFocus
+                  placeholder="New dealer name"
+                  value={newDealerName}
+                  onChange={(e) => setNewDealerName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-2"
+                />
+              )}
             </div>
           )}
 

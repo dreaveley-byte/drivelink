@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
@@ -65,7 +66,15 @@ export default async function AdminPage() {
           ))}
         </div>
 
-        <h2 className="text-base font-medium text-gray-900 mb-4">All Jobs</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-medium text-gray-900">All Jobs</h2>
+          <Link
+            href="/dashboard/post-job"
+            className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
+          >
+            + Post a new job
+          </Link>
+        </div>
         <div className="space-y-3">
           {jobs?.length === 0 && (
             <p className="text-sm text-gray-400 py-8 text-center">No jobs in the system yet.</p>
