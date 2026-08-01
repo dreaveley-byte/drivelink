@@ -106,6 +106,12 @@ export default async function DashboardPage() {
             >
               <div>
                 <p className="text-sm font-medium text-gray-900">{job.job_types?.name}</p>
+                {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
+                    {job.stock_number && ` · Stock #${job.stock_number}`}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>

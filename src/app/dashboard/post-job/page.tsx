@@ -19,6 +19,16 @@ export default function PostJobPage() {
 
   const [stops, setStops] = useState<string[]>(['', ''])
 
+  const [vehicleYear, setVehicleYear] = useState('')
+  const [vehicleMake, setVehicleMake] = useState('')
+  const [vehicleModel, setVehicleModel] = useState('')
+  const [stockNumber, setStockNumber] = useState('')
+  const [vin, setVin] = useState('')
+  const [mileage, setMileage] = useState('')
+  const [customerFullName, setCustomerFullName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerAddress, setCustomerAddress] = useState('')
+
   const [recipientName, setRecipientName] = useState('')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [scheduledFor, setScheduledFor] = useState('')
@@ -213,6 +223,15 @@ export default function PostJobPage() {
       dropoff_address: filledStops[filledStops.length - 1],
       recipient_name: recipientName || null,
       recipient_phone: recipientPhone || null,
+      vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+      vehicle_make: vehicleMake || null,
+      vehicle_model: vehicleModel || null,
+      stock_number: stockNumber || null,
+      vin: vin || null,
+      mileage: mileage ? parseInt(mileage) : null,
+      customer_full_name: customerFullName || null,
+      customer_phone: customerPhone || null,
+      customer_address: customerAddress || null,
       scheduled_for: scheduledFor || null,
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
@@ -318,6 +337,65 @@ export default function PostJobPage() {
             <button type="button" onClick={addStop} className="text-xs text-gray-600 hover:text-gray-900 underline">
               + Add a stop
             </button>
+          </div>
+
+          <div className="space-y-3 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-900">Vehicle</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Year</label>
+                <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Make</label>
+                <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Model</label>
+                <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Stock number</label>
+                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Mileage</label>
+                <input value={mileage} onChange={(e) => setMileage(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">VIN</label>
+              <input value={vin} onChange={(e) => setVin(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div className="space-y-3 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-900">Customer</p>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Full name</label>
+              <input value={customerFullName} onChange={(e) => setCustomerFullName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Address</label>
+                <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

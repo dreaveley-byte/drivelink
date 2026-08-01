@@ -13,6 +13,11 @@ type Job = {
   dropoff_address: string
   recipient_name: string | null
   estimated_driver_pay_cents: number | null
+  vehicle_year: number | null
+  vehicle_make: string | null
+  vehicle_model: string | null
+  stock_number: string | null
+  vin: string | null
   job_types: { name: string } | null
 }
 
@@ -94,6 +99,12 @@ export default function DriverJobActions({
     <div className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">{job.job_types?.name}</p>
+        {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
+          <p className="text-xs text-gray-600 mt-0.5">
+            {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
+            {job.stock_number && ` · Stock #${job.stock_number}`}
+          </p>
+        )}
         <p className="text-xs text-gray-500 mt-0.5">
           {job.pickup_address} → {job.dropoff_address}
         </p>

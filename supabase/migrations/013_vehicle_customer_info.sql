@@ -1,0 +1,9 @@
+alter table jobs add column vehicle_year int;
+alter table jobs add column vehicle_make text;
+alter table jobs add column vehicle_model text;
+alter table jobs add column stock_number text;
+alter table jobs add column vin text;
+alter table jobs add column mileage int;
+alter table jobs add column customer_full_name text;
+alter table jobs add column customer_phone text;
+alter table jobs add column customer_address text;
