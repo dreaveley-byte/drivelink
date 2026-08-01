@@ -21,6 +21,20 @@ export default async function DriverPage() {
     redirect('/dashboard')
   }
 
+  if (!profile.is_active) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-sm text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Account inactive</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Your driver account is currently turned off. Contact DriveLink if you think this is a mistake.
+          </p>
+          <SignOutButton />
+        </div>
+      </div>
+    )
+  }
+
   const { data: myJob } = await supabase
     .from('jobs')
     .select('*, job_types(name)')
