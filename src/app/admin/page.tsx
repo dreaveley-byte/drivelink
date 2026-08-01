@@ -49,6 +49,9 @@ export default async function AdminPage() {
           <p className="text-xs text-gray-500">All dealers, all jobs</p>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/admin/settings" className="text-sm text-gray-600 hover:text-gray-900">
+            Pricing
+          </Link>
           <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
             Drivers
           </Link>
