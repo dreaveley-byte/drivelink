@@ -17,18 +17,14 @@ const RELEASE_AND_MEDIA_CONSENT_TEXT =
 // two clearly labeled phases so the driver always knows where they are.
 export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   // Pickup phase
-  { label: 'Pickup: Pick up vehicle', type: 'check' },
-  { label: 'Pickup: Verify year, make, model, colour & VIN', type: 'check' },
-  { label: 'Pickup: Insurance matches VIN', type: 'tristate' },
-  { label: 'Pickup: Condition report', type: 'condition_report' },
-  { label: 'Pickup: Walk-around video', type: 'video' },
-  { label: 'Pickup: Photos of any damage', type: 'photo' },
+  { label: 'Pickup: Confirm VIN on vehicle matches Bill of Sale', type: 'check' },
+  { label: 'Pickup: Confirm VIN matches registration (if applicable)', type: 'tristate' },
+  { label: 'Pickup: Verify year, make, model & colour match Bill of Sale', type: 'check' },
   { label: 'Pickup: Photograph VIN', type: 'photo' },
-  { label: 'Pickup: Photograph dash & odometer', type: 'photo' },
-  { label: 'Pickup: Photograph fuel level', type: 'photo' },
+  { label: 'Pickup: Photograph odometer showing mileage', type: 'photo' },
   { label: 'Pickup: Photograph windshield', type: 'photo' },
-  { label: 'Pickup: Upload registration', type: 'upload' },
-  { label: 'Pickup: Upload out-of-province safety (if applicable)', type: 'upload' },
+  { label: 'Pickup: Full 360° walkaround video', type: 'video' },
+  { label: 'Pickup: Condition report', type: 'condition_report' },
   { label: 'Pickup: Mark vehicle picked up', type: 'check' },
 
   // Delivery phase
