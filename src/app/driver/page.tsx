@@ -87,18 +87,17 @@ export default async function DriverPage() {
 
   let jobsThisMonth = 0
   let earnedThisMonth = 0
-  let jobsAllTime = 0
-  let earnedAllTime = 0
 
   for (const job of completedJobs ?? []) {
     const payCents = job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
-    jobsAllTime += 1
-    earnedAllTime += payCents
     if (job.updated_at && new Date(job.updated_at) >= monthStart) {
       jobsThisMonth += 1
       earnedThisMonth += payCents
     }
   }
+
+  const pendingCount = myJobs?.length ?? 0
+  const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.estimated_driver_pay_cents ?? 0), 0)
 
   return (
     <div className="min-h-screen bg-white">
@@ -111,14 +110,14 @@ export default async function DriverPage() {
         <AutoRefresh />
         <div className="grid grid-cols-2 gap-3">
           <div className="border border-gray-200 rounded-xl px-4 py-3">
+            <p className="text-xs text-gray-500">Pending</p>
+            <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(pendingPay)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{pendingCount} job{pendingCount === 1 ? '' : 's'} in progress</p>
+          </div>
+          <div className="border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-500">This month</p>
             <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(earnedThisMonth)}</p>
             <p className="text-xs text-gray-400 mt-0.5">{jobsThisMonth} job{jobsThisMonth === 1 ? '' : 's'} completed</p>
-          </div>
-          <div className="border border-gray-200 rounded-xl px-4 py-3">
-            <p className="text-xs text-gray-500">All time</p>
-            <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(earnedAllTime)}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{jobsAllTime} job{jobsAllTime === 1 ? '' : 's'} completed</p>
           </div>
         </div>
 

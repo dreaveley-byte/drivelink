@@ -437,6 +437,24 @@ export default function DriverJobActions({
     setLoading(false)
   }
 
+  async function releaseJob() {
+    if (!confirm('Release this job back to the pool? Another driver will be able to claim it. Anything you\'ve already filled in stays saved.')) return
+
+    setLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    await supabase.from('jobs').update({ driver_id: null, status: 'awaiting_driver' }).eq('id', job.id)
+    await supabase.from('job_status_events').insert({
+      job_id: job.id,
+      status: 'awaiting_driver',
+      changed_by: user?.id,
+    })
+
+    router.refresh()
+    setLoading(false)
+  }
+
   function addToCalendar() {
     if (!job.scheduled_for) return
     const start = new Date(job.scheduled_for)
@@ -540,6 +558,16 @@ export default function DriverJobActions({
             className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
           >
             {loading ? '...' : nextStatusLabel[job.status]}
+          </button>
+        )}
+
+        {isActive && (
+          <button
+            onClick={releaseJob}
+            disabled={loading}
+            className="text-xs text-red-600 hover:text-red-700 underline disabled:opacity-50"
+          >
+            Release
           </button>
         )}
 
