@@ -99,9 +99,10 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   )
   const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
 
-  // Drivers always use their own vehicle. A second driver means a second vehicle
-  // (the chase vehicle) also racking up wear & tear over the same distance.
-  const wearAndTearCents = Math.round(tripDistanceKm * settings.wear_and_tear_cents_per_km) * numDrivers
+  // Drivers always use their own vehicle for the delivery itself — but wear & tear only
+  // applies once. A second driver's chase vehicle isn't their personal car taking the hit,
+  // so it doesn't get charged again.
+  const wearAndTearCents = Math.round(tripDistanceKm * settings.wear_and_tear_cents_per_km)
 
   const trailerDays = overnightRequired ? 2 : 1
   const trailerFeeCents = vehicleMode === 'towed' ? trailerDays * settings.trailer_fee_cents_per_day : 0
