@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
+import SortSelect from '@/components/SortSelect'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,9 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
+  const { sort } = await searchParams
+  const ascending = sort !== 'latest'
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,7 +41,7 @@ export default async function AdminPage() {
     .from('jobs')
     .select('*, job_types(name), organizations(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
-    .order('created_at', { ascending: false })
+    .order('scheduled_for', { ascending, nullsFirst: false })
 
   const total = jobs?.length ?? 0
   const awaiting = jobs?.filter((j) => j.status === 'awaiting_driver').length ?? 0
@@ -87,12 +90,15 @@ export default async function AdminPage() {
 
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-medium text-gray-900">All Jobs</h2>
-          <Link
-            href="/dashboard/post-job"
-            className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
-          >
-            + Post a new job
-          </Link>
+          <div className="flex items-center gap-3">
+            <SortSelect />
+            <Link
+              href="/dashboard/post-job"
+              className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
+            >
+              + Post a new job
+            </Link>
+          </div>
         </div>
         <div className="space-y-3">
           {jobs?.length === 0 && (
@@ -109,6 +115,11 @@ export default async function AdminPage() {
               : null
             const cardBody = (
               <>
+                {job.scheduled_for && (
+                  <p className="text-xs font-semibold text-blue-700">
+                    {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                )}
                 <p className="text-sm font-medium text-gray-900">
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>

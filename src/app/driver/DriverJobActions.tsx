@@ -455,6 +455,12 @@ export default function DriverJobActions({
     setLoading(false)
   }
 
+  const canReleaseByStatus = job.status === 'assigned' || job.status === 'picked_up'
+  const withinReleaseWindow = job.scheduled_for
+    ? new Date(job.scheduled_for).getTime() - Date.now() < 24 * 60 * 60 * 1000
+    : false
+  const canSelfRelease = canReleaseByStatus && !withinReleaseWindow
+
   function addToCalendar() {
     if (!job.scheduled_for) return
     const start = new Date(job.scheduled_for)
@@ -561,14 +567,20 @@ export default function DriverJobActions({
           </button>
         )}
 
-        {isActive && (
-          <button
-            onClick={releaseJob}
-            disabled={loading}
-            className="text-xs text-red-600 hover:text-red-700 underline disabled:opacity-50"
-          >
-            Release
-          </button>
+        {isActive && canReleaseByStatus && (
+          canSelfRelease ? (
+            <button
+              onClick={releaseJob}
+              disabled={loading}
+              className="text-xs text-red-600 hover:text-red-700 underline disabled:opacity-50"
+            >
+              Release
+            </button>
+          ) : (
+            <span className="text-[10px] text-amber-600 max-w-[110px] text-right leading-tight">
+              Call dispatch to release — within 24 hrs of delivery
+            </span>
+          )
         )}
 
         {!isActive && (

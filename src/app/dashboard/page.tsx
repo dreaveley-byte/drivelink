@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
+import SortSelect from '@/components/SortSelect'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,9 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
+  const { sort } = await searchParams
+  const ascending = sort !== 'latest'
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -72,9 +75,9 @@ export default async function DashboardPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
+    .select('id, status, scheduled_for, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
-    .order('created_at', { ascending: false })
+    .order('scheduled_for', { ascending, nullsFirst: false })
 
   return (
     <div className="min-h-screen bg-white">
@@ -91,6 +94,7 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
           <div className="flex items-center gap-4">
+            <SortSelect />
             <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
               Archived
             </Link>
@@ -118,6 +122,11 @@ export default async function DashboardPage() {
             const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
             const cardBody = (
               <>
+                {job.scheduled_for && (
+                  <p className="text-xs font-semibold text-blue-700">
+                    {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                )}
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
                 {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
                   <p className="text-xs text-gray-600 mt-0.5">

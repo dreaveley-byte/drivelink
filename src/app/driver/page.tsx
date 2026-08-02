@@ -4,11 +4,14 @@ import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
 import LocationSharer from '@/components/LocationSharer'
 import AutoRefresh from '@/components/AutoRefresh'
+import SortSelect from '@/components/SortSelect'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DriverPage() {
+export default async function DriverPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
+  const { sort } = await searchParams
+  const ascending = sort !== 'latest'
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -45,13 +48,13 @@ export default async function DriverPage() {
     .select(jobSelect)
     .eq('driver_id', user.id)
     .not('status', 'in', '("completed","cancelled")')
-    .order('scheduled_for', { ascending: true })
+    .order('scheduled_for', { ascending, nullsFirst: false })
 
   const { data: openJobs } = await supabase
     .from('jobs')
     .select(jobSelect)
     .eq('status', 'awaiting_driver')
-    .order('created_at', { ascending: true })
+    .order('scheduled_for', { ascending, nullsFirst: false })
 
   // A job's rough time window: scheduled start through an estimated round-trip duration
   // (falls back to 2 hours if we don't have a duration estimate yet).
@@ -140,7 +143,10 @@ export default async function DriverPage() {
         )}
 
         <div>
-          <h2 className="text-sm font-medium text-gray-500 mb-2">Available jobs</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium text-gray-500">Available jobs</h2>
+            <SortSelect />
+          </div>
           <div className="space-y-3">
             {openJobs?.length === 0 && (
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
