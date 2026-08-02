@@ -36,6 +36,7 @@ export type PricingInput = {
 
 export type PricingResult = {
   overnightRequired: boolean
+  tripDistanceKm: number
   baseDrivingHours: number
   dealerBilledHours: number
   driverPaidHours: number
@@ -60,10 +61,9 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     usedOwnVehicle, outOfProvinceInspection, registryVisit, additionalCharges,
   } = input
 
-  // Towed jobs are round-trip (the trailer has to come back); driven jobs are one-way,
-  // with any return travel handled separately via additional charges (flight, Uber, etc.)
-  const tripDistanceKm = vehicleMode === 'towed' ? distanceKm * 2 : distanceKm
-  const baseDrivingHours = (vehicleMode === 'towed' ? durationMinutes * 2 : durationMinutes) / 60
+  // Every delivery is a round trip — the driver (and trailer, if towing) always has to get back.
+  const tripDistanceKm = distanceKm * 2
+  const baseDrivingHours = (durationMinutes * 2) / 60
 
   const overnightRequired = baseDrivingHours > settings.max_driving_hours_before_overnight
 
@@ -95,7 +95,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
 
   const wearAndTearCents = usedOwnVehicle
-    ? Math.round(distanceKm * settings.wear_and_tear_cents_per_km)
+    ? Math.round(tripDistanceKm * settings.wear_and_tear_cents_per_km)
     : 0
 
   const trailerDays = overnightRequired ? 2 : 1
@@ -120,6 +120,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
 
   return {
     overnightRequired,
+    tripDistanceKm,
     baseDrivingHours,
     dealerBilledHours,
     driverPaidHours,

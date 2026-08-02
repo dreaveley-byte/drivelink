@@ -70,7 +70,7 @@ export default async function DashboardPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('*, job_types(name)')
+    .select('id, status, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name)')
     .order('created_at', { ascending: false })
 
   return (
@@ -99,13 +99,15 @@ export default async function DashboardPage() {
             <p className="text-sm text-gray-400 py-8 text-center">No jobs yet. Post your first one above.</p>
           )}
 
-          {jobs?.map((job) => (
+          {jobs?.map((job) => {
+            const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
+            return (
             <div
               key={job.id}
               className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between"
             >
               <div>
-                <p className="text-sm font-medium text-gray-900">{job.job_types?.name}</p>
+                <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
                 {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
                   <p className="text-xs text-gray-600 mt-0.5">
                     {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
@@ -125,7 +127,7 @@ export default async function DashboardPage() {
                 {statusLabels[job.status] ?? job.status}
               </span>
             </div>
-          ))}
+          )})}
         </div>
       </main>
     </div>

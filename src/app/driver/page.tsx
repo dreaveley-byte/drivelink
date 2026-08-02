@@ -35,16 +35,18 @@ export default async function DriverPage() {
     )
   }
 
+  const jobSelect = 'id, status, pickup_address, dropoff_address, recipient_name, customer_full_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, estimated_distance_km, estimated_driver_pay_cents, job_types(name), organizations(name)'
+
   const { data: myJob } = await supabase
     .from('jobs')
-    .select('*, job_types(name)')
+    .select(jobSelect)
     .eq('driver_id', user.id)
     .not('status', 'in', '("completed","cancelled")')
     .maybeSingle()
 
   const { data: openJobs } = await supabase
     .from('jobs')
-    .select('*, job_types(name)')
+    .select(jobSelect)
     .eq('status', 'awaiting_driver')
     .order('created_at', { ascending: true })
 

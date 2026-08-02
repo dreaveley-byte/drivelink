@@ -242,7 +242,7 @@ export default function PostJobPage() {
       registry_visit: registryVisit,
       additional_charges: additionalCharges,
       overnight_required: pricing?.overnightRequired ?? false,
-      estimated_distance_km: distanceKm,
+      estimated_distance_km: pricing?.tripDistanceKm ?? distanceKm,
       estimated_duration_minutes: durationMinutes,
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: pricing?.estimatedDriverPayCents ?? null,
@@ -526,16 +526,12 @@ export default function PostJobPage() {
           {pricing && (
             <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
               <p className="text-xs text-gray-500">
-                {distanceKm} km one-way {durationMinutes ? '· ' + (Math.round(durationMinutes / 60 * 10) / 10) + ' hrs drive time' : ''}
+                {pricing.tripDistanceKm} km round trip {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
               <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                 <span className="text-sm text-gray-700">Estimated dealer cost</span>
                 <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDealerCostCents)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">Estimated driver pay</span>
-                <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDriverPayCents)}</span>
               </div>
               <p className="text-xs text-gray-400 pt-1">
                 Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
