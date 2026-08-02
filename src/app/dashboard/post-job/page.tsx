@@ -533,27 +533,31 @@ export default function PostJobPage() {
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
 
-              <div className="space-y-1 pt-2 border-t border-gray-200">
-                <BreakdownRow label="Driving pay" cents={pricing.hourlyDealerCents} />
-                <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
-                <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
-                <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
-                <BreakdownRow label="Trailer fee" cents={pricing.trailerFeeCents} />
-                <BreakdownRow label="Hotel" cents={pricing.hotelCents} />
-                <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
-                <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
-                <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                <BreakdownRow label="Additional charges" cents={pricing.extrasDealerCents} />
-              </div>
+              {isAdmin && (
+                <>
+                  <div className="space-y-1 pt-2 border-t border-gray-200">
+                    <BreakdownRow label="Driving pay" cents={pricing.hourlyDealerCents} />
+                    <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
+                    <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
+                    <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
+                    <BreakdownRow label="Trailer fee" cents={pricing.trailerFeeCents} />
+                    <BreakdownRow label="Hotel" cents={pricing.hotelCents} />
+                    <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
+                    <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
+                    <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                    <BreakdownRow label="Additional charges" cents={pricing.extrasDealerCents} />
+                  </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
-                <span>Subtotal</span>
-                <span>{formatCents(pricing.costBasisCents)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
-                <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
-              </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
+                    <span>Subtotal</span>
+                    <span>{formatCents(pricing.costBasisCents)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                    <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
+                  </div>
+                </>
+              )}
 
               <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                 <span className="text-sm text-gray-700">Estimated dealer cost</span>
