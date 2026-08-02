@@ -109,7 +109,7 @@ export default async function DashboardPage() {
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
             const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
-            const isCompleted = job.status === 'completed'
+            const isFinished = job.status === 'completed' || job.status === 'cancelled'
             const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
             const cardBody = (
               <>
@@ -138,11 +138,11 @@ export default async function DashboardPage() {
                     Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
                   </p>
                 )}
-                {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+                {isFinished && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
                 {isTrackable && <p className="text-xs text-blue-600 mt-1">Track drive →</p>}
               </>
             )
-            const linkHref = isCompleted
+            const linkHref = isFinished
               ? `/dashboard/jobs/${job.id}/receipt`
               : isTrackable
               ? `/dashboard/jobs/${job.id}/track`

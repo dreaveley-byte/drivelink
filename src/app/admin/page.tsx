@@ -98,9 +98,9 @@ export default async function AdminPage() {
           )}
 
           {jobs?.map((job) => {
-            const isCompleted = job.status === 'completed'
+            const isFinished = job.status === 'completed' || job.status === 'cancelled'
             const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
-            const linkHref = isCompleted
+            const linkHref = isFinished
               ? `/dashboard/jobs/${job.id}/receipt`
               : isTrackable
               ? `/dashboard/jobs/${job.id}/track`
@@ -136,7 +136,7 @@ export default async function AdminPage() {
                     {job.estimated_driver_pay_cents != null && `Pay: ${formatCents(job.estimated_driver_pay_cents)}`}
                   </p>
                 )}
-                {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+                {isFinished && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
                 {isTrackable && <p className="text-xs text-blue-600 mt-1">Track drive →</p>}
               </>
             )

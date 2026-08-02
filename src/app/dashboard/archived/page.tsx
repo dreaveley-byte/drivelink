@@ -55,7 +55,7 @@ export default async function ArchivedJobsPage() {
 
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
-            const isCompleted = job.status === 'completed'
+            const isFinished = job.status === 'completed' || job.status === 'cancelled'
             const cardBody = (
               <>
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
@@ -73,12 +73,12 @@ export default async function ArchivedJobsPage() {
                     Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
                   </p>
                 )}
-                {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+                {isFinished && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
               </>
             )
             return (
-              <div key={job.id} className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${isCompleted ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}>
-                {isCompleted ? (
+              <div key={job.id} className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${isFinished ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}>
+                {isFinished ? (
                   <Link href={`/dashboard/jobs/${job.id}/receipt`} target="_blank" className="flex-1">
                     {cardBody}
                   </Link>

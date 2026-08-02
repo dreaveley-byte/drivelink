@@ -88,6 +88,19 @@ export default function DriverJobActions({
   const [loading, setLoading] = useState(false)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
+
+  async function refreshFileUrls(paths: string[]) {
+    if (paths.length === 0) return
+    const supabase = createClient()
+    const entries = await Promise.all(
+      paths.map(async (path) => {
+        const { data } = await supabase.storage.from('job-media').createSignedUrl(path, 60 * 60)
+        return [path, data?.signedUrl ?? ''] as const
+      })
+    )
+    setFileUrls((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+  }
 
   useEffect(() => {
     if (!isActive) return
@@ -102,6 +115,7 @@ export default function DriverJobActions({
 
       if (data && data.length > 0) {
         setChecklist(data)
+        refreshFileUrls(data.flatMap((i) => i.file_paths))
         return
       }
 
@@ -172,6 +186,7 @@ export default function DriverJobActions({
       })
       .eq('id', item.id)
 
+    refreshFileUrls(newPaths)
     setUploadingItemId(null)
   }
 
@@ -192,6 +207,7 @@ export default function DriverJobActions({
         .from('job_checklist_items')
         .update({ file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
         .eq('id', item.id)
+      refreshFileUrls([path])
     }
     setUploadingItemId(null)
   }
@@ -217,6 +233,31 @@ export default function DriverJobActions({
           ? { completed_at: new Date().toISOString(), completed_by: user?.id }
           : {}),
       })
+      .eq('id', item.id)
+  }
+
+  async function deleteFileFromItem(item: ChecklistItem, path: string) {
+    const supabase = createClient()
+    await supabase.storage.from('job-media').remove([path])
+
+    const updatedPaths = item.file_paths.filter((p) => p !== path)
+    // If this item required a file to be considered complete and none remain, un-complete it.
+    const needsFile = item.item_type !== 'check'
+    const stillComplete = needsFile
+      ? updatedPaths.length > 0 && (item.item_type !== 'condition_report' || !!(item.notes && item.notes.trim().length > 0))
+      : !!item.completed_at
+
+    setChecklist((prev) =>
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, file_paths: updatedPaths, completed_at: stillComplete ? i.completed_at : null }
+          : i
+      )
+    )
+
+    await supabase
+      .from('job_checklist_items')
+      .update({ file_paths: updatedPaths, ...(stillComplete ? {} : { completed_at: null, completed_by: null }) })
       .eq('id', item.id)
   }
 
@@ -355,6 +396,41 @@ export default function DriverJobActions({
                       {item.completed_at ? '✓ ' : ''}{displayLabel}
                       {item.file_paths.length > 0 && ` (${item.file_paths.length} saved)`}
                     </p>
+
+                    {item.file_paths.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {item.file_paths.map((path) => {
+                          const isImage = /\.(jpe?g|png|gif|webp)$/i.test(path)
+                          const url = fileUrls[path]
+                          return (
+                            <div key={path} className="relative">
+                              {isImage && url ? (
+                                <a href={url} target="_blank" rel="noopener noreferrer">
+                                  <img src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+                                </a>
+                              ) : (
+                                <a
+                                  href={url || '#'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-14 h-14 rounded-lg border border-gray-200 flex items-center justify-center text-xs text-gray-500 bg-gray-50"
+                                >
+                                  File
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteFileFromItem(item, path)}
+                                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                title="Remove"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
 
                     {item.item_type === 'signature' && (
                       <div className="space-y-2">

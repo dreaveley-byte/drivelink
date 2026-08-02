@@ -61,9 +61,9 @@ export default async function AdminArchivedJobsPage() {
             <p className="text-sm text-gray-400 py-8 text-center">No archived jobs.</p>
           )}
 
-          {jobs?.map((job) => (
-            <div key={job.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
+          {jobs?.map((job) => {
+            const cardBody = (
+              <>
                 <p className="text-sm font-medium text-gray-900">
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
@@ -93,7 +93,14 @@ export default async function AdminArchivedJobsPage() {
                     {job.estimated_driver_pay_cents != null && `Pay: ${formatCents(job.estimated_driver_pay_cents)}`}
                   </p>
                 )}
-              </div>
+                <p className="text-xs text-blue-600 mt-1">View receipt →</p>
+              </>
+            )
+            return (
+            <div key={job.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between hover:border-gray-300 hover:bg-gray-50">
+              <Link href={`/dashboard/jobs/${job.id}/receipt`} target="_blank" className="flex-1">
+                {cardBody}
+              </Link>
               <div className="flex flex-col items-end gap-2">
                 <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                   {statusLabels[job.status] ?? job.status}
@@ -101,7 +108,7 @@ export default async function AdminArchivedJobsPage() {
                 <JobActions jobId={job.id} status={job.status} archived />
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </main>
     </div>

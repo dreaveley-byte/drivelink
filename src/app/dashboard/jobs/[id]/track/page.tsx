@@ -32,9 +32,21 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
   const { data: checklist } = await supabase
     .from('job_checklist_items')
-    .select('id, label, completed_at')
+    .select('id, label, completed_at, file_paths, notes')
     .eq('job_id', jobId)
     .order('sort_order')
+
+  const checklistWithUrls = await Promise.all(
+    (checklist ?? []).map(async (item) => {
+      const urls = await Promise.all(
+        (item.file_paths ?? []).map(async (path: string) => {
+          const { data } = await supabase.storage.from('job-media').createSignedUrl(path, 60 * 60)
+          return data?.signedUrl ?? null
+        })
+      )
+      return { ...item, urls: urls.filter(Boolean) as string[] }
+    })
+  )
 
   const driverName = Array.isArray(job.driver) ? job.driver[0]?.full_name : (job.driver as { full_name: string } | null)?.full_name
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
@@ -69,22 +81,43 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           <p>{job.dropoff_address}</p>
         </div>
 
-        {checklist && checklist.length > 0 && (
+        {checklistWithUrls.length > 0 && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
+              Checklist ({checklistWithUrls.filter((i) => i.completed_at).length}/{checklistWithUrls.length})
             </p>
             <div className="space-y-1.5">
-              {checklist.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 text-sm">
-                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${item.completed_at ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300'}`}>
-                    {item.completed_at ? '✓' : ''}
-                  </span>
-                  <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                    {item.label}
-                  </span>
+              {checklistWithUrls.map((item, idx) => {
+                const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
+                const prevPhase = idx > 0
+                  ? (checklistWithUrls[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : checklistWithUrls[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                  : null
+                const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
+                return (
+                <div key={item.id}>
+                  {phase && phase !== prevPhase && (
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-1 first:mt-0">{phase}</p>
+                  )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs shrink-0 ${item.completed_at ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300'}`}>
+                      {item.completed_at ? '✓' : ''}
+                    </span>
+                    <span className={item.completed_at ? 'text-gray-400' : 'text-gray-700'}>
+                      {displayLabel}
+                    </span>
+                    {item.urls.length > 0 && (
+                      <span>
+                        {item.urls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline ml-1">
+                            [view{item.urls.length > 1 ? ` ${i + 1}` : ''}]
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  {item.notes && <p className="text-xs text-gray-500 ml-6">{item.notes}</p>}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}
