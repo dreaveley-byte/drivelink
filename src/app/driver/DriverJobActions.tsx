@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents } from '@/lib/pricing'
-import { getDefaultChecklist } from '@/lib/checklist'
+import { getDefaultChecklist, type ChecklistItemType } from '@/lib/checklist'
+import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 
 type Job = {
   id: string
@@ -21,6 +22,7 @@ type Job = {
   vehicle_model: string | null
   stock_number: string | null
   vin: string | null
+  is_trade_in_pickup: boolean | null
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string }[] | { name: string } | null
 }
@@ -43,7 +45,9 @@ function joinName(value: { name: string }[] | { name: string } | null): string |
 type ChecklistItem = {
   id: string
   label: string
+  item_type: ChecklistItemType
   completed_at: string | null
+  file_paths: string[]
 }
 
 const nextStatus: Record<string, string> = {
@@ -81,6 +85,7 @@ export default function DriverJobActions({
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isActive) return
@@ -89,7 +94,7 @@ export default function DriverJobActions({
     async function loadChecklist() {
       const { data } = await supabase
         .from('job_checklist_items')
-        .select('id, label, completed_at')
+        .select('id, label, item_type, completed_at, file_paths')
         .eq('job_id', job.id)
         .order('sort_order')
 
@@ -99,9 +104,12 @@ export default function DriverJobActions({
       }
 
       // Older jobs claimed before this feature existed won't have items yet — backfill them.
-      const defaults = getDefaultChecklist(joinName(job.job_types))
-      const rows = defaults.map((label, i) => ({ job_id: job.id, label, sort_order: i }))
-      const { data: created } = await supabase.from('job_checklist_items').insert(rows).select('id, label, completed_at')
+      const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup)
+      const rows = defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
+      const { data: created } = await supabase
+        .from('job_checklist_items')
+        .insert(rows)
+        .select('id, label, item_type, completed_at, file_paths')
       if (created) setChecklist(created)
     }
 
@@ -127,6 +135,54 @@ export default function DriverJobActions({
       .eq('id', item.id)
   }
 
+  async function uploadFilesForItem(item: ChecklistItem, files: File[]) {
+    setUploadingItemId(item.id)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const newPaths: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${job.id}/${item.id}-${Date.now()}-${i}.${ext}`
+      const { error } = await supabase.storage.from('job-media').upload(path, file, { upsert: true })
+      if (!error) newPaths.push(path)
+    }
+
+    const updatedPaths = [...item.file_paths, ...newPaths]
+    setChecklist((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, file_paths: updatedPaths, completed_at: new Date().toISOString() } : i))
+    )
+
+    await supabase
+      .from('job_checklist_items')
+      .update({ file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
+      .eq('id', item.id)
+
+    setUploadingItemId(null)
+  }
+
+  async function uploadSignatureForItem(item: ChecklistItem, blob: Blob) {
+    setUploadingItemId(item.id)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const path = `${job.id}/${item.id}-${Date.now()}-signature.png`
+    const { error } = await supabase.storage.from('job-media').upload(path, blob, { upsert: true, contentType: 'image/png' })
+
+    if (!error) {
+      const updatedPaths = [...item.file_paths, path]
+      setChecklist((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, file_paths: updatedPaths, completed_at: new Date().toISOString() } : i))
+      )
+      await supabase
+        .from('job_checklist_items')
+        .update({ file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
+        .eq('id', item.id)
+    }
+    setUploadingItemId(null)
+  }
+
   async function claimJob() {
     setLoading(true)
     const supabase = createClient()
@@ -144,9 +200,9 @@ export default function DriverJobActions({
       changed_by: user.id,
     })
 
-    const defaults = getDefaultChecklist(joinName(job.job_types))
+    const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup)
     await supabase.from('job_checklist_items').insert(
-      defaults.map((label, i) => ({ job_id: job.id, label, sort_order: i }))
+      defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
     )
 
     router.refresh()
@@ -229,22 +285,65 @@ export default function DriverJobActions({
       </div>
 
       {isActive && checklist.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500 mb-2">
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+          <p className="text-xs text-gray-500">
             Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
           </p>
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             {checklist.map((item) => (
-              <label key={item.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={!!item.completed_at}
-                  onChange={() => toggleChecklistItem(item)}
-                />
-                <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                  {item.label}
-                </span>
-              </label>
+              <div key={item.id}>
+                {item.item_type === 'check' ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!!item.completed_at}
+                      onChange={() => toggleChecklistItem(item)}
+                    />
+                    <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                      {item.label}
+                    </span>
+                  </label>
+                ) : (
+                  <div>
+                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                      {item.completed_at ? '✓ ' : ''}{item.label}
+                      {item.file_paths.length > 0 && ` (${item.file_paths.length} saved)`}
+                    </p>
+
+                    {item.item_type === 'signature' && (
+                      <ChecklistSignaturePad
+                        saving={uploadingItemId === item.id}
+                        onSave={(blob) => uploadSignatureForItem(item, blob)}
+                      />
+                    )}
+
+                    {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
+                      <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
+                        {uploadingItemId === item.id
+                          ? 'Uploading...'
+                          : item.item_type === 'video'
+                          ? 'Record / upload video'
+                          : item.item_type === 'photo'
+                          ? 'Take / upload photo'
+                          : 'Upload document'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          disabled={uploadingItemId === item.id}
+                          multiple={item.item_type === 'photo'}
+                          accept={item.item_type === 'video' ? 'video/*' : item.item_type === 'photo' ? 'image/*' : 'image/*,.pdf'}
+                          capture={item.item_type === 'video' || item.item_type === 'photo' ? 'environment' : undefined}
+                          onChange={(e) => {
+                            const files = e.target.files ? Array.from(e.target.files) : []
+                            if (files.length > 0) uploadFilesForItem(item, files)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

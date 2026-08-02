@@ -40,6 +40,25 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
     .eq('job_id', jobId)
     .order('created_at', { ascending: true })
 
+  const { data: checklist } = await supabase
+    .from('job_checklist_items')
+    .select('id, label, item_type, completed_at, file_paths')
+    .eq('job_id', jobId)
+    .order('sort_order')
+
+  // Generate short-lived signed URLs for any uploaded evidence, since job-media is a private bucket.
+  const checklistWithUrls = await Promise.all(
+    (checklist ?? []).map(async (item) => {
+      const urls = await Promise.all(
+        (item.file_paths ?? []).map(async (path: string) => {
+          const { data } = await supabase.storage.from('job-media').createSignedUrl(path, 60 * 60)
+          return data?.signedUrl ?? null
+        })
+      )
+      return { ...item, urls: urls.filter(Boolean) as string[] }
+    })
+  )
+
   const driverName = Array.isArray(job.driver) ? job.driver[0]?.full_name : job.driver?.full_name
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : job.job_types?.name
   const orgName = Array.isArray(job.organizations) ? job.organizations[0]?.name : job.organizations?.name
@@ -125,6 +144,32 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 {c.description || 'Additional charge'} — {formatCents(c.dealerAmountCents)}
               </p>
             ))}
+          </div>
+        )}
+
+        {checklistWithUrls.length > 0 && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Checklist ({checklistWithUrls.filter((i) => i.completed_at).length}/{checklistWithUrls.length})
+            </p>
+            <div className="space-y-1.5">
+              {checklistWithUrls.map((item) => (
+                <div key={item.id} className="text-sm">
+                  <span className={item.completed_at ? 'text-gray-700' : 'text-gray-400'}>
+                    {item.completed_at ? '✓ ' : '○ '}{item.label}
+                  </span>
+                  {item.urls.length > 0 && (
+                    <span className="ml-2 print:hidden">
+                      {item.urls.map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline ml-1">
+                          [view{item.urls.length > 1 ? ` ${i + 1}` : ''}]
+                        </a>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
