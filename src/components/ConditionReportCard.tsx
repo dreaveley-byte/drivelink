@@ -2,8 +2,67 @@
 
 import { useState } from 'react'
 
-export type ConditionMarker = { x: number; y: number; note: string }
+export type ConditionPanel = 'front' | 'rear' | 'driver' | 'passenger'
+export type ConditionMarker = { panel: ConditionPanel; x: number; y: number; note: string }
 export type ConditionData = { markers: ConditionMarker[]; cleanliness: number | null; smell: string }
+
+const PANELS: { key: ConditionPanel; label: string }[] = [
+  { key: 'driver', label: "Driver's side" },
+  { key: 'passenger', label: "Passenger's side" },
+  { key: 'front', label: 'Front' },
+  { key: 'rear', label: 'Rear' },
+]
+
+function SidePath() {
+  return (
+    <>
+      <path
+        d="M20,100 L20,80 Q20,70 30,68 L70,55 Q90,35 120,35 L190,35 Q215,35 230,55 L270,68 Q280,70 280,80 L280,100 Z"
+        fill="none" stroke="#9ca3af" strokeWidth="2"
+      />
+      <circle cx="70" cy="102" r="16" fill="none" stroke="#9ca3af" strokeWidth="2" />
+      <circle cx="230" cy="102" r="16" fill="none" stroke="#9ca3af" strokeWidth="2" />
+      <line x1="120" y1="35" x2="120" y2="60" stroke="#9ca3af" strokeWidth="1.5" />
+      <line x1="190" y1="35" x2="190" y2="60" stroke="#9ca3af" strokeWidth="1.5" />
+    </>
+  )
+}
+
+function FrontPath() {
+  return (
+    <>
+      <path
+        d="M80,110 L80,60 Q80,40 110,35 L190,35 Q220,40 220,60 L220,110 Z"
+        fill="none" stroke="#9ca3af" strokeWidth="2"
+      />
+      <rect x="95" y="60" width="30" height="18" rx="3" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <rect x="175" y="60" width="30" height="18" rx="3" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <rect x="130" y="85" width="40" height="14" rx="2" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <line x1="150" y1="35" x2="150" y2="110" stroke="#9ca3af" strokeWidth="1" />
+    </>
+  )
+}
+
+function RearPath() {
+  return (
+    <>
+      <path
+        d="M80,110 L80,65 Q80,42 110,38 L190,38 Q220,42 220,65 L220,110 Z"
+        fill="none" stroke="#9ca3af" strokeWidth="2"
+      />
+      <rect x="90" y="65" width="26" height="16" rx="2" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <rect x="184" y="65" width="26" height="16" rx="2" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <rect x="125" y="95" width="50" height="10" rx="2" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      <line x1="150" y1="38" x2="150" y2="110" stroke="#9ca3af" strokeWidth="1" />
+    </>
+  )
+}
+
+function panelPath(panel: ConditionPanel) {
+  if (panel === 'front') return <FrontPath />
+  if (panel === 'rear') return <RearPath />
+  return <SidePath />
+}
 
 export default function ConditionReportCard({
   data,
@@ -26,22 +85,21 @@ export default function ConditionReportCard({
   onDeleteFile: (path: string) => void
   uploading: boolean
 }) {
-  const [pendingPoint, setPendingPoint] = useState<{ x: number; y: number } | null>(null)
+  const [pendingPoint, setPendingPoint] = useState<{ panel: ConditionPanel; x: number; y: number } | null>(null)
   const [pendingNote, setPendingNote] = useState('')
 
-  function handleDiagramClick(e: React.MouseEvent<SVGSVGElement>) {
+  function handleDiagramClick(panel: ConditionPanel, e: React.MouseEvent<SVGSVGElement>) {
     const svg = e.currentTarget
     const rect = svg.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
-    setPendingPoint({ x, y })
+    setPendingPoint({ panel, x, y })
     setPendingNote('')
   }
 
   function confirmMarker() {
     if (!pendingPoint) return
-    const newMarker = { ...pendingPoint, note: pendingNote.trim() || 'Damage' }
-    onChange({ ...data, markers: [...data.markers, newMarker] })
+    onChange({ ...data, markers: [...data.markers, { ...pendingPoint, note: pendingNote.trim() || 'Damage' }] })
     setPendingPoint(null)
     setPendingNote('')
   }
@@ -50,47 +108,27 @@ export default function ConditionReportCard({
     onChange({ ...data, markers: data.markers.filter((_, i) => i !== index) })
   }
 
-  function setCleanliness(value: number) {
-    onChange({ ...data, cleanliness: value })
-  }
-
-  function setSmell(value: string) {
-    onChange({ ...data, smell: value })
-  }
-
   return (
     <div className="space-y-3 border border-gray-200 rounded-lg p-3 bg-gray-50">
-      <p className="text-xs text-gray-500">Tap the diagram to mark any damage</p>
+      <p className="text-xs text-gray-500">Tap any panel to mark damage on that side</p>
 
-      <div className="relative bg-white rounded-lg border border-gray-200">
-        <svg
-          viewBox="0 0 300 140"
-          className="w-full cursor-crosshair"
-          onClick={handleDiagramClick}
-        >
-          <path
-            d="M20,100 L20,80 Q20,70 30,68 L70,55 Q90,35 120,35 L190,35 Q215,35 230,55 L270,68 Q280,70 280,80 L280,100 Z"
-            fill="none"
-            stroke="#9ca3af"
-            strokeWidth="2"
-          />
-          <circle cx="70" cy="102" r="16" fill="none" stroke="#9ca3af" strokeWidth="2" />
-          <circle cx="230" cy="102" r="16" fill="none" stroke="#9ca3af" strokeWidth="2" />
-          <line x1="120" y1="35" x2="120" y2="60" stroke="#9ca3af" strokeWidth="1.5" />
-          <line x1="190" y1="35" x2="190" y2="60" stroke="#9ca3af" strokeWidth="1.5" />
-
-          {data.markers.map((m, i) => (
-            <g key={i}>
-              <circle cx={(m.x / 100) * 300} cy={(m.y / 140) * 140} r="6" fill="#dc2626" stroke="white" strokeWidth="1.5" />
-              <text x={(m.x / 100) * 300} y={(m.y / 140) * 140 + 3.5} fontSize="8" fill="white" textAnchor="middle">
-                {i + 1}
-              </text>
-            </g>
-          ))}
-          {pendingPoint && (
-            <circle cx={(pendingPoint.x / 100) * 300} cy={(pendingPoint.y / 140) * 140} r="6" fill="#f59e0b" stroke="white" strokeWidth="1.5" />
-          )}
-        </svg>
+      <div className="grid grid-cols-2 gap-2">
+        {PANELS.map(({ key, label }) => (
+          <div key={key} className="bg-white rounded-lg border border-gray-200 p-1">
+            <p className="text-[10px] text-gray-400 text-center mb-0.5">{label}</p>
+            <svg viewBox="0 0 300 140" className="w-full cursor-crosshair" onClick={(e) => handleDiagramClick(key, e)}>
+              {panelPath(key)}
+              {data.markers.filter((m) => m.panel === key).map((m, i) => (
+                <g key={i}>
+                  <circle cx={(m.x / 100) * 300} cy={(m.y / 140) * 140} r="7" fill="#dc2626" stroke="white" strokeWidth="1.5" />
+                </g>
+              ))}
+              {pendingPoint?.panel === key && (
+                <circle cx={(pendingPoint.x / 100) * 300} cy={(pendingPoint.y / 140) * 140} r="7" fill="#f59e0b" stroke="white" strokeWidth="1.5" />
+              )}
+            </svg>
+          </div>
+        ))}
       </div>
 
       {pendingPoint && (
@@ -115,7 +153,7 @@ export default function ConditionReportCard({
         <div className="space-y-1">
           {data.markers.map((m, i) => (
             <div key={i} className="flex items-center justify-between text-xs text-gray-600">
-              <span>{i + 1}. {m.note}</span>
+              <span>{PANELS.find((p) => p.key === m.panel)?.label}: {m.note}</span>
               <button type="button" onClick={() => removeMarker(i)} className="text-gray-400 hover:text-red-600">
                 ✕
               </button>
@@ -131,7 +169,7 @@ export default function ConditionReportCard({
             <button
               key={n}
               type="button"
-              onClick={() => setCleanliness(n)}
+              onClick={() => onChange({ ...data, cleanliness: n })}
               className={`w-8 h-8 rounded-lg border text-sm ${
                 data.cleanliness === n ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600'
               }`}
@@ -146,7 +184,7 @@ export default function ConditionReportCard({
         <p className="text-xs text-gray-500 mb-1">Any smells? (e.g. none, smoke, pets)</p>
         <input
           defaultValue={data.smell}
-          onBlur={(e) => setSmell(e.target.value)}
+          onBlur={(e) => onChange({ ...data, smell: e.target.value })}
           placeholder="None"
           className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
         />
