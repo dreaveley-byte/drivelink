@@ -71,7 +71,7 @@ export default async function DashboardPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name)')
+    .select('id, status, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
     .order('created_at', { ascending: false })
 
   return (
@@ -102,6 +102,7 @@ export default async function DashboardPage() {
 
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
+            const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
             return (
             <div
               key={job.id}
@@ -118,6 +119,16 @@ export default async function DashboardPage() {
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
+                {driverInfo?.full_name && (
+                  <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-1.5">
+                    {driverInfo.photo_url ? (
+                      <img src={driverInfo.photo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
+                    )}
+                    {driverInfo.full_name}
+                  </p>
+                )}
                 {job.estimated_dealer_cost_cents != null && (
                   <p className="text-xs text-gray-700 font-medium mt-0.5">
                     Est. cost: {formatCents(job.estimated_dealer_cost_cents)}

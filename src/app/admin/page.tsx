@@ -35,7 +35,7 @@ export default async function AdminPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name), driver:driver_id(full_name)')
+    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, photo_url)')
     .order('created_at', { ascending: false })
 
   const total = jobs?.length ?? 0
@@ -106,8 +106,20 @@ export default async function AdminPage() {
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Driver: {job.driver?.full_name ?? 'Unassigned'}
+                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                  Driver:
+                  {job.driver?.full_name ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      {job.driver.photo_url ? (
+                        <img src={job.driver.photo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
+                      )}
+                      {job.driver.full_name}
+                    </span>
+                  ) : (
+                    'Unassigned'
+                  )}
                 </p>
                 {(job.estimated_dealer_cost_cents != null || job.estimated_driver_pay_cents != null) && (
                   <p className="text-xs text-gray-500 mt-0.5">

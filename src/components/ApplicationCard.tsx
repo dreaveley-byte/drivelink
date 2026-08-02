@@ -14,6 +14,8 @@ export default function ApplicationCard({
   status,
   bucket,
   docs,
+  userId,
+  profilePhotoPath,
 }: {
   table: 'driver_applications' | 'dealer_applications'
   id: string
@@ -22,6 +24,8 @@ export default function ApplicationCard({
   status: string
   bucket: 'driver-documents' | 'dealer-documents'
   docs: Doc[]
+  userId?: string
+  profilePhotoPath?: string | null
 }) {
   const router = useRouter()
   const [showDocs, setShowDocs] = useState(false)
@@ -57,6 +61,20 @@ export default function ApplicationCard({
   async function updateStatus(newStatus: string) {
     setUpdating(true)
     const supabase = createClient()
+
+    // On driver approval, copy their profile photo to the public bucket so it can be
+    // shown on job cards without needing a signed URL every time.
+    if (newStatus === 'approved' && table === 'driver_applications' && userId && profilePhotoPath) {
+      const { data: fileBlob } = await supabase.storage.from('driver-documents').download(profilePhotoPath)
+      if (fileBlob) {
+        const ext = profilePhotoPath.split('.').pop() || 'jpg'
+        const publicPath = `${userId}/photo.${ext}`
+        await supabase.storage.from('driver-photos').upload(publicPath, fileBlob, { upsert: true })
+        const { data: urlData } = supabase.storage.from('driver-photos').getPublicUrl(publicPath)
+        await supabase.from('profiles').update({ photo_url: urlData.publicUrl }).eq('id', userId)
+      }
+    }
+
     await supabase.from(table).update({ status: newStatus }).eq('id', id)
     setUpdating(false)
     router.refresh()
