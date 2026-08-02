@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents } from '@/lib/pricing'
-import { getDefaultChecklist, getDocumentTextForLabel, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
+import { getDefaultChecklist, getDocumentTextForLabel, buildDeliveryDisclosureText, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
 
@@ -25,12 +25,18 @@ type Job = {
   vin: string | null
   is_trade_in_pickup: boolean | null
   is_first_nations_delivery: boolean | null
+  out_of_province_inspection: boolean | null
   key_count: number | null
   has_wheel_lock: boolean | null
   has_charging_cables: boolean | null
   other_included_items: string | null
+  customer_address: string | null
+  customer_phone: string | null
+  delivery_gps_lat: number | null
+  delivery_gps_lng: number | null
+  delivery_gps_at: string | null
   job_types: { name: string }[] | { name: string } | null
-  organizations: { name: string }[] | { name: string } | null
+  organizations: { name: string; address: string | null; phone: string | null }[] | { name: string; address: string | null; phone: string | null } | null
 }
 
 // Pulls a city out of a full address string like "123 Main St, Coquitlam, BC, Canada".
@@ -46,6 +52,13 @@ function extractCity(address: string): string {
 function joinName(value: { name: string }[] | { name: string } | null): string | null {
   if (!value) return null
   return Array.isArray(value) ? value[0]?.name ?? null : value.name
+}
+
+function joinOrg(
+  value: { name: string; address: string | null; phone: string | null }[] | { name: string; address: string | null; phone: string | null } | null
+) {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 type ChecklistItem = {
@@ -134,7 +147,7 @@ export default function DriverJobActions({
       hasWheelLock: !!job.has_wheel_lock,
       hasChargingCables: !!job.has_charging_cables,
       otherItems: job.other_included_items,
-    })
+    }, !!job.out_of_province_inspection)
       const rows = defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
       const { data: created } = await supabase
         .from('job_checklist_items')
@@ -297,6 +310,29 @@ export default function DriverJobActions({
     await supabase.from('job_checklist_items').update({ condition_data: conditionData }).eq('id', item.id)
   }
 
+  async function saveSimpleTextValue(item: ChecklistItem, value: string) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const shouldComplete = value.trim().length > 0
+
+    setChecklist((prev) =>
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, notes: value, completed_at: shouldComplete ? (i.completed_at ?? new Date().toISOString()) : null }
+          : i
+      )
+    )
+
+    await supabase
+      .from('job_checklist_items')
+      .update({
+        notes: value,
+        completed_at: shouldComplete ? new Date().toISOString() : null,
+        completed_by: shouldComplete ? user?.id : null,
+      })
+      .eq('id', item.id)
+  }
+
   async function claimJob() {
     setLoading(true)
     const supabase = createClient()
@@ -319,7 +355,7 @@ export default function DriverJobActions({
       hasWheelLock: !!job.has_wheel_lock,
       hasChargingCables: !!job.has_charging_cables,
       otherItems: job.other_included_items,
-    })
+    }, !!job.out_of_province_inspection)
     await supabase.from('job_checklist_items').insert(
       defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
     )
@@ -430,33 +466,46 @@ export default function DriverJobActions({
       </div>
 
       {isActive && checklist.length > 0 && (() => {
-        const currentPhase: 'Pickup' | 'Delivery' = job.status === 'assigned' ? 'Pickup' : 'Delivery'
-        const hasPhases = checklist.some((i) => i.label.startsWith('Pickup:') || i.label.startsWith('Delivery:'))
+        const currentPhase: 'Pickup' | 'Inspection' | 'Delivery' | 'None' =
+          job.status === 'assigned' ? 'Pickup' :
+          job.status === 'in_progress' ? 'Inspection' :
+          job.status === 'delivered' ? 'Delivery' :
+          'None'
+        const hasPhases = checklist.some((i) => i.label.startsWith('Pickup:') || i.label.startsWith('Delivery:') || i.label.startsWith('Inspection:'))
         const visibleChecklist = hasPhases
           ? checklist.filter((item) => {
               if (item.label.startsWith('Pickup:')) return currentPhase === 'Pickup'
+              if (item.label.startsWith('Inspection:')) return currentPhase === 'Inspection'
               if (item.label.startsWith('Delivery:')) return currentPhase === 'Delivery'
               return true
             })
           : checklist
         const pickupItems = checklist.filter((i) => i.label.startsWith('Pickup:'))
         const pickupDone = pickupItems.filter((i) => i.completed_at).length
+        const inspectionItems = checklist.filter((i) => i.label.startsWith('Inspection:'))
+        const inspectionDone = inspectionItems.filter((i) => i.completed_at).length
+
+        if (hasPhases && currentPhase === 'None') return null
+        if (hasPhases && visibleChecklist.length === 0) return null
 
         return (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-          {hasPhases && currentPhase === 'Delivery' && pickupItems.length > 0 && (
+          {(currentPhase === 'Inspection' || currentPhase === 'Delivery') && pickupItems.length > 0 && (
             <p className="text-xs text-gray-400">Pickup checklist: {pickupDone}/{pickupItems.length} completed</p>
+          )}
+          {currentPhase === 'Delivery' && inspectionItems.length > 0 && (
+            <p className="text-xs text-gray-400">Inspection checklist: {inspectionDone}/{inspectionItems.length} completed</p>
           )}
           <p className="text-xs text-gray-500">
             {hasPhases ? `${currentPhase} checklist` : 'Checklist'} ({visibleChecklist.filter((i) => i.completed_at).length}/{visibleChecklist.length})
           </p>
           <div className="space-y-3">
             {visibleChecklist.map((item, idx) => {
-              const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
+              const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Inspection:') ? 'Inspection' : item.label.startsWith('Pickup:') ? 'Pickup' : null
               const prevPhase = idx > 0
-                ? (visibleChecklist[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : visibleChecklist[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                ? (visibleChecklist[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : visibleChecklist[idx - 1].label.startsWith('Inspection:') ? 'Inspection' : visibleChecklist[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
                 : null
-              const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
+              const displayLabel = item.label.replace(/^(Pickup|Delivery|Inspection):\s*/, '')
               return (
               <div key={item.id}>
                 {phase && phase !== prevPhase && (
@@ -508,6 +557,25 @@ export default function DriverJobActions({
                         </button>
                       ))}
                     </div>
+                  </div>
+                ) : item.item_type === 'input' ? (
+                  <div>
+                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>{displayLabel}</p>
+                    <input
+                      defaultValue={item.notes ?? ''}
+                      onBlur={(e) => saveSimpleTextValue(item, e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                    />
+                  </div>
+                ) : item.item_type === 'notes' ? (
+                  <div>
+                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>{displayLabel}</p>
+                    <textarea
+                      defaultValue={item.notes ?? ''}
+                      onBlur={(e) => saveSimpleTextValue(item, e.target.value)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
                   </div>
                 ) : (
                   // Heavy items (photo/video/upload/signature/condition_report) collapse into a
@@ -587,39 +655,65 @@ export default function DriverJobActions({
 
                         {item.item_type === 'signature' && (
                           <div className="space-y-2">
-                            {getDocumentTextForLabel(item.label) && (
-                              <>
-                                {(() => {
-                                  const pickupCondition = checklist.find((c) => c.item_type === 'condition_report')
-                                  if (!pickupCondition) return null
-                                  const cd = pickupCondition.condition_data
-                                  return (
-                                    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                      <p className="text-xs font-semibold text-gray-500 mb-1">Pickup condition report — please review with customer</p>
-                                      {pickupCondition.notes && <p className="text-xs text-gray-600">{pickupCondition.notes}</p>}
-                                      {cd && (cd.cleanliness || cd.smell) && (
-                                        <p className="text-xs text-gray-600 mt-0.5">
-                                          {cd.cleanliness && `Cleanliness: ${cd.cleanliness}/5`}
-                                          {cd.cleanliness && cd.smell && ' · '}
-                                          {cd.smell && `Smell: ${cd.smell}`}
-                                        </p>
-                                      )}
-                                      {cd && cd.markers.length > 0 && (
-                                        <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
-                                          {cd.markers.map((m, i) => <li key={i}>{m.note}</li>)}
-                                        </ul>
-                                      )}
-                                      <FilePreviewRow filePaths={pickupCondition.file_paths} fileUrls={fileUrls} />
-                                    </div>
-                                  )
-                                })()}
-                              </>
+                            {(() => {
+                              const pickupCondition = checklist.find((c) => c.item_type === 'condition_report')
+                              if (!pickupCondition) return null
+                              const cd = pickupCondition.condition_data
+                              return (
+                                <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                  <p className="text-xs font-semibold text-gray-500 mb-1">Pickup condition report — please review with customer</p>
+                                  {pickupCondition.notes && <p className="text-xs text-gray-600">{pickupCondition.notes}</p>}
+                                  {cd && (cd.cleanliness || cd.smell) && (
+                                    <p className="text-xs text-gray-600 mt-0.5">
+                                      {cd.cleanliness && `Cleanliness: ${cd.cleanliness}/5`}
+                                      {cd.cleanliness && cd.smell && ' · '}
+                                      {cd.smell && `Smell: ${cd.smell}`}
+                                    </p>
+                                  )}
+                                  {cd && cd.markers.length > 0 && (
+                                    <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
+                                      {cd.markers.map((m, i) => <li key={i}>{m.note}</li>)}
+                                    </ul>
+                                  )}
+                                  <FilePreviewRow filePaths={pickupCondition.file_paths} fileUrls={fileUrls} />
+                                </div>
+                              )
+                            })()}
+
+                            {item.label === 'Delivery: Customer signs delivery disclosure' ? (
+                              (() => {
+                                const org = joinOrg(job.organizations)
+                                const odometerItem = checklist.find((c) => c.label === 'Delivery: Enter the odometer reading')
+                                const disclosureText = buildDeliveryDisclosureText({
+                                  customerName: job.customer_full_name || job.recipient_name,
+                                  customerAddress: job.customer_address,
+                                  customerPhone: job.customer_phone,
+                                  vehicleYear: job.vehicle_year,
+                                  vehicleMake: job.vehicle_make,
+                                  vehicleModel: job.vehicle_model,
+                                  vin: job.vin,
+                                  odometer: odometerItem?.notes ?? null,
+                                  dealerName: org?.name,
+                                  dealerAddress: org?.address,
+                                  dealerPhone: org?.phone,
+                                  deliveryDateTime: new Date().toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }),
+                                  deliveryLat: job.delivery_gps_lat,
+                                  deliveryLng: job.delivery_gps_lng,
+                                })
+                                return (
+                                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-line max-h-64 overflow-y-auto">
+                                    {disclosureText}
+                                  </p>
+                                )
+                              })()
+                            ) : (
+                              getDocumentTextForLabel(item.label) && (
+                                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                  {getDocumentTextForLabel(item.label)}
+                                </p>
+                              )
                             )}
-                            {getDocumentTextForLabel(item.label) && (
-                              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                {getDocumentTextForLabel(item.label)}
-                              </p>
-                            )}
+
                             <ChecklistSignaturePad
                               saving={uploadingItemId === item.id}
                               onSave={(blob) => uploadSignatureForItem(item, blob)}

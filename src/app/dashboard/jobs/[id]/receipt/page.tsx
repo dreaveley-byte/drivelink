@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import PrintButton from '@/components/PrintButton'
 import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
-import { getDocumentTextForLabel } from '@/lib/checklist'
+import { buildDeliveryDisclosureText } from '@/lib/checklist'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,8 +21,8 @@ function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-const CONDITION_LABEL_MATCH = /condition report|condition walkaround|photos of any damage|walk-around video/i
-const DISCLOSURE_LABEL_MATCH = /release, condition acceptance/i
+const CONDITION_LABEL_MATCH = /condition report|walkaround|photos of any.*damage/i
+const DISCLOSURE_LABEL_MATCH = /delivery disclosure/i
 
 export default async function JobReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params
@@ -36,7 +36,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, phone)')
+    .select('*, job_types(name), organizations(name, address, phone), driver:driver_id(full_name, phone)')
     .eq('id', jobId)
     .single()
 
@@ -71,7 +71,8 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   const driverName = driverInfo?.full_name as string | undefined
   const driverPhone = driverInfo?.phone as string | undefined
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : job.job_types?.name
-  const orgName = Array.isArray(job.organizations) ? job.organizations[0]?.name : job.organizations?.name
+  const org = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
+  const orgName = org?.name
 
   const pickedUpEvent = events?.find((e) => e.status === 'picked_up')
   const deliveredEvent = events?.find((e) => e.status === 'delivered' || e.status === 'completed')
@@ -245,21 +246,38 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        {/* Delivery Disclosure: the full release / condition acceptance / media consent document */}
-        {disclosureItem && (
-          <div className="mb-6">
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
-            {getDocumentTextForLabel(disclosureItem.label) && (
-              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
-                {getDocumentTextForLabel(disclosureItem.label)}
+        {/* Delivery Disclosure: the full acknowledgement / condition acceptance / media consent document */}
+        {disclosureItem && (() => {
+          const odometerItem = checklistWithUrls.find((i) => i.label === 'Delivery: Enter the odometer reading')
+          const disclosureText = buildDeliveryDisclosureText({
+            customerName: job.customer_full_name || job.recipient_name,
+            customerAddress: job.customer_address,
+            customerPhone: job.customer_phone,
+            vehicleYear: job.vehicle_year,
+            vehicleMake: job.vehicle_make,
+            vehicleModel: job.vehicle_model,
+            vin: job.vin,
+            odometer: odometerItem?.notes ?? null,
+            dealerName: org?.name,
+            dealerAddress: org?.address,
+            dealerPhone: org?.phone,
+            deliveryDateTime: disclosureItem.completed_at ? fmtDateTime(disclosureItem.completed_at) : null,
+            deliveryLat: job.delivery_gps_lat,
+            deliveryLng: job.delivery_gps_lng,
+          })
+          return (
+            <div className="mb-6">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
+              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
+                {disclosureText}
               </p>
-            )}
-            <p className="text-sm text-gray-700">
-              {disclosureItem.completed_at ? `Signed by ${job.customer_full_name || 'customer'} on ${fmtDateTime(disclosureItem.completed_at)}` : 'Not yet signed'}
-            </p>
-            <FileThumbs files={disclosureItem.files} />
-          </div>
-        )}
+              <p className="text-sm text-gray-700">
+                {disclosureItem.completed_at ? `Signed by ${job.customer_full_name || 'customer'} on ${fmtDateTime(disclosureItem.completed_at)}` : 'Not yet signed'}
+              </p>
+              <FileThumbs files={disclosureItem.files} />
+            </div>
+          )
+        })()}
 
         {/* Full checklist for reference */}
         {otherItems.length > 0 && (

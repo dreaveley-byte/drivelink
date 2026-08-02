@@ -92,6 +92,9 @@ export default async function DashboardPage() {
             <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
               Archived
             </Link>
+            <Link href="/dashboard/org-settings" className="text-sm text-gray-600 hover:text-gray-900">
+              Business Info
+            </Link>
             <Link
               href="/dashboard/post-job"
               className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
