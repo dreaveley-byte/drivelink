@@ -109,12 +109,9 @@ export default async function DashboardPage() {
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
             const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
-            return (
-            <div
-              key={job.id}
-              className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between"
-            >
-              <div>
+            const isCompleted = job.status === 'completed'
+            const cardBody = (
+              <>
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
                 {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
                   <p className="text-xs text-gray-600 mt-0.5">
@@ -140,7 +137,21 @@ export default async function DashboardPage() {
                     Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
                   </p>
                 )}
-              </div>
+                {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+              </>
+            )
+            return (
+            <div
+              key={job.id}
+              className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${isCompleted ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}
+            >
+              {isCompleted ? (
+                <Link href={`/dashboard/jobs/${job.id}/receipt`} target="_blank" className="flex-1">
+                  {cardBody}
+                </Link>
+              ) : (
+                <div>{cardBody}</div>
+              )}
               <div className="flex flex-col items-end gap-2">
                 <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
                   {statusLabels[job.status] ?? job.status}

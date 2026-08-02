@@ -55,25 +55,36 @@ export default async function ArchivedJobsPage() {
 
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
-            return (
-              <div key={job.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
-                  {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
-                      {job.stock_number && ` · Stock #${job.stock_number}`}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {job.pickup_address} → {job.dropoff_address}
+            const isCompleted = job.status === 'completed'
+            const cardBody = (
+              <>
+                <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
+                {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
+                    {job.stock_number && ` · Stock #${job.stock_number}`}
                   </p>
-                  {job.estimated_dealer_cost_cents != null && (
-                    <p className="text-xs text-gray-700 font-medium mt-0.5">
-                      Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
-                    </p>
-                  )}
-                </div>
+                )}
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {job.pickup_address} → {job.dropoff_address}
+                </p>
+                {job.estimated_dealer_cost_cents != null && (
+                  <p className="text-xs text-gray-700 font-medium mt-0.5">
+                    Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
+                  </p>
+                )}
+                {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+              </>
+            )
+            return (
+              <div key={job.id} className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${isCompleted ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}>
+                {isCompleted ? (
+                  <Link href={`/dashboard/jobs/${job.id}/receipt`} target="_blank" className="flex-1">
+                    {cardBody}
+                  </Link>
+                ) : (
+                  <div>{cardBody}</div>
+                )}
                 <div className="flex flex-col items-end gap-2">
                   <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
                     {statusLabels[job.status] ?? job.status}
