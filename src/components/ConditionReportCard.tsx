@@ -6,47 +6,10 @@ export type ConditionPanel = 'driver' | 'passenger'
 export type ConditionMarker = { panel: ConditionPanel; x: number; y: number; note: string }
 export type ConditionData = { markers: ConditionMarker[]; cleanliness: number | null; smell: string }
 
-const PANELS: { key: ConditionPanel; label: string }[] = [
-  { key: 'driver', label: "Driver's side" },
-  { key: 'passenger', label: "Passenger's side" },
+const PANELS: { key: ConditionPanel; label: string; image: string }[] = [
+  { key: 'driver', label: "Driver's side", image: '/condition-report/driver-side.jpg' },
+  { key: 'passenger', label: "Passenger's side", image: '/condition-report/passenger-side.jpg' },
 ]
-
-// A more detailed 3/4-profile car outline — roofline, window line, wheel wells,
-// door seams — so it actually reads as a car rather than an abstract shape.
-function CarOutline() {
-  return (
-    <>
-      <path
-        d="M15,105 L15,82 Q15,74 24,71 L55,62 Q65,45 85,38 L100,33 Q120,28 145,28 L215,28
-           Q245,28 262,45 L272,62 L282,66 Q292,68 292,80 L292,105 Z"
-        fill="none" stroke="#6b7280" strokeWidth="2" strokeLinejoin="round"
-      />
-      {/* Window line */}
-      <path
-        d="M62,62 L88,42 Q100,36 118,34 L140,34 L140,62 Z"
-        fill="none" stroke="#9ca3af" strokeWidth="1.3"
-      />
-      <path
-        d="M148,34 L212,34 Q232,34 248,48 L262,62 L148,62 Z"
-        fill="none" stroke="#9ca3af" strokeWidth="1.3"
-      />
-      <line x1="140" y1="34" x2="140" y2="62" stroke="#9ca3af" strokeWidth="1.3" />
-      {/* Door seams */}
-      <line x1="118" y1="62" x2="115" y2="105" stroke="#9ca3af" strokeWidth="1" />
-      <line x1="205" y1="62" x2="205" y2="105" stroke="#9ca3af" strokeWidth="1" />
-      {/* Door handles */}
-      <line x1="150" y1="72" x2="165" y2="72" stroke="#9ca3af" strokeWidth="1.3" />
-      <line x1="230" y1="72" x2="245" y2="72" stroke="#9ca3af" strokeWidth="1.3" />
-      {/* Wheel wells */}
-      <path d="M45,105 A32,32 0 0 1 109,105" fill="none" stroke="#6b7280" strokeWidth="2" />
-      <path d="M198,105 A32,32 0 0 1 262,105" fill="none" stroke="#6b7280" strokeWidth="2" />
-      <circle cx="77" cy="106" r="16" fill="none" stroke="#6b7280" strokeWidth="2" />
-      <circle cx="230" cy="106" r="16" fill="none" stroke="#6b7280" strokeWidth="2" />
-      {/* Mirror */}
-      <path d="M100,58 L92,52 L96,48 L104,54 Z" fill="none" stroke="#9ca3af" strokeWidth="1" />
-    </>
-  )
-}
 
 export default function ConditionReportCard({
   data,
@@ -73,9 +36,9 @@ export default function ConditionReportCard({
   // input tracks a specific, already-placed marker rather than a shared "pending" dot.
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
-  function handleDiagramClick(panel: ConditionPanel, e: React.MouseEvent<SVGSVGElement>) {
-    const svg = e.currentTarget
-    const rect = svg.getBoundingClientRect()
+  function handleDiagramClick(panel: ConditionPanel, e: React.MouseEvent<HTMLDivElement>) {
+    const container = e.currentTarget
+    const rect = container.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
     // Every click immediately and permanently places its own marker — nothing
@@ -120,29 +83,31 @@ export default function ConditionReportCard({
       <div>
         <p className="text-xs text-gray-500 mb-1.5">Tap either side to mark any damage</p>
         <div className="grid grid-cols-1 gap-2">
-          {PANELS.map(({ key, label }) => (
+          {PANELS.map(({ key, label, image }) => (
             <div key={key} className="bg-white rounded-lg border border-gray-200 p-1.5">
               <p className="text-[10px] text-gray-400 text-center mb-0.5">{label}</p>
-              <svg viewBox="0 0 305 115" className="w-full cursor-crosshair" onClick={(e) => handleDiagramClick(key, e)}>
-                <CarOutline />
+              <div
+                className="relative w-full cursor-crosshair select-none"
+                onClick={(e) => handleDiagramClick(key, e)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={image} alt={label} className="w-full rounded pointer-events-none" draggable={false} />
                 {data.markers.map((m, i) =>
                   m.panel === key ? (
-                    <g key={i}>
-                      <circle
-                        cx={(m.x / 100) * 305}
-                        cy={(m.y / 115) * 115}
-                        r="7"
-                        fill={editingIndex === i ? '#f59e0b' : '#dc2626'}
-                        stroke="white"
-                        strokeWidth="1.5"
-                      />
-                      <text x={(m.x / 100) * 305} y={(m.y / 115) * 115 + 3} fontSize="8" fill="white" textAnchor="middle">
-                        {i + 1}
-                      </text>
-                    </g>
+                    <div
+                      key={i}
+                      className="absolute w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-medium -translate-x-1/2 -translate-y-1/2 border-2 border-white shadow"
+                      style={{
+                        left: `${m.x}%`,
+                        top: `${m.y}%`,
+                        backgroundColor: editingIndex === i ? '#f59e0b' : '#dc2626',
+                      }}
+                    >
+                      {i + 1}
+                    </div>
                   ) : null
                 )}
-              </svg>
+              </div>
             </div>
           ))}
         </div>
