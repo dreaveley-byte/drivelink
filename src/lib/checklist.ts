@@ -58,8 +58,7 @@ export const FIRST_NATIONS_CHECKLIST: ChecklistDefinitionItem[] = [
 export const TRADE_IN_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Get trade-in registration from customer', type: 'upload' },
   { label: 'Confirm name on registration matches bill of sale owner', type: 'check' },
-  { label: 'Registration signed by customer (both signers if two names on it)', type: 'signature' },
-  { label: 'APV9T / transfer form signed', type: 'signature' },
+  { label: 'All owners listed on registration have signed both the registration and APV9T/transfer form', type: 'check' },
 ]
 
 // Document/courier jobs get a shorter checklist.
