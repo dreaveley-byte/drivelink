@@ -129,7 +129,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
         <div className="border-b border-gray-200 pb-6 mb-6">
           <p className="text-xs text-gray-400 uppercase tracking-wide">Delivery Receipt</p>
-          <h1 className="text-xl font-semibold text-gray-900 mt-1">DriveLink</h1>
+          <h1 className="text-xl font-semibold text-gray-900 mt-1">Drivflo</h1>
           <p className="text-sm text-gray-500 mt-1">{orgName}</p>
           <p className="text-xs text-gray-400 mt-2">Job ID: {job.id}</p>
         </div>

@@ -200,7 +200,7 @@ export function buildDeliveryDisclosureText(params: {
   )
   lines.push('')
   lines.push(
-    'I voluntarily authorize DriveLink, its third-party partners, and the selling dealership to use ' +
+    'I voluntarily authorize Drivflo, its third-party partners, and the selling dealership to use ' +
     'photographs and video taken during this delivery for promotional and marketing purposes. I understand my ' +
     'participation is entirely voluntary, I will receive no compensation, and declining this authorization ' +
     'will not affect my purchase.'

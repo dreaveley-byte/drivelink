@@ -126,7 +126,7 @@ export default function DealerApplyPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
         <h1 className="text-lg font-semibold text-gray-900">Dealer Application</h1>
-        <p className="text-xs text-gray-500">DriveLink</p>
+        <p className="text-xs text-gray-500">Drivflo</p>
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
@@ -222,9 +222,9 @@ export default function DealerApplyPage() {
             <h2 className="text-sm font-semibold text-gray-900">Dealer Agreement</h2>
             <div className="border border-gray-200 rounded-lg p-4 text-xs text-gray-600 max-h-40 overflow-y-auto">
               <p className="mb-2">
-                This agreement is between the dealer, DriveLink, and any drivers assigned to jobs posted by the
-                dealer. By signing, the dealer releases DriveLink and its drivers from liability for matters
-                outside DriveLink&apos;s reasonable control, and agrees to DriveLink&apos;s standard job posting,
+                This agreement is between the dealer, Drivflo, and any drivers assigned to jobs posted by the
+                dealer. By signing, the dealer releases Drivflo and its drivers from liability for matters
+                outside Drivflo&apos;s reasonable control, and agrees to Drivflo&apos;s standard job posting,
                 payment, and cancellation terms.
               </p>
               <p>

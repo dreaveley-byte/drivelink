@@ -473,13 +473,13 @@ export default function DriverJobActions({
     const start = new Date(job.scheduled_for)
     const end = new Date(start.getTime() + (job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120) * 60000)
     const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
-    const title = `${joinName(job.job_types) ?? 'DriveLink job'} — ${[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}`
+    const title = `${joinName(job.job_types) ?? 'Drivflo job'} — ${[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}`
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//DriveLink//EN',
+      'PRODID:-//Drivflo//EN',
       'BEGIN:VEVENT',
-      `UID:${job.id}@drivelink`,
+      `UID:${job.id}@drivflo`,
       `DTSTAMP:${fmt(new Date())}`,
       `DTSTART:${fmt(start)}`,
       `DTEND:${fmt(end)}`,
@@ -494,7 +494,7 @@ export default function DriverJobActions({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `drivelink-job-${job.id.slice(0, 8)}.ics`
+    a.download = `drivflo-job-${job.id.slice(0, 8)}.ics`
     a.click()
     URL.revokeObjectURL(url)
   }

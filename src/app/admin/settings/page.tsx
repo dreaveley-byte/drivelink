@@ -112,7 +112,7 @@ export default function PricingSettingsPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">DriveLink — Pricing Settings</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Drivflo — Pricing Settings</h1>
           <p className="text-xs text-gray-500">These rates drive every job&apos;s cost and pay estimate</p>
         </div>
         <div className="flex items-center gap-4">

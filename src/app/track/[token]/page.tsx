@@ -30,7 +30,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
     <div className="min-h-screen bg-white">
       <div className="max-w-lg mx-auto px-6 py-8">
         <div className="mb-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">DriveLink</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Drivflo</p>
           <h1 className="text-lg font-semibold text-gray-900 mt-1">
             {info.organization_name ? `${info.organization_name} — ` : ''}Your delivery
           </h1>
@@ -53,7 +53,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
         />
 
         <p className="text-xs text-gray-400 mt-6 text-center">
-          Powered by DriveLink
+          Powered by Drivflo
         </p>
 
         {(info.status === 'delivered' || info.status === 'completed') && (

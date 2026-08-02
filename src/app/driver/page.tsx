@@ -33,7 +33,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-gray-900 mb-2">Account inactive</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Your driver account is currently turned off. Contact DriveLink if you think this is a mistake.
+            Your driver account is currently turned off. Contact Drivflo if you think this is a mistake.
           </p>
           <SignOutButton />
         </div>
@@ -105,7 +105,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">DriveLink — Driver</h1>
+        <h1 className="text-lg font-semibold text-gray-900">Drivflo — Driver</h1>
         <div className="flex items-center gap-4">
           <SortSelect />
           <SignOutButton />

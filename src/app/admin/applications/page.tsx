@@ -36,7 +36,7 @@ export default async function AdminApplicationsPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">DriveLink — Applications</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Drivflo — Applications</h1>
           <p className="text-xs text-gray-500">Review driver and dealer applications</p>
         </div>
         <div className="flex items-center gap-4">

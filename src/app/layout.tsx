@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DriveLink",
+  title: "Drivflo",
   description: "Vehicle delivery dispatch for CarbyClick",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "DriveLink",
+    title: "Drivflo",
   },
   icons: {
     apple: "/apple-touch-icon.png",

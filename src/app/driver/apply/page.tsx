@@ -135,7 +135,7 @@ export default function DriverApplyPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
         <h1 className="text-lg font-semibold text-gray-900">Driver Application</h1>
-        <p className="text-xs text-gray-500">DriveLink</p>
+        <p className="text-xs text-gray-500">Drivflo</p>
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
@@ -205,7 +205,7 @@ export default function DriverApplyPage() {
                 <label className="block text-sm text-gray-700 mb-1">SIN</label>
                 <input value={sinNumber} onChange={(e) => setSinNumber(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-                <p className="text-xs text-gray-400 mt-1">Kept private — only visible to DriveLink admin, used for tax reporting.</p>
+                <p className="text-xs text-gray-400 mt-1">Kept private — only visible to Drivflo admin, used for tax reporting.</p>
               </div>
             )}
             {userId && (
@@ -241,10 +241,10 @@ export default function DriverApplyPage() {
             <h2 className="text-sm font-semibold text-gray-900">Contractor Agreement</h2>
             <div className="border border-gray-200 rounded-lg p-4 text-xs text-gray-600 max-h-40 overflow-y-auto">
               <p className="mb-2">
-                This agreement is between the driver and DriveLink (and, by extension, the dealers and other
-                parties DriveLink assigns jobs on behalf of). It covers the terms of independent contractor
+                This agreement is between the driver and Drivflo (and, by extension, the dealers and other
+                parties Drivflo assigns jobs on behalf of). It covers the terms of independent contractor
                 work, including per-job compensation, a 90-day initial probationary period during which either
-                party may end the arrangement without cause, and DriveLink&apos;s drug and alcohol policy — which
+                party may end the arrangement without cause, and Drivflo&apos;s drug and alcohol policy — which
                 prohibits performing any job while impaired and requires passing the assessments uploaded above
                 prior to approval.
               </p>
@@ -254,7 +254,7 @@ export default function DriverApplyPage() {
             </div>
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input type="checkbox" className="mt-0.5" checked={agreedDrugAlcohol} onChange={(e) => setAgreedDrugAlcohol(e.target.checked)} />
-              I have read and agree to DriveLink&apos;s drug and alcohol policy.
+              I have read and agree to Drivflo&apos;s drug and alcohol policy.
             </label>
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input type="checkbox" className="mt-0.5" checked={agreedProbation} onChange={(e) => setAgreedProbation(e.target.checked)} />
