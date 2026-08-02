@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [intendedRole, setIntendedRole] = useState<'driver' | 'dealer' | ''>('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -20,13 +21,33 @@ export default function LoginPage() {
     const supabase = createClient()
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password })
+      if (!intendedRole) {
+        setError('Please choose whether you want to become a driver or a dealer.')
+        setLoading(false)
+        return
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { intended_role: intendedRole } },
+      })
       if (error) {
         setError(error.message)
         setLoading(false)
         return
       }
-      setError('Account created. Check your email to confirm, then log in.')
+
+      // If email confirmation isn't required, Supabase signs the user in immediately —
+      // in that case, send them straight to the right application instead of making
+      // them log in again.
+      if (data.session) {
+        router.push(intendedRole === 'driver' ? '/driver/apply' : '/dashboard/apply')
+        router.refresh()
+        return
+      }
+
+      setError('Account created. Check your email to confirm, then log in to start your application.')
       setMode('login')
       setLoading(false)
       return
@@ -53,6 +74,21 @@ export default function LoginPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'signup' && (
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">What are you looking for?</label>
+              <select
+                required
+                value={intendedRole}
+                onChange={(e) => setIntendedRole(e.target.value as 'driver' | 'dealer' | '')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+              >
+                <option value="" disabled>Select one...</option>
+                <option value="driver">Become a driver</option>
+                <option value="dealer">Become a dealer</option>
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm text-gray-700 mb-1">Email</label>
             <input

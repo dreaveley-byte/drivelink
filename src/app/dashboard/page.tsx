@@ -55,6 +55,43 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
 
   if (!profile?.organization_id) {
+    const intendedRole = (user.user_metadata?.intended_role as string | undefined) ?? null
+
+    // Already submitted? Show status instead of sending them back to a blank form.
+    const { data: driverApp } = await supabase
+      .from('driver_applications')
+      .select('status')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .maybeSingle()
+
+    const { data: dealerApp } = await supabase
+      .from('dealer_applications')
+      .select('status')
+      .eq('submitted_by', user.id)
+      .order('created_at', { ascending: false })
+      .maybeSingle()
+
+    const existingApp = driverApp ?? dealerApp
+
+    if (existingApp) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white px-6">
+          <div className="max-w-sm text-center">
+            <h1 className="text-lg font-semibold text-gray-900 mb-2">Application received</h1>
+            <p className="text-sm text-gray-500 mb-6">
+              Status: <span className="font-medium text-gray-700">{existingApp.status}</span>. We&apos;ll connect your
+              account once it&apos;s approved — no need to do anything else for now.
+            </p>
+            <SignOutButton />
+          </div>
+        </div>
+      )
+    }
+
+    if (intendedRole === 'driver') redirect('/driver/apply')
+    if (intendedRole === 'dealer') redirect('/dashboard/apply')
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
         <div className="max-w-sm text-center">
