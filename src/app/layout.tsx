@@ -4,19 +4,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Drivflo",
   description: "Vehicle delivery dispatch for CarbyClick",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Drivflo",
   },
-  icons: {
-    apple: "/apple-touch-icon.png",
-  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#111827",
+  themeColor: "#378ADD",
 };
 
 export default function RootLayout({
