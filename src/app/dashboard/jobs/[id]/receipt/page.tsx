@@ -34,11 +34,25 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'platform_admin'
 
-  const { data: job } = await supabase
+  const { data: job, error: jobError } = await supabase
     .from('jobs')
     .select('*, job_types(name), organizations(name, address, phone), driver:driver_id(full_name, phone)')
     .eq('id', jobId)
     .single()
+
+  if (jobError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Couldn&apos;t load this receipt</h1>
+          <p className="text-sm text-red-600 mb-4">{jobError.message}</p>
+          <p className="text-sm text-gray-500">
+            This usually means a recent database migration hasn&apos;t been run yet in Supabase.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!job) notFound()
 

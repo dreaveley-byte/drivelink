@@ -24,11 +24,25 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: job } = await supabase
+  const { data: job, error: jobError } = await supabase
     .from('jobs')
     .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, job_types(name), driver:driver_id(full_name)')
     .eq('id', jobId)
     .single()
+
+  if (jobError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Couldn&apos;t load this job</h1>
+          <p className="text-sm text-red-600 mb-4">{jobError.message}</p>
+          <p className="text-sm text-gray-500">
+            This usually means a recent database migration hasn&apos;t been run yet in Supabase.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!job) notFound()
 
