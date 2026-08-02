@@ -71,7 +71,8 @@ export default async function DashboardPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
+    .select('id, status, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
 
   return (
@@ -87,12 +88,17 @@ export default async function DashboardPage() {
       <main className="max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
-          <Link
-            href="/dashboard/post-job"
-            className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
-          >
-            + Post a new job
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
+              Archived
+            </Link>
+            <Link
+              href="/dashboard/post-job"
+              className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
+            >
+              + Post a new job
+            </Link>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -139,7 +145,7 @@ export default async function DashboardPage() {
                 <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
                   {statusLabels[job.status] ?? job.status}
                 </span>
-                <JobActions jobId={job.id} status={job.status} />
+                <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
               </div>
             </div>
           )})}
