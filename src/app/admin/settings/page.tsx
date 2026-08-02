@@ -36,6 +36,7 @@ export default function PricingSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [notAdmin, setNotAdmin] = useState(false)
 
   useEffect(() => {
@@ -72,8 +73,17 @@ export default function PricingSettingsPage() {
     if (!settings) return
     setSaving(true)
     setSaved(false)
+    setSaveError('')
     const supabase = createClient()
-    await supabase.from('pricing_settings').update(settings).eq('id', 1)
+    const { error } = await supabase.from('pricing_settings').update(settings).eq('id', 1)
+    if (error) {
+      setSaving(false)
+      setSaveError(error.message)
+      return
+    }
+    // Re-fetch to confirm what's actually in the database now, not just what we sent.
+    const { data: confirmed } = await supabase.from('pricing_settings').select('*').eq('id', 1).single()
+    setSettings(confirmed)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -257,6 +267,7 @@ export default function PricingSettingsPage() {
         >
           {saving ? 'Saving...' : saved ? 'Saved ✓' : 'Save Settings'}
         </button>
+        {saveError && <p className="text-sm text-red-600">Save failed: {saveError}</p>}
       </main>
     </div>
   )
