@@ -5,6 +5,7 @@ import DriverJobActions from './DriverJobActions'
 import LocationSharer from '@/components/LocationSharer'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
+import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,9 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
         <div className="max-w-sm text-center">
+          <div className="flex justify-center mb-6">
+            <Logo height={28} />
+          </div>
           <h1 className="text-lg font-semibold text-gray-900 mb-2">Account inactive</h1>
           <p className="text-sm text-gray-500 mb-6">
             Your driver account is currently turned off. Contact Drivflo if you think this is a mistake.
@@ -105,7 +109,10 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Drivflo — Driver</h1>
+        <div className="flex items-center gap-2">
+          <Logo height={22} />
+          <span className="text-sm text-gray-400">— Driver</span>
+        </div>
         <div className="flex items-center gap-4">
           <SortSelect />
           <SignOutButton />

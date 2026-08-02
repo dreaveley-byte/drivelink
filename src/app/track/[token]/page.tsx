@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
+import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +31,8 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
     <div className="min-h-screen bg-white">
       <div className="max-w-lg mx-auto px-6 py-8">
         <div className="mb-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Drivflo</p>
-          <h1 className="text-lg font-semibold text-gray-900 mt-1">
+          <Logo height={24} />
+          <h1 className="text-lg font-semibold text-gray-900 mt-3">
             {info.organization_name ? `${info.organization_name} — ` : ''}Your delivery
           </h1>
           {vehicleDesc && <p className="text-sm text-gray-600 mt-1">{vehicleDesc}</p>}

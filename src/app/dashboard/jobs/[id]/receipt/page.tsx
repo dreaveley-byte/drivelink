@@ -5,6 +5,7 @@ import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
 import { buildDeliveryDisclosureText } from '@/lib/checklist'
 import DealerFeedbackForm from '@/components/DealerFeedbackForm'
+import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -128,9 +129,9 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         </div>
 
         <div className="border-b border-gray-200 pb-6 mb-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Delivery Receipt</p>
-          <h1 className="text-xl font-semibold text-gray-900 mt-1">Drivflo</h1>
-          <p className="text-sm text-gray-500 mt-1">{orgName}</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Receipt</p>
+          <Logo height={28} />
+          <p className="text-sm text-gray-500 mt-2">{orgName}</p>
           <p className="text-xs text-gray-400 mt-2">Job ID: {job.id}</p>
         </div>
 

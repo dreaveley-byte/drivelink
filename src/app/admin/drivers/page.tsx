@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
+import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,8 +48,11 @@ export default async function AdminDriversPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Drivflo — Drivers</h1>
-          <p className="text-xs text-gray-500">Turn drivers on or off</p>
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Drivers</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Turn drivers on or off</p>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">

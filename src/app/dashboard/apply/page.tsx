@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import FileUploadField from '@/components/FileUploadField'
 import SignaturePad from '@/components/SignaturePad'
+import Logo from '@/components/Logo'
 
 export default function DealerApplyPage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -125,8 +126,10 @@ export default function DealerApplyPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
+        <div className="mb-2">
+          <Logo height={18} />
+        </div>
         <h1 className="text-lg font-semibold text-gray-900">Dealer Application</h1>
-        <p className="text-xs text-gray-500">Drivflo</p>
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">

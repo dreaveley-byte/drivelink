@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
+import Logo from '@/components/Logo'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -279,6 +280,9 @@ export default function PostJobPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Logo height={20} />
+        </div>
         <h1 className="text-lg font-semibold text-gray-900">Post a new job</h1>
       </header>
 

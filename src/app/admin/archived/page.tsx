@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import JobActions from '@/components/JobActions'
+import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,10 @@ export default async function AdminArchivedJobsPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Archived jobs</h1>
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Archived Jobs</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">

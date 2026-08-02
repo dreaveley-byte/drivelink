@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
 import CloseButton from '@/components/CloseButton'
 import CopyLinkButton from '@/components/CopyLinkButton'
+import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,9 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
       <div className="max-w-2xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
+            <div className="mb-1">
+              <Logo height={18} />
+            </div>
             <h1 className="text-lg font-semibold text-gray-900">{jobTypeName}</h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {statusLabels[job.status] ?? job.status}

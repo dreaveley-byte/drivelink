@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Logo from '@/components/Logo'
 
 export default function OrgSettingsPage() {
   const router = useRouter()
@@ -52,7 +53,10 @@ export default function OrgSettingsPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
-        <h1 className="text-lg font-semibold text-gray-900">Business Info</h1>
+        <div className="flex items-center gap-2">
+          <Logo height={22} />
+          <span className="text-sm text-gray-400">— Business Info</span>
+        </div>
         <p className="text-xs text-gray-500 mt-0.5">Used on the delivery disclosure document customers sign</p>
       </header>
 

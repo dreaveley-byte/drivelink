@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import SignOutButton from '@/components/SignOutButton'
+import Logo from '@/components/Logo'
 
 type Settings = {
   hourly_rate_cents: number
@@ -112,8 +113,11 @@ export default function PricingSettingsPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Drivflo — Pricing Settings</h1>
-          <p className="text-xs text-gray-500">These rates drive every job&apos;s cost and pay estimate</p>
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Pricing Settings</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">These rates drive every job&apos;s cost and pay estimate</p>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
