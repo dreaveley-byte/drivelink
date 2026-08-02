@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents } from '@/lib/pricing'
-import { getDefaultChecklist, type ChecklistItemType } from '@/lib/checklist'
+import { getDefaultChecklist, getDocumentTextForLabel, type ChecklistItemType } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 
 type Job = {
@@ -23,6 +23,7 @@ type Job = {
   stock_number: string | null
   vin: string | null
   is_trade_in_pickup: boolean | null
+  is_first_nations_delivery: boolean | null
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string }[] | { name: string } | null
 }
@@ -105,7 +106,7 @@ export default function DriverJobActions({
       }
 
       // Older jobs claimed before this feature existed won't have items yet — backfill them.
-      const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup)
+      const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery)
       const rows = defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
       const { data: created } = await supabase
         .from('job_checklist_items')
@@ -236,7 +237,7 @@ export default function DriverJobActions({
       changed_by: user.id,
     })
 
-    const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup)
+    const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery)
     await supabase.from('job_checklist_items').insert(
       defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
     )
@@ -356,10 +357,17 @@ export default function DriverJobActions({
                     </p>
 
                     {item.item_type === 'signature' && (
-                      <ChecklistSignaturePad
-                        saving={uploadingItemId === item.id}
-                        onSave={(blob) => uploadSignatureForItem(item, blob)}
-                      />
+                      <div className="space-y-2">
+                        {getDocumentTextForLabel(item.label) && (
+                          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            {getDocumentTextForLabel(item.label)}
+                          </p>
+                        )}
+                        <ChecklistSignaturePad
+                          saving={uploadingItemId === item.id}
+                          onSave={(blob) => uploadSignatureForItem(item, blob)}
+                        />
+                      </div>
                     )}
 
                     {item.item_type === 'condition_report' && (

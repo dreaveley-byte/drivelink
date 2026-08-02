@@ -3,7 +3,17 @@ export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signat
 export type ChecklistDefinitionItem = {
   label: string
   type: ChecklistItemType
+  // Shown above the signature pad for signature items that represent a real
+  // legal document, rather than a simple "sign here" acknowledgment.
+  documentText?: string
 }
+
+const RELEASE_AND_MEDIA_CONSENT_TEXT =
+  'I acknowledge that I have received and personally inspected the vehicle described above, ' +
+  'together with all included options and equipment. I accept the vehicle and its condition as ' +
+  "recorded in this delivery's condition report, and I confirm that I am completely satisfied with " +
+  'the vehicle. I grant DriveLink, its third-party partners, and the selling dealer permission to use ' +
+  'photographs of me with my purchased vehicle for promotional and social media purposes.'
 
 // Vehicle-moving jobs get the full pickup-through-delivery checklist, split into
 // two clearly labeled phases so the driver always knows where they are.
@@ -24,12 +34,23 @@ export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: "Delivery: Verify purchaser — photo of customer holding driver's license", type: 'photo' },
   { label: 'Delivery: Condition walkaround video', type: 'video' },
   { label: 'Delivery: Photos of any damage', type: 'photo' },
-  { label: 'Delivery: Customer signs off on condition report', type: 'signature' },
+  {
+    label: 'Delivery: Customer signs release, condition acceptance & media consent',
+    type: 'signature',
+    documentText: RELEASE_AND_MEDIA_CONSENT_TEXT,
+  },
   { label: 'Delivery: Photograph vehicle', type: 'photo' },
   { label: 'Delivery: Photograph odometer', type: 'photo' },
   { label: 'Delivery: Obtain signatures', type: 'signature' },
+  { label: 'Delivery: Short video testimonial from customer', type: 'video' },
   { label: 'Delivery: Complete checklist', type: 'check' },
   { label: 'Delivery: Upload photos', type: 'photo' },
+]
+
+// Appended when the job is flagged as a First Nations reserve delivery.
+export const FIRST_NATIONS_CHECKLIST: ChecklistDefinitionItem[] = [
+  { label: 'Delivery: Deliver vehicle to the reservation', type: 'check' },
+  { label: 'Delivery: Photograph customer in front of their vehicle at the reservation', type: 'photo' },
 ]
 
 // Added on top of the vehicle checklist whenever the job includes a trade-in pickup.
@@ -49,9 +70,23 @@ export const DOCUMENT_CHECKLIST: ChecklistDefinitionItem[] = [
 
 const VEHICLE_JOB_TYPES = ['Vehicle Delivery', 'Vehicle Pickup', 'Dealer to Dealer']
 
-export function getDefaultChecklist(jobTypeName: string | null | undefined, isTradeIn: boolean): ChecklistDefinitionItem[] {
+export function getDocumentTextForLabel(label: string): string | undefined {
+  const displayLabel = label.replace(/^(Pickup|Delivery):\s*/, '')
+  const match = [...VEHICLE_CHECKLIST, ...TRADE_IN_CHECKLIST, ...DOCUMENT_CHECKLIST].find(
+    (item) => item.label.replace(/^(Pickup|Delivery):\s*/, '') === displayLabel
+  )
+  return match?.documentText
+}
+export function getDefaultChecklist(
+  jobTypeName: string | null | undefined,
+  isTradeIn: boolean,
+  isFirstNationsDelivery: boolean = false
+): ChecklistDefinitionItem[] {
   if (jobTypeName && VEHICLE_JOB_TYPES.includes(jobTypeName)) {
-    return isTradeIn ? [...VEHICLE_CHECKLIST, ...TRADE_IN_CHECKLIST] : VEHICLE_CHECKLIST
+    let items = VEHICLE_CHECKLIST
+    if (isTradeIn) items = [...items, ...TRADE_IN_CHECKLIST]
+    if (isFirstNationsDelivery) items = [...items, ...FIRST_NATIONS_CHECKLIST]
+    return items
   }
   return DOCUMENT_CHECKLIST
 }

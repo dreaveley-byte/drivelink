@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import PrintButton from '@/components/PrintButton'
 import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
+import { getDocumentTextForLabel } from '@/lib/checklist'
 
 export const dynamic = 'force-dynamic'
 
@@ -178,6 +179,9 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   )}
                   {item.notes && (
                     <p className="text-xs text-gray-500 mt-0.5 ml-4">{item.notes}</p>
+                  )}
+                  {item.completed_at && getDocumentTextForLabel(item.label) && (
+                    <p className="text-xs text-gray-400 mt-0.5 ml-4 italic">{getDocumentTextForLabel(item.label)}</p>
                   )}
                 </div>
               )})}

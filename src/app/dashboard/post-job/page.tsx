@@ -35,6 +35,7 @@ export default function PostJobPage() {
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
+  const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
@@ -235,6 +236,7 @@ export default function PostJobPage() {
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
+      is_first_nations_delivery: isFirstNationsDelivery,
       vehicle_mode: vehicleMode,
       used_own_vehicle: true,
       out_of_province_inspection: outOfProvinceInspection,
@@ -456,6 +458,10 @@ export default function PostJobPage() {
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={registryVisit} onChange={(e) => setRegistryVisit(e.target.checked)} />
               Registry visit required
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
+              Delivery is to a First Nations reserve
             </label>
           </div>
 

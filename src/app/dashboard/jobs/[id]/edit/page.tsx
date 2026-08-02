@@ -34,6 +34,7 @@ export default function EditJobPage() {
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
+  const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
@@ -107,6 +108,7 @@ export default function EditJobPage() {
       setSecondDriver(job.second_driver_required ?? false)
       setChaseVehicle(job.chase_vehicle_required ?? false)
       setIsTradeIn(job.is_trade_in_pickup ?? false)
+      setIsFirstNationsDelivery(job.is_first_nations_delivery ?? false)
       setVehicleMode(job.vehicle_mode ?? 'driven')
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
@@ -220,6 +222,7 @@ export default function EditJobPage() {
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
+      is_first_nations_delivery: isFirstNationsDelivery,
       vehicle_mode: vehicleMode,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
@@ -435,6 +438,10 @@ export default function EditJobPage() {
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={registryVisit} onChange={(e) => setRegistryVisit(e.target.checked)} />
               Registry visit required
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
+              Delivery is to a First Nations reserve
             </label>
           </div>
 
