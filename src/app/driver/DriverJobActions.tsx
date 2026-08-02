@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents } from '@/lib/pricing'
-import { getDefaultChecklist, getDocumentTextForLabel, type ChecklistItemType } from '@/lib/checklist'
+import { getDefaultChecklist, getDocumentTextForLabel, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
 
@@ -25,6 +25,10 @@ type Job = {
   vin: string | null
   is_trade_in_pickup: boolean | null
   is_first_nations_delivery: boolean | null
+  key_count: number | null
+  has_wheel_lock: boolean | null
+  has_charging_cables: boolean | null
+  other_included_items: string | null
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string }[] | { name: string } | null
 }
@@ -125,7 +129,12 @@ export default function DriverJobActions({
       }
 
       // Older jobs claimed before this feature existed won't have items yet — backfill them.
-      const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery)
+      const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery, {
+      keyCount: job.key_count,
+      hasWheelLock: !!job.has_wheel_lock,
+      hasChargingCables: !!job.has_charging_cables,
+      otherItems: job.other_included_items,
+    })
       const rows = defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
       const { data: created } = await supabase
         .from('job_checklist_items')
@@ -305,7 +314,12 @@ export default function DriverJobActions({
       changed_by: user.id,
     })
 
-    const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery)
+    const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery, {
+      keyCount: job.key_count,
+      hasWheelLock: !!job.has_wheel_lock,
+      hasChargingCables: !!job.has_charging_cables,
+      otherItems: job.other_included_items,
+    })
     await supabase.from('job_checklist_items').insert(
       defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
     )

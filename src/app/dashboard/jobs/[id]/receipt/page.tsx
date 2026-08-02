@@ -129,6 +129,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             {job.stock_number && <p className="text-sm text-gray-600">Stock #{job.stock_number}</p>}
             {job.vin && <p className="text-sm text-gray-600">VIN: {job.vin}</p>}
             {job.mileage && <p className="text-sm text-gray-600">{job.mileage} km</p>}
+            {(job.key_count || job.has_wheel_lock || job.has_charging_cables || job.other_included_items) && (
+              <p className="text-xs text-gray-500 mt-1">
+                Included: {[
+                  job.key_count && `${job.key_count} set${job.key_count === 1 ? '' : 's'} of keys`,
+                  job.has_wheel_lock && 'wheel lock',
+                  job.has_charging_cables && 'charging cables',
+                  job.other_included_items,
+                ].filter(Boolean).join(', ')}
+              </p>
+            )}
             <p className="text-sm text-gray-600 mt-1">{jobTypeName}</p>
           </div>
 

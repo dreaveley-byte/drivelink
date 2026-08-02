@@ -74,13 +74,38 @@ export function getDocumentTextForLabel(label: string): string | undefined {
   )
   return match?.documentText
 }
+export type IncludedItems = {
+  keyCount: number | null
+  hasWheelLock: boolean
+  hasChargingCables: boolean
+  otherItems: string | null
+}
+
+function includedItemsLabel(items: IncludedItems): string | null {
+  const parts: string[] = []
+  if (items.keyCount) parts.push(`${items.keyCount} set${items.keyCount === 1 ? '' : 's'} of keys`)
+  if (items.hasWheelLock) parts.push('wheel lock')
+  if (items.hasChargingCables) parts.push('charging cables')
+  if (items.otherItems) parts.push(items.otherItems)
+  if (parts.length === 0) return null
+  return `Pickup: Confirm included items — ${parts.join(', ')}`
+}
+
 export function getDefaultChecklist(
   jobTypeName: string | null | undefined,
   isTradeIn: boolean,
-  isFirstNationsDelivery: boolean = false
+  isFirstNationsDelivery: boolean = false,
+  includedItems?: IncludedItems
 ): ChecklistDefinitionItem[] {
   if (jobTypeName && VEHICLE_JOB_TYPES.includes(jobTypeName)) {
-    let items = VEHICLE_CHECKLIST
+    let items = [...VEHICLE_CHECKLIST]
+    if (includedItems) {
+      const label = includedItemsLabel(includedItems)
+      if (label) {
+        // Insert right after the first item (VIN/BOS confirmation), before the rest of pickup.
+        items.splice(1, 0, { label, type: 'check' })
+      }
+    }
     if (isTradeIn) items = [...items, ...TRADE_IN_CHECKLIST]
     if (isFirstNationsDelivery) items = [...items, ...FIRST_NATIONS_CHECKLIST]
     return items

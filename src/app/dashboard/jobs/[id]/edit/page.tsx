@@ -24,6 +24,10 @@ export default function EditJobPage() {
   const [stockNumber, setStockNumber] = useState('')
   const [vin, setVin] = useState('')
   const [mileage, setMileage] = useState('')
+  const [keyCount, setKeyCount] = useState('')
+  const [hasWheelLock, setHasWheelLock] = useState(false)
+  const [hasChargingCables, setHasChargingCables] = useState(false)
+  const [otherIncludedItems, setOtherIncludedItems] = useState('')
   const [customerFullName, setCustomerFullName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
@@ -99,6 +103,10 @@ export default function EditJobPage() {
       setStockNumber(job.stock_number ?? '')
       setVin(job.vin ?? '')
       setMileage(job.mileage?.toString() ?? '')
+      setKeyCount(job.key_count?.toString() ?? '')
+      setHasWheelLock(job.has_wheel_lock ?? false)
+      setHasChargingCables(job.has_charging_cables ?? false)
+      setOtherIncludedItems(job.other_included_items ?? '')
       setCustomerFullName(job.customer_full_name ?? '')
       setCustomerPhone(job.customer_phone ?? '')
       setCustomerAddress(job.customer_address ?? '')
@@ -215,6 +223,10 @@ export default function EditJobPage() {
       stock_number: stockNumber || null,
       vin: vin || null,
       mileage: mileage ? parseInt(mileage) : null,
+      key_count: keyCount ? parseInt(keyCount) : null,
+      has_wheel_lock: hasWheelLock,
+      has_charging_cables: hasChargingCables,
+      other_included_items: otherIncludedItems || null,
       customer_full_name: customerFullName || null,
       customer_phone: customerPhone || null,
       customer_address: customerAddress || null,
@@ -355,6 +367,30 @@ export default function EditJobPage() {
               <label className="block text-xs text-gray-500 mb-1">VIN</label>
               <input value={vin} onChange={(e) => setVin(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-2">Included with vehicle</p>
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Sets of keys</label>
+                  <input type="number" min="0" value={keyCount} onChange={(e) => setKeyCount(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Other</label>
+                  <input value={otherIncludedItems} onChange={(e) => setOtherIncludedItems(e.target.value)}
+                    placeholder="e.g. floor mats" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 mb-1">
+                <input type="checkbox" checked={hasWheelLock} onChange={(e) => setHasWheelLock(e.target.checked)} />
+                Wheel lock included
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={hasChargingCables} onChange={(e) => setHasChargingCables(e.target.checked)} />
+                Charging cables included (if applicable)
+              </label>
             </div>
           </div>
 

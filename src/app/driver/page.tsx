@@ -37,7 +37,7 @@ export default async function DriverPage() {
     )
   }
 
-  const jobSelect = 'id, status, pickup_address, dropoff_address, recipient_name, customer_full_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, estimated_distance_km, estimated_driver_pay_cents, job_types(name), organizations(name)'
+  const jobSelect = 'id, status, pickup_address, dropoff_address, recipient_name, customer_full_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, key_count, has_wheel_lock, has_charging_cables, other_included_items, estimated_distance_km, estimated_driver_pay_cents, job_types(name), organizations(name)'
 
   const { data: myJob } = await supabase
     .from('jobs')
