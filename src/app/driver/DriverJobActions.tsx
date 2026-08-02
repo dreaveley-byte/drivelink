@@ -91,6 +91,9 @@ export default function DriverJobActions({
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const HEAVY_TYPES = ['photo', 'video', 'upload', 'signature', 'condition_report']
 
   async function refreshFileUrls(paths: string[]) {
     if (paths.length === 0) return
@@ -190,6 +193,7 @@ export default function DriverJobActions({
 
     refreshFileUrls(newPaths)
     setUploadingItemId(null)
+    if (item.item_type !== 'condition_report') setExpandedId(null)
   }
 
   async function uploadSignatureForItem(item: ChecklistItem, blob: Blob) {
@@ -212,6 +216,7 @@ export default function DriverJobActions({
       refreshFileUrls([path])
     }
     setUploadingItemId(null)
+    setExpandedId(null)
   }
 
   async function saveNotesForItem(item: ChecklistItem, notes: string) {
@@ -454,6 +459,24 @@ export default function DriverJobActions({
                       {displayLabel}
                     </span>
                   </label>
+                ) : item.item_type === 'yesno' ? (
+                  <div>
+                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>{displayLabel}</p>
+                    <div className="flex gap-2">
+                      {['Yes', 'No'].map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setTristateValue(item, opt)}
+                          className={`text-xs px-3 py-1.5 rounded-lg border ${
+                            item.notes === opt ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ) : item.item_type === 'tristate' ? (
                   <div>
                     <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>{displayLabel}</p>
@@ -472,130 +495,149 @@ export default function DriverJobActions({
                       ))}
                     </div>
                   </div>
-                ) : item.item_type === 'condition_report' ? (
-                  <div>
-                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                      {item.completed_at ? '✓ ' : ''}{displayLabel}
-                    </p>
-                    <ConditionReportCard
-                      data={item.condition_data ?? { markers: [], cleanliness: null, smell: '' }}
-                      onChange={(d) => saveConditionData(item, d)}
-                      notes={item.notes ?? ''}
-                      onNotesBlur={(v) => saveNotesForItem(item, v)}
-                      filePaths={item.file_paths}
-                      fileUrls={fileUrls}
-                      onUploadPhotos={(files) => uploadFilesForItem(item, files)}
-                      onDeleteFile={(path) => deleteFileFromItem(item, path)}
-                      uploading={uploadingItemId === item.id}
-                    />
-                  </div>
                 ) : (
+                  // Heavy items (photo/video/upload/signature/condition_report) collapse into a
+                  // single tappable row, expanding to their full controls one at a time.
                   <div>
-                    <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                      {item.completed_at ? '✓ ' : ''}{displayLabel}
-                      {item.file_paths.length > 0 && ` (${item.file_paths.length} saved)`}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                      className="w-full flex items-center justify-between text-left"
+                    >
+                      <span className={`text-sm ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>
+                        {item.completed_at ? '✓ ' : ''}{displayLabel}
+                        {item.file_paths.length > 0 && ` (${item.file_paths.length} saved)`}
+                      </span>
+                      <span className="text-gray-300 text-xs">{expandedId === item.id ? '▾' : '▸'}</span>
+                    </button>
 
-                    {item.file_paths.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {item.file_paths.map((path) => {
-                          const isImage = /\.(jpe?g|png|gif|webp)$/i.test(path)
-                          const url = fileUrls[path]
-                          return (
-                            <div key={path} className="relative">
-                              {isImage && url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer">
-                                  <img src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
-                                </a>
-                              ) : (
-                                <a
-                                  href={url || '#'}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-14 h-14 rounded-lg border border-gray-200 flex items-center justify-center text-xs text-gray-500 bg-gray-50"
-                                >
-                                  File
-                                </a>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => deleteFileFromItem(item, path)}
-                                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {item.item_type === 'signature' && (
-                      <div className="space-y-2">
-                        {getDocumentTextForLabel(item.label) && (
-                          <>
-                            {(() => {
-                              const pickupCondition = checklist.find((c) => c.item_type === 'condition_report')
-                              if (!pickupCondition) return null
-                              const cd = pickupCondition.condition_data
+                    {expandedId === item.id && (
+                      <div className="mt-2">
+                        {item.file_paths.length > 0 && item.item_type !== 'condition_report' && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {item.file_paths.map((path) => {
+                              const isImage = /\.(jpe?g|png|gif|webp)$/i.test(path)
+                              const url = fileUrls[path]
                               return (
-                                <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                  <p className="text-xs font-semibold text-gray-500 mb-1">Pickup condition report — please review with customer</p>
-                                  {pickupCondition.notes && <p className="text-xs text-gray-600">{pickupCondition.notes}</p>}
-                                  {cd && (cd.cleanliness || cd.smell) && (
-                                    <p className="text-xs text-gray-600 mt-0.5">
-                                      {cd.cleanliness && `Cleanliness: ${cd.cleanliness}/5`}
-                                      {cd.cleanliness && cd.smell && ' · '}
-                                      {cd.smell && `Smell: ${cd.smell}`}
-                                    </p>
+                                <div key={path} className="relative">
+                                  {isImage && url ? (
+                                    <a href={url} target="_blank" rel="noopener noreferrer">
+                                      <img src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+                                    </a>
+                                  ) : (
+                                    <a
+                                      href={url || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="w-14 h-14 rounded-lg border border-gray-200 flex items-center justify-center text-xs text-gray-500 bg-gray-50"
+                                    >
+                                      File
+                                    </a>
                                   )}
-                                  {cd && cd.markers.length > 0 && (
-                                    <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
-                                      {cd.markers.map((m, i) => <li key={i}>{m.note}</li>)}
-                                    </ul>
-                                  )}
-                                  <FilePreviewRow filePaths={pickupCondition.file_paths} fileUrls={fileUrls} />
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteFileFromItem(item, path)}
+                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                    title="Remove"
+                                  >
+                                    ✕
+                                  </button>
                                 </div>
                               )
-                            })()}
-                          </>
+                            })}
+                          </div>
                         )}
-                        {getDocumentTextForLabel(item.label) && (
-                          <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                            {getDocumentTextForLabel(item.label)}
-                          </p>
-                        )}
-                        <ChecklistSignaturePad
-                          saving={uploadingItemId === item.id}
-                          onSave={(blob) => uploadSignatureForItem(item, blob)}
-                        />
-                      </div>
-                    )}
 
-                    {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
-                      <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
-                        {uploadingItemId === item.id
-                          ? 'Uploading...'
-                          : item.item_type === 'video'
-                          ? 'Record / upload video'
-                          : item.item_type === 'photo'
-                          ? 'Take / upload photo'
-                          : 'Upload document'}
-                        <input
-                          type="file"
-                          className="hidden"
-                          disabled={uploadingItemId === item.id}
-                          multiple={item.item_type === 'photo'}
-                          accept={item.item_type === 'video' ? 'video/*' : item.item_type === 'photo' ? 'image/*' : 'image/*,.pdf'}
-                          capture={item.item_type === 'video' || item.item_type === 'photo' ? 'environment' : undefined}
-                          onChange={(e) => {
-                            const files = e.target.files ? Array.from(e.target.files) : []
-                            if (files.length > 0) uploadFilesForItem(item, files)
-                            e.target.value = ''
-                          }}
-                        />
-                      </label>
+                        {item.item_type === 'condition_report' && (
+                          <div className="space-y-2">
+                            <ConditionReportCard
+                              data={item.condition_data ?? { markers: [], cleanliness: null, smell: '' }}
+                              onChange={(d) => saveConditionData(item, d)}
+                              notes={item.notes ?? ''}
+                              onNotesBlur={(v) => saveNotesForItem(item, v)}
+                              filePaths={item.file_paths}
+                              fileUrls={fileUrls}
+                              onUploadPhotos={(files) => uploadFilesForItem(item, files)}
+                              onDeleteFile={(path) => deleteFileFromItem(item, path)}
+                              uploading={uploadingItemId === item.id}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setExpandedId(null)}
+                              className="text-xs text-gray-500 hover:text-gray-900 underline"
+                            >
+                              Done — collapse
+                            </button>
+                          </div>
+                        )}
+
+                        {item.item_type === 'signature' && (
+                          <div className="space-y-2">
+                            {getDocumentTextForLabel(item.label) && (
+                              <>
+                                {(() => {
+                                  const pickupCondition = checklist.find((c) => c.item_type === 'condition_report')
+                                  if (!pickupCondition) return null
+                                  const cd = pickupCondition.condition_data
+                                  return (
+                                    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                      <p className="text-xs font-semibold text-gray-500 mb-1">Pickup condition report — please review with customer</p>
+                                      {pickupCondition.notes && <p className="text-xs text-gray-600">{pickupCondition.notes}</p>}
+                                      {cd && (cd.cleanliness || cd.smell) && (
+                                        <p className="text-xs text-gray-600 mt-0.5">
+                                          {cd.cleanliness && `Cleanliness: ${cd.cleanliness}/5`}
+                                          {cd.cleanliness && cd.smell && ' · '}
+                                          {cd.smell && `Smell: ${cd.smell}`}
+                                        </p>
+                                      )}
+                                      {cd && cd.markers.length > 0 && (
+                                        <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
+                                          {cd.markers.map((m, i) => <li key={i}>{m.note}</li>)}
+                                        </ul>
+                                      )}
+                                      <FilePreviewRow filePaths={pickupCondition.file_paths} fileUrls={fileUrls} />
+                                    </div>
+                                  )
+                                })()}
+                              </>
+                            )}
+                            {getDocumentTextForLabel(item.label) && (
+                              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                {getDocumentTextForLabel(item.label)}
+                              </p>
+                            )}
+                            <ChecklistSignaturePad
+                              saving={uploadingItemId === item.id}
+                              onSave={(blob) => uploadSignatureForItem(item, blob)}
+                            />
+                          </div>
+                        )}
+
+                        {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
+                          <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
+                            {uploadingItemId === item.id
+                              ? 'Uploading...'
+                              : item.item_type === 'video'
+                              ? 'Record / upload video'
+                              : item.item_type === 'photo'
+                              ? 'Take / upload photo'
+                              : 'Upload document'}
+                            <input
+                              type="file"
+                              className="hidden"
+                              disabled={uploadingItemId === item.id}
+                              multiple={item.item_type === 'photo'}
+                              accept={item.item_type === 'video' ? 'video/*' : item.item_type === 'photo' ? 'image/*' : 'image/*,.pdf'}
+                              capture={item.item_type === 'video' || item.item_type === 'photo' ? 'environment' : undefined}
+                              onChange={(e) => {
+                                const files = e.target.files ? Array.from(e.target.files) : []
+                                if (files.length > 0) uploadFilesForItem(item, files)
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

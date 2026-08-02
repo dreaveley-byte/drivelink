@@ -1,4 +1,4 @@
-export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report' | 'tristate'
+export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report' | 'tristate' | 'yesno'
 
 export type ChecklistDefinitionItem = {
   label: string
@@ -17,7 +17,7 @@ const RELEASE_AND_MEDIA_CONSENT_TEXT =
 // two clearly labeled phases so the driver always knows where they are.
 export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   // Pickup phase
-  { label: 'Pickup: Confirm VIN on vehicle matches Bill of Sale', type: 'check' },
+  { label: 'Pickup: Confirm VIN on vehicle matches Bill of Sale', type: 'yesno' },
   { label: 'Pickup: Confirm VIN matches registration (if applicable)', type: 'tristate' },
   { label: 'Pickup: Verify year, make, model & colour match Bill of Sale', type: 'check' },
   { label: 'Pickup: Photograph VIN', type: 'photo' },
