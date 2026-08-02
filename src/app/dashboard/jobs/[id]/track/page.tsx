@@ -1,7 +1,9 @@
 import { redirect, notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
 import CloseButton from '@/components/CloseButton'
+import CopyLinkButton from '@/components/CopyLinkButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,11 +26,16 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, job_types(name), driver:driver_id(full_name)')
+    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, job_types(name), driver:driver_id(full_name)')
     .eq('id', jobId)
     .single()
 
   if (!job) notFound()
+
+  const headersList = await headers()
+  const host = headersList.get('host')
+  const protocol = host?.includes('localhost') ? 'http' : 'https'
+  const publicTrackingUrl = `${protocol}://${host}/track/${job.tracking_token}`
 
   const { data: checklist } = await supabase
     .from('job_checklist_items')
@@ -74,6 +81,10 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           initialLocationUpdatedAt={job.driver_location_updated_at}
           jobStatus={job.status}
         />
+
+        <div className="mt-4">
+          <CopyLinkButton url={publicTrackingUrl} />
+        </div>
 
         <div className="mt-4 text-sm text-gray-500">
           <p>{job.pickup_address}</p>

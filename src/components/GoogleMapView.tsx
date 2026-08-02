@@ -39,6 +39,7 @@ type Props = {
   initialDriverLng: number | null
   initialLocationUpdatedAt: string | null
   jobStatus: string
+  publicToken?: string
 }
 
 export default function GoogleMapView({
@@ -49,6 +50,7 @@ export default function GoogleMapView({
   initialDriverLng,
   initialLocationUpdatedAt,
   jobStatus,
+  publicToken,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -146,14 +148,29 @@ export default function GoogleMapView({
 
     const supabase = createClient()
     const interval = setInterval(async () => {
-      const { data } = await supabase
-        .from('jobs')
-        .select('driver_lat, driver_lng, driver_location_updated_at')
-        .eq('id', jobId)
-        .single()
+      let driverLat: number | null = null
+      let driverLng: number | null = null
+      let updatedAt: string | null = null
 
-      if (data?.driver_lat != null && data?.driver_lng != null && window.google?.maps) {
-        const pos = { lat: data.driver_lat, lng: data.driver_lng }
+      if (publicToken) {
+        const { data } = await supabase.rpc('get_tracking_info', { p_token: publicToken })
+        const row = Array.isArray(data) ? data[0] : data
+        driverLat = row?.driver_lat ?? null
+        driverLng = row?.driver_lng ?? null
+        updatedAt = row?.driver_location_updated_at ?? null
+      } else {
+        const { data } = await supabase
+          .from('jobs')
+          .select('driver_lat, driver_lng, driver_location_updated_at')
+          .eq('id', jobId)
+          .single()
+        driverLat = data?.driver_lat ?? null
+        driverLng = data?.driver_lng ?? null
+        updatedAt = data?.driver_location_updated_at ?? null
+      }
+
+      if (driverLat != null && driverLng != null && window.google?.maps) {
+        const pos = { lat: driverLat, lng: driverLng }
         if (driverMarkerRef.current) {
           driverMarkerRef.current.setPosition(pos)
         } else if (mapRef.current) {
@@ -171,13 +188,13 @@ export default function GoogleMapView({
             title: 'Driver',
           })
         }
-        setLocationUpdatedAt(data.driver_location_updated_at)
-        updateEta(data.driver_lat, data.driver_lng)
+        setLocationUpdatedAt(updatedAt)
+        updateEta(driverLat, driverLng)
       }
     }, 15000)
 
     return () => clearInterval(interval)
-  }, [jobId, isTerminal, updateEta])
+  }, [jobId, isTerminal, updateEta, publicToken])
 
   const minutesAgo = locationUpdatedAt
     ? Math.round((Date.now() - new Date(locationUpdatedAt).getTime()) / 60000)
