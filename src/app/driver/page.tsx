@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
+import LocationSharer from '@/components/LocationSharer'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -100,6 +101,9 @@ export default async function DriverPage() {
           <div>
             <h2 className="text-sm font-medium text-gray-500 mb-2">Your active job</h2>
             <DriverJobActions job={myJob} isActive />
+            <div className="mt-2">
+              <LocationSharer jobId={myJob.id} />
+            </div>
           </div>
         )}
 

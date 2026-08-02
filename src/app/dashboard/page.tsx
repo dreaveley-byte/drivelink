@@ -110,6 +110,7 @@ export default async function DashboardPage() {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
             const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
             const isCompleted = job.status === 'completed'
+            const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
             const cardBody = (
               <>
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
@@ -138,15 +139,21 @@ export default async function DashboardPage() {
                   </p>
                 )}
                 {isCompleted && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
+                {isTrackable && <p className="text-xs text-blue-600 mt-1">Track drive →</p>}
               </>
             )
+            const linkHref = isCompleted
+              ? `/dashboard/jobs/${job.id}/receipt`
+              : isTrackable
+              ? `/dashboard/jobs/${job.id}/track`
+              : null
             return (
             <div
               key={job.id}
-              className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${isCompleted ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}
+              className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${linkHref ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}
             >
-              {isCompleted ? (
-                <Link href={`/dashboard/jobs/${job.id}/receipt`} target="_blank" className="flex-1">
+              {linkHref ? (
+                <Link href={linkHref} target="_blank" className="flex-1">
                   {cardBody}
                 </Link>
               ) : (

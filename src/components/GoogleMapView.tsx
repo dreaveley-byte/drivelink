@@ -1,0 +1,203 @@
+'use client'
+
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+declare global {
+  interface Window {
+    google: any
+    __driveLinkMapsLoading?: Promise<void>
+  }
+}
+
+function loadGoogleMaps(): Promise<void> {
+  if (window.google?.maps) return Promise.resolve()
+  if (window.__driveLinkMapsLoading) return window.__driveLinkMapsLoading
+
+  window.__driveLinkMapsLoading = new Promise((resolve, reject) => {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    if (!key) {
+      reject(new Error('missing_key'))
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geocoding`
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('load_failed'))
+    document.head.appendChild(script)
+  })
+
+  return window.__driveLinkMapsLoading
+}
+
+type Props = {
+  jobId: string
+  pickupAddress: string
+  dropoffAddress: string
+  initialDriverLat: number | null
+  initialDriverLng: number | null
+  initialLocationUpdatedAt: string | null
+  jobStatus: string
+}
+
+export default function GoogleMapView({
+  jobId,
+  pickupAddress,
+  dropoffAddress,
+  initialDriverLat,
+  initialDriverLng,
+  initialLocationUpdatedAt,
+  jobStatus,
+}: Props) {
+  const mapDivRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+  const driverMarkerRef = useRef<any>(null)
+  const [mapError, setMapError] = useState('')
+  const [locationUpdatedAt, setLocationUpdatedAt] = useState(initialLocationUpdatedAt)
+  const [eta, setEta] = useState<string>('')
+  const isTerminal = jobStatus === 'completed' || jobStatus === 'cancelled'
+
+  const updateEta = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch('/api/distance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: [`${lat},${lng}`, dropoffAddress] }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setEta(`${data.durationMinutes} min (${data.distanceKm} km) to dropoff`)
+      }
+    } catch {
+      // ETA is a nice-to-have; fail silently if it doesn't come back.
+    }
+  }, [dropoffAddress])
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadGoogleMaps()
+      .then(() => {
+        if (cancelled || !mapDivRef.current) return
+        const google = window.google
+
+        const map = new google.maps.Map(mapDivRef.current, {
+          zoom: 11,
+          center: { lat: 49.28, lng: -123.12 },
+          disableDefaultUI: false,
+        })
+        mapRef.current = map
+
+        const geocoder = new google.maps.Geocoder()
+        const bounds = new google.maps.LatLngBounds()
+
+        geocoder.geocode({ address: pickupAddress }, (results: any, status: string) => {
+          if (status === 'OK' && results?.[0]) {
+            const loc = results[0].geometry.location
+            new google.maps.Marker({ position: loc, map, label: 'P', title: 'Pickup' })
+            bounds.extend(loc)
+            map.fitBounds(bounds)
+          }
+        })
+
+        geocoder.geocode({ address: dropoffAddress }, (results: any, status: string) => {
+          if (status === 'OK' && results?.[0]) {
+            const loc = results[0].geometry.location
+            new google.maps.Marker({ position: loc, map, label: 'D', title: 'Dropoff' })
+            bounds.extend(loc)
+            map.fitBounds(bounds)
+          }
+        })
+
+        if (initialDriverLat != null && initialDriverLng != null) {
+          const pos = { lat: initialDriverLat, lng: initialDriverLng }
+          driverMarkerRef.current = new google.maps.Marker({
+            position: pos,
+            map,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#2563eb',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            },
+            title: 'Driver',
+          })
+          bounds.extend(pos)
+          map.fitBounds(bounds)
+          if (!isTerminal) updateEta(initialDriverLat, initialDriverLng)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setMapError(err.message === 'missing_key' ? 'Maps is not configured yet.' : 'Could not load the map.')
+        }
+      })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Poll for driver location updates every 15s while the job is still active
+  useEffect(() => {
+    if (isTerminal) return
+
+    const supabase = createClient()
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('jobs')
+        .select('driver_lat, driver_lng, driver_location_updated_at')
+        .eq('id', jobId)
+        .single()
+
+      if (data?.driver_lat != null && data?.driver_lng != null && window.google?.maps) {
+        const pos = { lat: data.driver_lat, lng: data.driver_lng }
+        if (driverMarkerRef.current) {
+          driverMarkerRef.current.setPosition(pos)
+        } else if (mapRef.current) {
+          driverMarkerRef.current = new window.google.maps.Marker({
+            position: pos,
+            map: mapRef.current,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#2563eb',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            },
+            title: 'Driver',
+          })
+        }
+        setLocationUpdatedAt(data.driver_location_updated_at)
+        updateEta(data.driver_lat, data.driver_lng)
+      }
+    }, 15000)
+
+    return () => clearInterval(interval)
+  }, [jobId, isTerminal, updateEta])
+
+  const minutesAgo = locationUpdatedAt
+    ? Math.round((Date.now() - new Date(locationUpdatedAt).getTime()) / 60000)
+    : null
+
+  return (
+    <div>
+      {mapError ? (
+        <div className="border border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">{mapError}</div>
+      ) : (
+        <div ref={mapDivRef} className="w-full h-80 rounded-lg border border-gray-200" />
+      )}
+      <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+        <span>
+          {eta && !isTerminal ? eta : isTerminal ? 'Trip finished' : 'Waiting for driver location...'}
+        </span>
+        {minutesAgo != null && !isTerminal && (
+          <span>Updated {minutesAgo === 0 ? 'just now' : `${minutesAgo} min ago`}</span>
+        )}
+      </div>
+    </div>
+  )
+}

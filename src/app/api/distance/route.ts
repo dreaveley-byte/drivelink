@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Detects a "lat,lng" formatted string (used for the driver's live GPS position)
+// vs. a normal street address, and builds the right waypoint shape for the Routes API.
+function toWaypoint(point: string) {
+  const match = point.trim().match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/)
+  if (match) {
+    return { location: { latLng: { latitude: parseFloat(match[1]), longitude: parseFloat(match[3]) } } }
+  }
+  return { address: point }
+}
+
 export async function POST(req: NextRequest) {
   const { addresses } = await req.json()
 
@@ -17,9 +27,9 @@ export async function POST(req: NextRequest) {
   const waypoints = addresses.slice(1, -1)
 
   const body = {
-    origin: { address: origin },
-    destination: { address: destination },
-    intermediates: waypoints.map((address: string) => ({ address })),
+    origin: toWaypoint(origin),
+    destination: toWaypoint(destination),
+    intermediates: waypoints.map(toWaypoint),
     travelMode: 'DRIVE',
     units: 'METRIC',
   }
