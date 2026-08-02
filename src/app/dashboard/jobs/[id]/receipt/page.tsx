@@ -17,6 +17,13 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+const CONDITION_LABEL_MATCH = /condition report|condition walkaround|photos of any damage|walk-around video/i
+const DISCLOSURE_LABEL_MATCH = /release, condition acceptance/i
+
 export default async function JobReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params
   const supabase = await createClient()
@@ -29,7 +36,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name), driver:driver_id(full_name)')
+    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, phone)')
     .eq('id', jobId)
     .single()
 
@@ -53,16 +60,48 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       const urls = await Promise.all(
         (item.file_paths ?? []).map(async (path: string) => {
           const { data } = await supabase.storage.from('job-media').createSignedUrl(path, 60 * 60)
-          return data?.signedUrl ?? null
+          return { path, url: data?.signedUrl ?? null }
         })
       )
-      return { ...item, urls: urls.filter(Boolean) as string[] }
+      return { ...item, files: urls.filter((u) => u.url) as { path: string; url: string }[] }
     })
   )
 
-  const driverName = Array.isArray(job.driver) ? job.driver[0]?.full_name : job.driver?.full_name
+  const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
+  const driverName = driverInfo?.full_name as string | undefined
+  const driverPhone = driverInfo?.phone as string | undefined
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : job.job_types?.name
   const orgName = Array.isArray(job.organizations) ? job.organizations[0]?.name : job.organizations?.name
+
+  const pickedUpEvent = events?.find((e) => e.status === 'picked_up')
+  const deliveredEvent = events?.find((e) => e.status === 'delivered' || e.status === 'completed')
+
+  const conditionItems = checklistWithUrls.filter((i) => CONDITION_LABEL_MATCH.test(i.label))
+  const disclosureItem = checklistWithUrls.find((i) => DISCLOSURE_LABEL_MATCH.test(i.label))
+  const otherItems = checklistWithUrls.filter((i) => i !== disclosureItem && !conditionItems.includes(i))
+
+  function isImagePath(path: string) {
+    return /\.(jpe?g|png|gif|webp)$/i.test(path)
+  }
+
+  function FileThumbs({ files }: { files: { path: string; url: string }[] }) {
+    if (files.length === 0) return null
+    return (
+      <div className="flex flex-wrap gap-2 mt-1.5">
+        {files.map((f) => (
+          <a key={f.path} href={f.url} target="_blank" rel="noopener noreferrer">
+            {isImagePath(f.path) ? (
+              <img src={f.url} alt="" className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+            ) : (
+              <span className="w-20 h-20 rounded-lg border border-gray-200 flex items-center justify-center text-xs text-gray-500 bg-gray-50 print:hidden">
+                File
+              </span>
+            )}
+          </a>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -114,7 +153,24 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             {job.vehicle_mode && ` · ${job.vehicle_mode === 'towed' ? 'Towed' : 'Driven'}`}
             {job.second_driver_required && ' · Second driver'}
           </p>
-          {driverName && <p className="text-sm text-gray-600 mt-1">Driver: {driverName}</p>}
+        </div>
+
+        {/* Driver, GPS, and pickup/delivery timing */}
+        <div className="mb-6">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Info</p>
+          <div className="text-sm text-gray-700 space-y-1">
+            {driverName && (
+              <p>Driver: {driverName}{driverPhone && ` · ${driverPhone}`}</p>
+            )}
+            {pickedUpEvent && <p>Picked up: {fmtDateTime(pickedUpEvent.created_at)}</p>}
+            {deliveredEvent && <p>Delivered: {fmtDateTime(deliveredEvent.created_at)}</p>}
+            {job.driver_lat != null && job.driver_lng != null && (
+              <p className="text-gray-500">
+                Last recorded GPS: {Number(job.driver_lat).toFixed(5)}, {Number(job.driver_lng).toFixed(5)}
+                {job.driver_location_updated_at && ` (${fmtDateTime(job.driver_location_updated_at)})`}
+              </p>
+            )}
+          </div>
         </div>
 
         {events && events.length > 0 && (
@@ -124,12 +180,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               {events.map((e, i) => (
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-gray-700">{statusLabels[e.status] ?? e.status}</span>
-                  <span className="text-gray-400">
-                    {new Date(e.created_at).toLocaleString('en-CA', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </span>
+                  <span className="text-gray-400">{fmtDateTime(e.created_at)}</span>
                 </div>
               ))}
             </div>
@@ -148,16 +199,51 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        {checklistWithUrls.length > 0 && (
+        {/* Condition Report: pickup + delivery condition documentation, with visible photos */}
+        {conditionItems.length > 0 && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Condition Report</p>
+            <div className="space-y-3">
+              {conditionItems.map((item) => (
+                <div key={item.id} className="text-sm">
+                  <span className={item.completed_at ? 'text-gray-700' : 'text-gray-400'}>
+                    {item.completed_at ? '✓ ' : '○ '}{item.label.replace(/^(Pickup|Delivery):\s*/, '')}
+                  </span>
+                  {item.notes && <p className="text-xs text-gray-600 mt-0.5">{item.notes}</p>}
+                  <FileThumbs files={item.files} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Delivery Disclosure: the full release / condition acceptance / media consent document */}
+        {disclosureItem && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
+            {getDocumentTextForLabel(disclosureItem.label) && (
+              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+                {getDocumentTextForLabel(disclosureItem.label)}
+              </p>
+            )}
+            <p className="text-sm text-gray-700">
+              {disclosureItem.completed_at ? `Signed by ${job.customer_full_name || 'customer'} on ${fmtDateTime(disclosureItem.completed_at)}` : 'Not yet signed'}
+            </p>
+            <FileThumbs files={disclosureItem.files} />
+          </div>
+        )}
+
+        {/* Full checklist for reference */}
+        {otherItems.length > 0 && (
           <div className="mb-6">
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Checklist ({checklistWithUrls.filter((i) => i.completed_at).length}/{checklistWithUrls.length})
             </p>
-            <div className="space-y-1.5">
-              {checklistWithUrls.map((item, idx) => {
+            <div className="space-y-2">
+              {otherItems.map((item, idx) => {
                 const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
                 const prevPhase = idx > 0
-                  ? (checklistWithUrls[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : checklistWithUrls[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                  ? (otherItems[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : otherItems[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
                   : null
                 const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
                 return (
@@ -168,21 +254,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className={item.completed_at ? 'text-gray-700' : 'text-gray-400'}>
                     {item.completed_at ? '✓ ' : '○ '}{displayLabel}
                   </span>
-                  {item.urls.length > 0 && (
-                    <span className="ml-2 print:hidden">
-                      {item.urls.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline ml-1">
-                          [view{item.urls.length > 1 ? ` ${i + 1}` : ''}]
-                        </a>
-                      ))}
-                    </span>
-                  )}
                   {item.notes && (
                     <p className="text-xs text-gray-500 mt-0.5 ml-4">{item.notes}</p>
                   )}
-                  {item.completed_at && getDocumentTextForLabel(item.label) && (
-                    <p className="text-xs text-gray-400 mt-0.5 ml-4 italic">{getDocumentTextForLabel(item.label)}</p>
-                  )}
+                  <FileThumbs files={item.files} />
                 </div>
               )})}
             </div>
