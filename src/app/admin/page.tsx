@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import JobActions from '@/components/JobActions'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -116,9 +117,12 @@ export default async function AdminPage() {
                   </p>
                 )}
               </div>
-              <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
-                {statusLabels[job.status] ?? job.status}
-              </span>
+              <div className="flex flex-col items-end gap-2">
+                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                  {statusLabels[job.status] ?? job.status}
+                </span>
+                <JobActions jobId={job.id} status={job.status} />
+              </div>
             </div>
           ))}
         </div>

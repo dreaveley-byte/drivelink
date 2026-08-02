@@ -11,6 +11,7 @@ export type PricingSettings = {
   meal_allowance_every_hours: number
   meal_allowance_max_count: number
   dealer_markup_percent: number
+  minimum_driver_pay_cents: number
   out_of_province_inspection_min_hours: number
   out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
@@ -122,15 +123,20 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     .filter((c) => c.paidToDriver)
     .reduce((sum, c) => sum + c.dealerAmountCents, 0)
 
+  // Guarantee a minimum total payout per job, regardless of how short the trip is.
+  const computedDriverPayCents =
+    hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents + extrasDriverCents
+  const estimatedDriverPayCents = Math.max(computedDriverPayCents, settings.minimum_driver_pay_cents)
+  // If the floor kicked in, the dealer's cost basis needs to cover that extra amount
+  // too, before markup is applied on top.
+  const driverPayFloorBumpCents = estimatedDriverPayCents - computedDriverPayCents
+
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
-    registryFeeCents + extrasDealerCents
+    registryFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
-
-  const estimatedDriverPayCents =
-    hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents + extrasDriverCents
 
   return {
     overnightRequired,
