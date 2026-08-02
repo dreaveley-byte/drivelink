@@ -4,6 +4,7 @@ import PrintButton from '@/components/PrintButton'
 import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
 import { buildDeliveryDisclosureText } from '@/lib/checklist'
+import DealerFeedbackForm from '@/components/DealerFeedbackForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -324,6 +325,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
+        {!isAdmin && job.status === 'completed' && (
+          <div className="mb-6">
+            <DealerFeedbackForm jobId={job.id} initialRating={job.dealer_rating} initialFeedback={job.dealer_feedback} />
+          </div>
+        )}
+
         <div className="border-t border-gray-200 pt-6">
           {isAdmin ? (
             <div className="space-y-1">
@@ -337,6 +344,20 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Driver paid</span>
                   <span className="text-gray-900 font-medium">{formatCents(job.estimated_driver_pay_cents)}</span>
+                </div>
+              )}
+              {(job.customer_rating != null || job.customer_feedback) && (
+                <div className="text-sm mt-2">
+                  <span className="text-gray-600">Customer rating: </span>
+                  <span className="text-gray-900 font-medium">{job.customer_rating != null ? `${job.customer_rating}/5` : '—'}</span>
+                  {job.customer_feedback && <p className="text-xs text-gray-500 mt-0.5">{job.customer_feedback}</p>}
+                </div>
+              )}
+              {(job.dealer_rating != null || job.dealer_feedback) && (
+                <div className="text-sm mt-2">
+                  <span className="text-gray-600">Dealer rating: </span>
+                  <span className="text-gray-900 font-medium">{job.dealer_rating != null ? `${job.dealer_rating}/5` : '—'}</span>
+                  {job.dealer_feedback && <p className="text-xs text-gray-500 mt-0.5">{job.dealer_feedback}</p>}
                 </div>
               )}
             </div>

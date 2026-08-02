@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
+import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,18 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
         <p className="text-xs text-gray-400 mt-6 text-center">
           Powered by DriveLink
         </p>
+
+        {(info.status === 'delivered' || info.status === 'completed') && (
+          <div className="mt-6">
+            {info.customer_rating != null ? (
+              <div className="border border-gray-200 rounded-lg p-4 text-center text-sm text-gray-600">
+                Thank you for your feedback!
+              </div>
+            ) : (
+              <CustomerFeedbackForm token={token} />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

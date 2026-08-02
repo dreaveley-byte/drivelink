@@ -450,6 +450,13 @@ export default function DriverJobActions({
       status: 'awaiting_driver',
       changed_by: user?.id,
     })
+    if (user?.id) {
+      await supabase.from('job_releases').insert({
+        job_id: job.id,
+        driver_id: user.id,
+        released_from_status: job.status,
+      })
+    }
 
     router.refresh()
     setLoading(false)
@@ -565,22 +572,6 @@ export default function DriverJobActions({
           >
             {loading ? '...' : nextStatusLabel[job.status]}
           </button>
-        )}
-
-        {isActive && canReleaseByStatus && (
-          canSelfRelease ? (
-            <button
-              onClick={releaseJob}
-              disabled={loading}
-              className="text-xs text-red-600 hover:text-red-700 underline disabled:opacity-50"
-            >
-              Release
-            </button>
-          ) : (
-            <span className="text-[10px] text-amber-600 max-w-[110px] text-right leading-tight">
-              Call dispatch to release — within 24 hrs of delivery
-            </span>
-          )
         )}
 
         {!isActive && (
@@ -890,6 +881,24 @@ export default function DriverJobActions({
         </div>
         )
       })()}
+
+      {isActive && canReleaseByStatus && (
+        <div className="flex justify-end mt-3 pt-3 border-t border-gray-100">
+          {canSelfRelease ? (
+            <button
+              onClick={releaseJob}
+              disabled={loading}
+              className="text-xs text-red-600 hover:text-red-700 underline disabled:opacity-50"
+            >
+              Release drive
+            </button>
+          ) : (
+            <span className="text-[10px] text-amber-600 text-right leading-tight">
+              Call dispatch to release — within 24 hrs of delivery
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
