@@ -287,6 +287,20 @@ export default function DriverJobActions({
     setLoading(false)
   }
 
+  function getCurrentPositionSafe(): Promise<GeolocationPosition | null> {
+    return new Promise((resolve) => {
+      if (!('geolocation' in navigator)) {
+        resolve(null)
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(pos),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    })
+  }
+
   async function advanceStatus() {
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
@@ -294,7 +308,19 @@ export default function DriverJobActions({
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase.from('jobs').update({ status: newStatus }).eq('id', job.id)
+    const jobUpdate: Record<string, string | number> = { status: newStatus }
+
+    if (newStatus === 'picked_up' || newStatus === 'delivered') {
+      const pos = await getCurrentPositionSafe()
+      if (pos) {
+        const prefix = newStatus === 'picked_up' ? 'pickup' : 'delivery'
+        jobUpdate[`${prefix}_gps_lat`] = pos.coords.latitude
+        jobUpdate[`${prefix}_gps_lng`] = pos.coords.longitude
+        jobUpdate[`${prefix}_gps_at`] = new Date().toISOString()
+      }
+    }
+
+    await supabase.from('jobs').update(jobUpdate).eq('id', job.id)
     await supabase.from('job_status_events').insert({
       job_id: job.id,
       status: newStatus,

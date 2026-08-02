@@ -163,11 +163,17 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               <p>Driver: {driverName}{driverPhone && ` · ${driverPhone}`}</p>
             )}
             {pickedUpEvent && <p>Picked up: {fmtDateTime(pickedUpEvent.created_at)}</p>}
-            {deliveredEvent && <p>Delivered: {fmtDateTime(deliveredEvent.created_at)}</p>}
-            {job.driver_lat != null && job.driver_lng != null && (
+            {job.pickup_gps_lat != null && job.pickup_gps_lng != null && (
               <p className="text-gray-500">
-                Last recorded GPS: {Number(job.driver_lat).toFixed(5)}, {Number(job.driver_lng).toFixed(5)}
-                {job.driver_location_updated_at && ` (${fmtDateTime(job.driver_location_updated_at)})`}
+                Pickup GPS: {Number(job.pickup_gps_lat).toFixed(5)}, {Number(job.pickup_gps_lng).toFixed(5)}
+                {job.pickup_gps_at && ` (${fmtDateTime(job.pickup_gps_at)})`}
+              </p>
+            )}
+            {deliveredEvent && <p>Delivered: {fmtDateTime(deliveredEvent.created_at)}</p>}
+            {job.delivery_gps_lat != null && job.delivery_gps_lng != null && (
+              <p className="text-gray-500">
+                Delivery GPS: {Number(job.delivery_gps_lat).toFixed(5)}, {Number(job.delivery_gps_lng).toFixed(5)}
+                {job.delivery_gps_at && ` (${fmtDateTime(job.delivery_gps_at)})`}
               </p>
             )}
           </div>
