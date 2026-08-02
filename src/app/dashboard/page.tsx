@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import JobActions from '@/components/JobActions'
+import AutoRefresh from '@/components/AutoRefresh'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -86,6 +87,7 @@ export default async function DashboardPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
+        <AutoRefresh />
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
           <div className="flex items-center gap-4">

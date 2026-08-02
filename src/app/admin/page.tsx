@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import JobActions from '@/components/JobActions'
+import AutoRefresh from '@/components/AutoRefresh'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -69,6 +70,7 @@ export default async function AdminPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8">
+        <AutoRefresh />
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Total Jobs', value: total },

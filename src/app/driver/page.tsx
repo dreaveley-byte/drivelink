@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
 import LocationSharer from '@/components/LocationSharer'
+import AutoRefresh from '@/components/AutoRefresh'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -84,6 +85,7 @@ export default async function DriverPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+        <AutoRefresh />
         <div className="grid grid-cols-2 gap-3">
           <div className="border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-500">This month</p>
