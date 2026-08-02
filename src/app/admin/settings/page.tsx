@@ -75,15 +75,21 @@ export default function PricingSettingsPage() {
     setSaved(false)
     setSaveError('')
     const supabase = createClient()
-    const { error } = await supabase.from('pricing_settings').update(settings).eq('id', 1)
-    if (error) {
+    // Chaining .select().single() forces this to error if 0 rows were actually
+    // updated (e.g. an RLS policy silently blocking it) instead of reporting
+    // false success.
+    const { data: updated, error } = await supabase
+      .from('pricing_settings')
+      .update(settings)
+      .eq('id', 1)
+      .select()
+      .single()
+    if (error || !updated) {
       setSaving(false)
-      setSaveError(error.message)
+      setSaveError(error?.message || 'Update did not return the saved row — it may not have been applied.')
       return
     }
-    // Re-fetch to confirm what's actually in the database now, not just what we sent.
-    const { data: confirmed } = await supabase.from('pricing_settings').select('*').eq('id', 1).single()
-    setSettings(confirmed)
+    setSettings(updated)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
