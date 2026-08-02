@@ -19,7 +19,9 @@ type Settings = {
   meal_allowance_max_count: number
   dealer_markup_percent: number
   out_of_province_inspection_min_hours: number
+  out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
+  registry_visit_fee_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -197,7 +199,7 @@ export default function PricingSettingsPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-900">Fixed Extras (billed to dealer)</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Fixed Fees (billed to dealer)</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-700 mb-1">Out-of-province inspection minimum (hrs)</label>
@@ -206,9 +208,21 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
+              <label className="block text-sm text-gray-700 mb-1">Out-of-province inspection fee ($)</label>
+              <input type="number" step="0.01" value={dollars(settings.out_of_province_inspection_fee_cents)}
+                onChange={(e) => updateDollarField('out_of_province_inspection_fee_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
               <label className="block text-sm text-gray-700 mb-1">Registry visit minimum (hrs)</label>
               <input type="number" step="0.5" value={settings.registry_visit_min_hours}
                 onChange={(e) => updateNumberField('registry_visit_min_hours', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Registry visit fee ($)</label>
+              <input type="number" step="0.01" value={dollars(settings.registry_visit_fee_cents)}
+                onChange={(e) => updateDollarField('registry_visit_fee_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>

@@ -36,7 +36,7 @@ export default function PostJobPage() {
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
-  const [usedOwnVehicle, setUsedOwnVehicle] = useState(false)
+  // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
@@ -143,7 +143,6 @@ export default function PostJobPage() {
           durationMinutes: data.durationMinutes,
           vehicleMode,
           numDrivers: secondDriver ? 2 : 1,
-          usedOwnVehicle,
           outOfProvinceInspection,
           registryVisit,
           additionalCharges,
@@ -155,7 +154,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, usedOwnVehicle, outOfProvinceInspection, registryVisit, additionalCharges, pricingSettings])
+  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -237,7 +236,7 @@ export default function PostJobPage() {
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
       vehicle_mode: vehicleMode,
-      used_own_vehicle: usedOwnVehicle,
+      used_own_vehicle: true,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
       additional_charges: additionalCharges,
@@ -435,16 +434,20 @@ export default function PostJobPage() {
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={secondDriver} onChange={(e) => setSecondDriver(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={secondDriver}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setSecondDriver(checked)
+                  if (checked) setChaseVehicle(true)
+                }}
+              />
               Second driver required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={chaseVehicle} onChange={(e) => setChaseVehicle(e.target.checked)} />
               Chase vehicle required
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={usedOwnVehicle} onChange={(e) => setUsedOwnVehicle(e.target.checked)} />
-              Driver will use their own vehicle
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => setOutOfProvinceInspection(e.target.checked)} />
@@ -529,6 +532,29 @@ export default function PostJobPage() {
                 {pricing.tripDistanceKm} km round trip {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
+
+              <div className="space-y-1 pt-2 border-t border-gray-200">
+                <BreakdownRow label="Driving pay" cents={pricing.hourlyDealerCents} />
+                <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
+                <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
+                <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
+                <BreakdownRow label="Trailer fee" cents={pricing.trailerFeeCents} />
+                <BreakdownRow label="Hotel" cents={pricing.hotelCents} />
+                <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
+                <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
+                <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                <BreakdownRow label="Additional charges" cents={pricing.extrasDealerCents} />
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
+                <span>Subtotal</span>
+                <span>{formatCents(pricing.costBasisCents)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
+              </div>
+
               <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                 <span className="text-sm text-gray-700">Estimated dealer cost</span>
                 <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDealerCostCents)}</span>
@@ -555,6 +581,16 @@ export default function PostJobPage() {
           </div>
         </form>
       </main>
+    </div>
+  )
+}
+
+function BreakdownRow({ label, cents }: { label: string; cents: number }) {
+  if (!cents) return null
+  return (
+    <div className="flex items-center justify-between text-xs text-gray-600">
+      <span>{label}</span>
+      <span>{formatCents(cents)}</span>
     </div>
   )
 }

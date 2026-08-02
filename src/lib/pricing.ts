@@ -12,7 +12,9 @@ export type PricingSettings = {
   meal_allowance_max_count: number
   dealer_markup_percent: number
   out_of_province_inspection_min_hours: number
+  out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
+  registry_visit_fee_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -28,7 +30,6 @@ export type PricingInput = {
   durationMinutes: number // one-way, from Google
   vehicleMode: 'driven' | 'towed'
   numDrivers: 1 | 2
-  usedOwnVehicle: boolean
   outOfProvinceInspection: boolean
   registryVisit: boolean
   additionalCharges: AdditionalCharge[]
@@ -46,6 +47,8 @@ export type PricingResult = {
   trailerFeeCents: number
   hotelCents: number
   overnightFeeCents: number
+  inspectionFeeCents: number
+  registryFeeCents: number
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
@@ -58,7 +61,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    usedOwnVehicle, outOfProvinceInspection, registryVisit, additionalCharges,
+    outOfProvinceInspection, registryVisit, additionalCharges,
   } = input
 
   // Every delivery is a round trip — the driver (and trailer, if towing) always has to get back.
@@ -86,7 +89,9 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const fuelEconomy = vehicleMode === 'towed'
     ? settings.fuel_economy_towed_l_per_100km
     : settings.fuel_economy_driven_l_per_100km
-  const gasCostCents = Math.round((tripDistanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre)
+  // Second driver means a second vehicle (the chase vehicle) covering the same distance —
+  // so fuel gets charged per vehicle, same as hourly pay is charged per driver.
+  const gasCostCents = Math.round((tripDistanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre) * numDrivers
 
   const mealBreaks = Math.min(
     Math.floor(baseDrivingHours / settings.meal_allowance_every_hours),
@@ -94,15 +99,20 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   )
   const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
 
-  const wearAndTearCents = usedOwnVehicle
-    ? Math.round(tripDistanceKm * settings.wear_and_tear_cents_per_km)
-    : 0
+  // Drivers always use their own vehicle. A second driver means a second vehicle
+  // (the chase vehicle) also racking up wear & tear over the same distance.
+  const wearAndTearCents = Math.round(tripDistanceKm * settings.wear_and_tear_cents_per_km) * numDrivers
 
   const trailerDays = overnightRequired ? 2 : 1
   const trailerFeeCents = vehicleMode === 'towed' ? trailerDays * settings.trailer_fee_cents_per_day : 0
 
   const hotelCents = overnightRequired ? settings.hotel_rate_cents : 0
   const overnightFeeCents = overnightRequired ? settings.overnight_fee_cents * numDrivers : 0
+
+  // Flat service fees on top of the hourly-minimum time already billed above —
+  // dealer-only, not paid to the driver (same treatment as hotel).
+  const inspectionFeeCents = outOfProvinceInspection ? settings.out_of_province_inspection_fee_cents : 0
+  const registryFeeCents = registryVisit ? settings.registry_visit_fee_cents : 0
 
   const extrasDealerCents = additionalCharges.reduce((sum, c) => sum + c.dealerAmountCents, 0)
   const extrasDriverCents = additionalCharges
@@ -111,7 +121,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
 
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
-    trailerFeeCents + hotelCents + overnightFeeCents + extrasDealerCents
+    trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
+    registryFeeCents + extrasDealerCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
 
@@ -130,6 +141,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     trailerFeeCents,
     hotelCents,
     overnightFeeCents,
+    inspectionFeeCents,
+    registryFeeCents,
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,
