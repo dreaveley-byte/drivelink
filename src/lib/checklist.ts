@@ -15,6 +15,7 @@ export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Pickup: Condition report — note damages, cleanliness & fuel level', type: 'condition_report' },
   { label: 'Pickup: Walk-around video', type: 'video' },
   { label: 'Pickup: Photos of any damage, the VIN, and the dash', type: 'photo' },
+  { label: 'Pickup: Photograph windshield', type: 'photo' },
   { label: 'Pickup: Upload registration', type: 'upload' },
   { label: 'Pickup: Upload out-of-province safety (if applicable)', type: 'upload' },
   { label: 'Pickup: Mark vehicle picked up', type: 'check' },
