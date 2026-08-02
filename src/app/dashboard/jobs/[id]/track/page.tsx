@@ -30,6 +30,12 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
   if (!job) notFound()
 
+  const { data: checklist } = await supabase
+    .from('job_checklist_items')
+    .select('id, label, completed_at')
+    .eq('job_id', jobId)
+    .order('sort_order')
+
   const driverName = Array.isArray(job.driver) ? job.driver[0]?.full_name : (job.driver as { full_name: string } | null)?.full_name
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
 
@@ -62,6 +68,26 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           <p className="text-xs text-gray-400 my-1">↓</p>
           <p>{job.dropoff_address}</p>
         </div>
+
+        {checklist && checklist.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
+            </p>
+            <div className="space-y-1.5">
+              {checklist.map((item) => (
+                <div key={item.id} className="flex items-center gap-2 text-sm">
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${item.completed_at ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300'}`}>
+                    {item.completed_at ? '✓' : ''}
+                  </span>
+                  <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                    {item.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents } from '@/lib/pricing'
+import { getDefaultChecklist } from '@/lib/checklist'
 
 type Job = {
   id: string
@@ -37,6 +38,12 @@ function extractCity(address: string): string {
 function joinName(value: { name: string }[] | { name: string } | null): string | null {
   if (!value) return null
   return Array.isArray(value) ? value[0]?.name ?? null : value.name
+}
+
+type ChecklistItem = {
+  id: string
+  label: string
+  completed_at: string | null
 }
 
 const nextStatus: Record<string, string> = {
@@ -73,6 +80,52 @@ export default function DriverJobActions({
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([])
+
+  useEffect(() => {
+    if (!isActive) return
+    const supabase = createClient()
+
+    async function loadChecklist() {
+      const { data } = await supabase
+        .from('job_checklist_items')
+        .select('id, label, completed_at')
+        .eq('job_id', job.id)
+        .order('sort_order')
+
+      if (data && data.length > 0) {
+        setChecklist(data)
+        return
+      }
+
+      // Older jobs claimed before this feature existed won't have items yet — backfill them.
+      const defaults = getDefaultChecklist(joinName(job.job_types))
+      const rows = defaults.map((label, i) => ({ job_id: job.id, label, sort_order: i }))
+      const { data: created } = await supabase.from('job_checklist_items').insert(rows).select('id, label, completed_at')
+      if (created) setChecklist(created)
+    }
+
+    loadChecklist()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, job.id])
+
+  async function toggleChecklistItem(item: ChecklistItem) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const nowCompleting = !item.completed_at
+
+    setChecklist((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, completed_at: nowCompleting ? new Date().toISOString() : null } : i))
+    )
+
+    await supabase
+      .from('job_checklist_items')
+      .update({
+        completed_at: nowCompleting ? new Date().toISOString() : null,
+        completed_by: nowCompleting ? user?.id : null,
+      })
+      .eq('id', item.id)
+  }
 
   async function claimJob() {
     setLoading(true)
@@ -90,6 +143,11 @@ export default function DriverJobActions({
       status: 'assigned',
       changed_by: user.id,
     })
+
+    const defaults = getDefaultChecklist(joinName(job.job_types))
+    await supabase.from('job_checklist_items').insert(
+      defaults.map((label, i) => ({ job_id: job.id, label, sort_order: i }))
+    )
 
     router.refresh()
     setLoading(false)
@@ -114,7 +172,8 @@ export default function DriverJobActions({
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+    <div className="border border-gray-200 rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">{joinName(job.job_types)}</p>
         {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
@@ -167,6 +226,29 @@ export default function DriverJobActions({
           </button>
         )}
       </div>
+      </div>
+
+      {isActive && checklist.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500 mb-2">
+            Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
+          </p>
+          <div className="space-y-1.5">
+            {checklist.map((item) => (
+              <label key={item.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!!item.completed_at}
+                  onChange={() => toggleChecklistItem(item)}
+                />
+                <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                  {item.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
