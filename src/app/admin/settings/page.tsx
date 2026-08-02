@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 import SignOutButton from '@/components/SignOutButton'
 
 type Settings = {
@@ -97,7 +98,18 @@ export default function PricingSettingsPage() {
           <h1 className="text-lg font-semibold text-gray-900">DriveLink — Pricing Settings</h1>
           <p className="text-xs text-gray-500">These rates drive every job&apos;s cost and pay estimate</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+            Admin
+          </Link>
+          <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
+            Drivers
+          </Link>
+          <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
+            Applications
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">

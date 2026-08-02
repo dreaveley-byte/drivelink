@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import ApplicationCard from '@/components/ApplicationCard'
@@ -38,7 +39,18 @@ export default async function AdminApplicationsPage() {
           <h1 className="text-lg font-semibold text-gray-900">DriveLink — Applications</h1>
           <p className="text-xs text-gray-500">Review driver and dealer applications</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+            Admin
+          </Link>
+          <Link href="/admin/settings" className="text-sm text-gray-600 hover:text-gray-900">
+            Pricing
+          </Link>
+          <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
+            Drivers
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
