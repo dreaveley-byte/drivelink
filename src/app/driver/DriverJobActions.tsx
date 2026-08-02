@@ -12,6 +12,8 @@ import ConditionReportCard, { type ConditionData } from '@/components/ConditionR
 type Job = {
   id: string
   status: string
+  scheduled_for: string | null
+  estimated_duration_minutes: number | null
   pickup_address: string
   dropoff_address: string
   recipient_name: string | null
@@ -408,10 +410,46 @@ export default function DriverJobActions({
     setLoading(false)
   }
 
+  function addToCalendar() {
+    if (!job.scheduled_for) return
+    const start = new Date(job.scheduled_for)
+    const end = new Date(start.getTime() + (job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120) * 60000)
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    const title = `${joinName(job.job_types) ?? 'DriveLink job'} — ${[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}`
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//DriveLink//EN',
+      'BEGIN:VEVENT',
+      `UID:${job.id}@drivelink`,
+      `DTSTAMP:${fmt(new Date())}`,
+      `DTSTART:${fmt(start)}`,
+      `DTEND:${fmt(end)}`,
+      `SUMMARY:${title}`,
+      `LOCATION:${job.pickup_address}`,
+      `DESCRIPTION:Pickup: ${job.pickup_address}\\nDropoff: ${job.dropoff_address}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n')
+
+    const blob = new Blob([ics], { type: 'text/calendar' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `drivelink-job-${job.id.slice(0, 8)}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="border border-gray-200 rounded-xl px-4 py-3">
       <div className="flex items-center justify-between">
       <div>
+        {job.scheduled_for && (
+          <p className="text-xs font-semibold text-blue-700 mb-0.5">
+            {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+          </p>
+        )}
         <p className="text-sm font-medium text-gray-900">{joinName(job.job_types)}</p>
         {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
           <p className="text-xs text-gray-600 mt-0.5">
@@ -443,6 +481,15 @@ export default function DriverJobActions({
           {statusLabels[job.status] ?? job.status}
         </span>
 
+        {isActive && job.scheduled_for && (
+          <button
+            onClick={addToCalendar}
+            className="text-xs text-gray-500 hover:text-gray-900 underline"
+          >
+            Add to calendar
+          </button>
+        )}
+
         {isActive && nextStatus[job.status] && (
           <button
             onClick={advanceStatus}
@@ -454,13 +501,18 @@ export default function DriverJobActions({
         )}
 
         {!isActive && (
-          <button
-            onClick={claimJob}
-            disabled={loading || disabled}
-            className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-          >
-            {loading ? '...' : 'Claim'}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={claimJob}
+              disabled={loading || disabled}
+              className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              {loading ? '...' : 'Claim'}
+            </button>
+            {disabled && (
+              <span className="text-[10px] text-amber-600">Conflicts with another job</span>
+            )}
+          </div>
         )}
       </div>
       </div>

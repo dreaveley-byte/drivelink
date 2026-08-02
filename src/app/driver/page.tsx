@@ -38,20 +38,43 @@ export default async function DriverPage() {
     )
   }
 
-  const jobSelect = 'id, status, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, estimated_distance_km, estimated_driver_pay_cents, job_types(name), organizations(name, address, phone)'
+  const jobSelect = 'id, status, scheduled_for, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, job_types(name), organizations(name, address, phone)'
 
-  const { data: myJob } = await supabase
+  const { data: myJobs } = await supabase
     .from('jobs')
     .select(jobSelect)
     .eq('driver_id', user.id)
     .not('status', 'in', '("completed","cancelled")')
-    .maybeSingle()
+    .order('scheduled_for', { ascending: true })
 
   const { data: openJobs } = await supabase
     .from('jobs')
     .select(jobSelect)
     .eq('status', 'awaiting_driver')
     .order('created_at', { ascending: true })
+
+  // A job's rough time window: scheduled start through an estimated round-trip duration
+  // (falls back to 2 hours if we don't have a duration estimate yet).
+  function getJobWindow(job: { scheduled_for: string | null; estimated_duration_minutes: number | null }) {
+    if (!job.scheduled_for) return null
+    const start = new Date(job.scheduled_for).getTime()
+    const durationMin = job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120
+    return { start, end: start + durationMin * 60000 }
+  }
+
+  function overlapsAnyMyJob(job: { scheduled_for: string | null; estimated_duration_minutes: number | null }) {
+    const myActiveJobs = myJobs ?? []
+    if (myActiveJobs.length === 0) return false
+    const window = getJobWindow(job)
+    // If either this job or an already-claimed job has no schedule, we can't safely
+    // confirm they don't overlap — be conservative and treat it as a conflict.
+    if (!window) return true
+    return myActiveJobs.some((mine) => {
+      const mineWindow = getJobWindow(mine)
+      if (!mineWindow) return true
+      return window.start < mineWindow.end && mineWindow.start < window.end
+    })
+  }
 
   const { data: completedJobs } = await supabase
     .from('jobs')
@@ -99,12 +122,20 @@ export default async function DriverPage() {
           </div>
         </div>
 
-        {myJob && (
+        {myJobs && myJobs.length > 0 && (
           <div>
-            <h2 className="text-sm font-medium text-gray-500 mb-2">Your active job</h2>
-            <DriverJobActions job={myJob} isActive />
-            <div className="mt-2">
-              <LocationSharer jobId={myJob.id} />
+            <h2 className="text-sm font-medium text-gray-500 mb-2">
+              Your active job{myJobs.length > 1 ? 's' : ''}
+            </h2>
+            <div className="space-y-3">
+              {myJobs.map((job) => (
+                <div key={job.id}>
+                  <DriverJobActions job={job} isActive />
+                  <div className="mt-2">
+                    <LocationSharer jobId={job.id} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -116,7 +147,7 @@ export default async function DriverPage() {
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
             )}
             {openJobs?.map((job) => (
-              <DriverJobActions key={job.id} job={job} isActive={false} disabled={!!myJob} />
+              <DriverJobActions key={job.id} job={job} isActive={false} disabled={overlapsAnyMyJob(job)} />
             ))}
           </div>
         </div>
