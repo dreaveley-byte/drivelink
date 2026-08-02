@@ -470,13 +470,27 @@ export default function DriverJobActions({
 
   return (
     <div className="border border-gray-200 rounded-xl px-4 py-3">
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          {job.scheduled_for && (
+            <p className="text-xs font-semibold text-blue-700">
+              {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </p>
+          )}
+          <p className="text-xs text-blue-600">To: {extractCity(job.dropoff_address)}</p>
+        </div>
+        {isActive && job.scheduled_for && (
+          <button
+            onClick={addToCalendar}
+            className="text-xs text-gray-500 hover:text-gray-900 underline whitespace-nowrap"
+          >
+            Add to calendar
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
       <div>
-        {job.scheduled_for && (
-          <p className="text-xs font-semibold text-blue-700 mb-0.5">
-            {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-          </p>
-        )}
         <p className="text-sm font-medium text-gray-900">{joinName(job.job_types)}</p>
         {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
           <p className="text-xs text-gray-600 mt-0.5">
@@ -503,28 +517,20 @@ export default function DriverJobActions({
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
-          {statusLabels[job.status] ?? job.status}
-        </span>
-
-        {isActive && job.scheduled_for && (
-          <button
-            onClick={addToCalendar}
-            className="text-xs text-gray-500 hover:text-gray-900 underline"
-          >
-            Add to calendar
-          </button>
-        )}
-
-        {isActive && previousStatus[job.status] && (
+      <div className="flex items-center gap-2">
+        {isActive && previousStatus[job.status] ? (
           <button
             onClick={goBackStatus}
             disabled={loading}
-            className="text-xs text-gray-500 hover:text-gray-900 underline disabled:opacity-50"
+            title="Tap to go back a step"
+            className="text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
-            ← Go back
+            ← {statusLabels[job.status] ?? job.status}
           </button>
+        ) : (
+          <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
+            {statusLabels[job.status] ?? job.status}
+          </span>
         )}
 
         {isActive && nextStatus[job.status] && (
@@ -543,8 +549,7 @@ export default function DriverJobActions({
               onClick={claimJob}
               disabled={loading || disabled}
               className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loading ? '...' : 'Claim'}
+            >              {loading ? '...' : 'Claim'}
             </button>
             {disabled && (
               <span className="text-[10px] text-amber-600">Conflicts with another job</span>
