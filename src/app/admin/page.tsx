@@ -68,6 +68,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href="/admin/archived" className="text-sm text-gray-600 hover:text-gray-900">
             Archived
           </Link>
+          <SortSelect />
           <SignOutButton />
         </div>
       </header>
@@ -91,7 +92,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-medium text-gray-900">All Jobs</h2>
           <div className="flex items-center gap-3">
-            <SortSelect />
             <Link
               href="/dashboard/post-job"
               className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"

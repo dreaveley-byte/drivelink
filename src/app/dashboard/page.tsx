@@ -86,7 +86,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h1 className="text-lg font-semibold text-gray-900">DriveLink</h1>
           <p className="text-xs text-gray-500">{org?.name}</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <SortSelect />
+          <SignOutButton />
+        </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
@@ -94,7 +97,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
           <div className="flex items-center gap-4">
-            <SortSelect />
             <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
               Archived
             </Link>

@@ -106,7 +106,10 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">DriveLink — Driver</h1>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <SortSelect />
+          <SignOutButton />
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
@@ -143,10 +146,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-medium text-gray-500">Available jobs</h2>
-            <SortSelect />
-          </div>
+          <h2 className="text-sm font-medium text-gray-500 mb-2">Available jobs</h2>
           <div className="space-y-3">
             {openJobs?.length === 0 && (
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
