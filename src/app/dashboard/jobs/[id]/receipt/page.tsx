@@ -50,7 +50,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: checklist } = await supabase
     .from('job_checklist_items')
-    .select('id, label, item_type, completed_at, file_paths, notes')
+    .select('id, label, item_type, completed_at, file_paths, notes, condition_data')
     .eq('job_id', jobId)
     .order('sort_order')
 
@@ -216,6 +216,18 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                     {item.completed_at ? '✓ ' : '○ '}{item.label.replace(/^(Pickup|Delivery):\s*/, '')}
                   </span>
                   {item.notes && <p className="text-xs text-gray-600 mt-0.5">{item.notes}</p>}
+                  {item.condition_data && (item.condition_data.cleanliness || item.condition_data.smell) && (
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {item.condition_data.cleanliness && `Cleanliness: ${item.condition_data.cleanliness}/5`}
+                      {item.condition_data.cleanliness && item.condition_data.smell && ' · '}
+                      {item.condition_data.smell && `Smell: ${item.condition_data.smell}`}
+                    </p>
+                  )}
+                  {item.condition_data && item.condition_data.markers?.length > 0 && (
+                    <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
+                      {item.condition_data.markers.map((m: { note: string }, i: number) => <li key={i}>{m.note}</li>)}
+                    </ul>
+                  )}
                   <FileThumbs files={item.files} />
                 </div>
               ))}

@@ -1,10 +1,8 @@
-export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report'
+export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report' | 'tristate'
 
 export type ChecklistDefinitionItem = {
   label: string
   type: ChecklistItemType
-  // Shown above the signature pad for signature items that represent a real
-  // legal document, rather than a simple "sign here" acknowledgment.
   documentText?: string
 }
 
@@ -20,11 +18,14 @@ const RELEASE_AND_MEDIA_CONSENT_TEXT =
 export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   // Pickup phase
   { label: 'Pickup: Pick up vehicle', type: 'check' },
-  { label: 'Pickup: Verify year, make, model & VIN', type: 'check' },
-  { label: 'Pickup: Check VIN on registration matches vehicle (if insurance complete)', type: 'check' },
-  { label: 'Pickup: Condition report — note damages, cleanliness & fuel level', type: 'condition_report' },
+  { label: 'Pickup: Verify year, make, model, colour & VIN', type: 'check' },
+  { label: 'Pickup: Insurance matches VIN', type: 'tristate' },
+  { label: 'Pickup: Condition report', type: 'condition_report' },
   { label: 'Pickup: Walk-around video', type: 'video' },
-  { label: 'Pickup: Photos of any damage, the VIN, and the dash', type: 'photo' },
+  { label: 'Pickup: Photos of any damage', type: 'photo' },
+  { label: 'Pickup: Photograph VIN', type: 'photo' },
+  { label: 'Pickup: Photograph dash & odometer', type: 'photo' },
+  { label: 'Pickup: Photograph fuel level', type: 'photo' },
   { label: 'Pickup: Photograph windshield', type: 'photo' },
   { label: 'Pickup: Upload registration', type: 'upload' },
   { label: 'Pickup: Upload out-of-province safety (if applicable)', type: 'upload' },
