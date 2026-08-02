@@ -410,16 +410,32 @@ export default function DriverJobActions({
       </div>
       </div>
 
-      {isActive && checklist.length > 0 && (
+      {isActive && checklist.length > 0 && (() => {
+        const currentPhase: 'Pickup' | 'Delivery' = job.status === 'assigned' ? 'Pickup' : 'Delivery'
+        const hasPhases = checklist.some((i) => i.label.startsWith('Pickup:') || i.label.startsWith('Delivery:'))
+        const visibleChecklist = hasPhases
+          ? checklist.filter((item) => {
+              if (item.label.startsWith('Pickup:')) return currentPhase === 'Pickup'
+              if (item.label.startsWith('Delivery:')) return currentPhase === 'Delivery'
+              return true
+            })
+          : checklist
+        const pickupItems = checklist.filter((i) => i.label.startsWith('Pickup:'))
+        const pickupDone = pickupItems.filter((i) => i.completed_at).length
+
+        return (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+          {hasPhases && currentPhase === 'Delivery' && pickupItems.length > 0 && (
+            <p className="text-xs text-gray-400">Pickup checklist: {pickupDone}/{pickupItems.length} completed</p>
+          )}
           <p className="text-xs text-gray-500">
-            Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
+            {hasPhases ? `${currentPhase} checklist` : 'Checklist'} ({visibleChecklist.filter((i) => i.completed_at).length}/{visibleChecklist.length})
           </p>
           <div className="space-y-3">
-            {checklist.map((item, idx) => {
+            {visibleChecklist.map((item, idx) => {
               const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
               const prevPhase = idx > 0
-                ? (checklist[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : checklist[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                ? (visibleChecklist[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : visibleChecklist[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
                 : null
               const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
               return (
@@ -588,7 +604,8 @@ export default function DriverJobActions({
             })}
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

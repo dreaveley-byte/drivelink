@@ -56,9 +56,9 @@ export const FIRST_NATIONS_CHECKLIST: ChecklistDefinitionItem[] = [
 
 // Added on top of the vehicle checklist whenever the job includes a trade-in pickup.
 export const TRADE_IN_CHECKLIST: ChecklistDefinitionItem[] = [
-  { label: 'Get trade-in registration from customer', type: 'upload' },
-  { label: 'Confirm name on registration matches bill of sale owner', type: 'check' },
-  { label: 'All owners listed on registration have signed both the registration and APV9T/transfer form', type: 'check' },
+  { label: 'Pickup: Get trade-in registration from customer', type: 'upload' },
+  { label: 'Pickup: Confirm name on registration matches bill of sale owner', type: 'check' },
+  { label: 'Pickup: All owners listed on registration have signed both the registration and APV9T/transfer form', type: 'check' },
 ]
 
 // Document/courier jobs get a shorter checklist.
