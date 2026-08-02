@@ -153,10 +153,19 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               Checklist ({checklistWithUrls.filter((i) => i.completed_at).length}/{checklistWithUrls.length})
             </p>
             <div className="space-y-1.5">
-              {checklistWithUrls.map((item) => (
+              {checklistWithUrls.map((item, idx) => {
+                const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
+                const prevPhase = idx > 0
+                  ? (checklistWithUrls[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : checklistWithUrls[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                  : null
+                const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
+                return (
                 <div key={item.id} className="text-sm">
+                  {phase && phase !== prevPhase && (
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-1 first:mt-0">{phase}</p>
+                  )}
                   <span className={item.completed_at ? 'text-gray-700' : 'text-gray-400'}>
-                    {item.completed_at ? '✓ ' : '○ '}{item.label}
+                    {item.completed_at ? '✓ ' : '○ '}{displayLabel}
                   </span>
                   {item.urls.length > 0 && (
                     <span className="ml-2 print:hidden">
@@ -171,7 +180,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                     <p className="text-xs text-gray-500 mt-0.5 ml-4">{item.notes}</p>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

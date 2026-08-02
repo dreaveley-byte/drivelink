@@ -326,8 +326,17 @@ export default function DriverJobActions({
             Checklist ({checklist.filter((i) => i.completed_at).length}/{checklist.length})
           </p>
           <div className="space-y-3">
-            {checklist.map((item) => (
+            {checklist.map((item, idx) => {
+              const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
+              const prevPhase = idx > 0
+                ? (checklist[idx - 1].label.startsWith('Delivery:') ? 'Delivery' : checklist[idx - 1].label.startsWith('Pickup:') ? 'Pickup' : null)
+                : null
+              const displayLabel = item.label.replace(/^(Pickup|Delivery):\s*/, '')
+              return (
               <div key={item.id}>
+                {phase && phase !== prevPhase && (
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-1">{phase}</p>
+                )}
                 {item.item_type === 'check' ? (
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -336,13 +345,13 @@ export default function DriverJobActions({
                       onChange={() => toggleChecklistItem(item)}
                     />
                     <span className={item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                      {item.label}
+                      {displayLabel}
                     </span>
                   </label>
                 ) : (
                   <div>
                     <p className={`text-sm mb-1 ${item.completed_at ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                      {item.completed_at ? '✓ ' : ''}{item.label}
+                      {item.completed_at ? '✓ ' : ''}{displayLabel}
                       {item.file_paths.length > 0 && ` (${item.file_paths.length} saved)`}
                     </p>
 
@@ -408,7 +417,8 @@ export default function DriverJobActions({
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

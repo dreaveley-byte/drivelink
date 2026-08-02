@@ -5,24 +5,30 @@ export type ChecklistDefinitionItem = {
   type: ChecklistItemType
 }
 
-// Vehicle-moving jobs get the full pickup-through-delivery checklist.
+// Vehicle-moving jobs get the full pickup-through-delivery checklist, split into
+// two clearly labeled phases so the driver always knows where they are.
 export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
-  { label: 'Pick up vehicle', type: 'check' },
-  { label: 'Verify year, make, model & VIN', type: 'check' },
-  { label: 'Check VIN on registration matches vehicle (if insurance complete)', type: 'check' },
-  { label: 'Condition report — note damages, cleanliness & fuel level', type: 'condition_report' },
-  { label: 'Walk-around video of vehicle condition', type: 'video' },
-  { label: 'Verify purchaser', type: 'check' },
-  { label: 'Photograph vehicle', type: 'photo' },
-  { label: 'Photograph odometer', type: 'photo' },
-  { label: 'Obtain signature at pickup', type: 'signature' },
-  { label: 'Upload photos', type: 'photo' },
-  { label: 'Upload registration', type: 'upload' },
-  { label: 'Upload out-of-province safety (if applicable)', type: 'upload' },
-  { label: 'Complete checklist', type: 'check' },
-  { label: 'Customer walkthrough at delivery', type: 'check' },
-  { label: 'Photo with customer', type: 'photo' },
-  { label: 'Customer signs consent & satisfaction form', type: 'signature' },
+  // Pickup phase
+  { label: 'Pickup: Pick up vehicle', type: 'check' },
+  { label: 'Pickup: Verify year, make, model & VIN', type: 'check' },
+  { label: 'Pickup: Check VIN on registration matches vehicle (if insurance complete)', type: 'check' },
+  { label: 'Pickup: Condition report — note damages, cleanliness & fuel level', type: 'condition_report' },
+  { label: 'Pickup: Walk-around video', type: 'video' },
+  { label: 'Pickup: Photos of any damage, the VIN, and the dash', type: 'photo' },
+  { label: 'Pickup: Upload registration', type: 'upload' },
+  { label: 'Pickup: Upload out-of-province safety (if applicable)', type: 'upload' },
+  { label: 'Pickup: Mark vehicle picked up', type: 'check' },
+
+  // Delivery phase
+  { label: "Delivery: Verify purchaser — photo of customer holding driver's license", type: 'photo' },
+  { label: 'Delivery: Condition walkaround video', type: 'video' },
+  { label: 'Delivery: Photos of any damage', type: 'photo' },
+  { label: 'Delivery: Customer signs off on condition report', type: 'signature' },
+  { label: 'Delivery: Photograph vehicle', type: 'photo' },
+  { label: 'Delivery: Photograph odometer', type: 'photo' },
+  { label: 'Delivery: Obtain signatures', type: 'signature' },
+  { label: 'Delivery: Complete checklist', type: 'check' },
+  { label: 'Delivery: Upload photos', type: 'photo' },
 ]
 
 // Added on top of the vehicle checklist whenever the job includes a trade-in pickup.
