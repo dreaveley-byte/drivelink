@@ -42,7 +42,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: checklist } = await supabase
     .from('job_checklist_items')
-    .select('id, label, item_type, completed_at, file_paths')
+    .select('id, label, item_type, completed_at, file_paths, notes')
     .eq('job_id', jobId)
     .order('sort_order')
 
@@ -166,6 +166,9 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                         </a>
                       ))}
                     </span>
+                  )}
+                  {item.notes && (
+                    <p className="text-xs text-gray-500 mt-0.5 ml-4">{item.notes}</p>
                   )}
                 </div>
               ))}

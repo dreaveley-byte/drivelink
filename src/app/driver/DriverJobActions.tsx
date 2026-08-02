@@ -48,6 +48,7 @@ type ChecklistItem = {
   item_type: ChecklistItemType
   completed_at: string | null
   file_paths: string[]
+  notes: string | null
 }
 
 const nextStatus: Record<string, string> = {
@@ -94,7 +95,7 @@ export default function DriverJobActions({
     async function loadChecklist() {
       const { data } = await supabase
         .from('job_checklist_items')
-        .select('id, label, item_type, completed_at, file_paths')
+        .select('id, label, item_type, completed_at, file_paths, notes')
         .eq('job_id', job.id)
         .order('sort_order')
 
@@ -109,7 +110,7 @@ export default function DriverJobActions({
       const { data: created } = await supabase
         .from('job_checklist_items')
         .insert(rows)
-        .select('id, label, item_type, completed_at, file_paths')
+        .select('id, label, item_type, completed_at, file_paths, notes')
       if (created) setChecklist(created)
     }
 
@@ -150,13 +151,24 @@ export default function DriverJobActions({
     }
 
     const updatedPaths = [...item.file_paths, ...newPaths]
+    const shouldComplete = item.item_type === 'condition_report'
+      ? !!(item.notes && item.notes.trim().length > 0)
+      : true
+
     setChecklist((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, file_paths: updatedPaths, completed_at: new Date().toISOString() } : i))
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, file_paths: updatedPaths, completed_at: shouldComplete ? new Date().toISOString() : i.completed_at }
+          : i
+      )
     )
 
     await supabase
       .from('job_checklist_items')
-      .update({ file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
+      .update({
+        file_paths: updatedPaths,
+        ...(shouldComplete ? { completed_at: new Date().toISOString(), completed_by: user?.id } : {}),
+      })
       .eq('id', item.id)
 
     setUploadingItemId(null)
@@ -181,6 +193,30 @@ export default function DriverJobActions({
         .eq('id', item.id)
     }
     setUploadingItemId(null)
+  }
+
+  async function saveNotesForItem(item: ChecklistItem, notes: string) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const shouldComplete = notes.trim().length > 0 && item.file_paths.length > 0
+
+    setChecklist((prev) =>
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, notes, completed_at: shouldComplete ? (i.completed_at ?? new Date().toISOString()) : i.completed_at }
+          : i
+      )
+    )
+
+    await supabase
+      .from('job_checklist_items')
+      .update({
+        notes,
+        ...(shouldComplete && !item.completed_at
+          ? { completed_at: new Date().toISOString(), completed_by: user?.id }
+          : {}),
+      })
+      .eq('id', item.id)
   }
 
   async function claimJob() {
@@ -315,6 +351,34 @@ export default function DriverJobActions({
                         saving={uploadingItemId === item.id}
                         onSave={(blob) => uploadSignatureForItem(item, blob)}
                       />
+                    )}
+
+                    {item.item_type === 'condition_report' && (
+                      <div className="space-y-2">
+                        <textarea
+                          defaultValue={item.notes ?? ''}
+                          onBlur={(e) => saveNotesForItem(item, e.target.value)}
+                          placeholder="Note any damage, cleanliness issues, and fuel level..."
+                          rows={2}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        />
+                        <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
+                          {uploadingItemId === item.id ? 'Uploading...' : 'Take / upload photo'}
+                          <input
+                            type="file"
+                            className="hidden"
+                            disabled={uploadingItemId === item.id}
+                            multiple
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              const files = e.target.files ? Array.from(e.target.files) : []
+                              if (files.length > 0) uploadFilesForItem(item, files)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                      </div>
                     )}
 
                     {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (

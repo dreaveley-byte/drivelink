@@ -1,17 +1,25 @@
-export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature'
+export type ChecklistItemType = 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report'
 
 export type ChecklistDefinitionItem = {
   label: string
   type: ChecklistItemType
 }
 
-// Vehicle-moving jobs get the full condition/documentation checklist.
+// Vehicle-moving jobs get the full pickup-through-delivery checklist.
 export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
-  { label: 'Confirm odometer & fuel level at pickup', type: 'check' },
+  { label: 'Pick up vehicle', type: 'check' },
+  { label: 'Verify year, make, model & VIN', type: 'check' },
+  { label: 'Check VIN on registration matches vehicle (if insurance complete)', type: 'check' },
+  { label: 'Condition report — note damages, cleanliness & fuel level', type: 'condition_report' },
   { label: 'Walk-around video of vehicle condition', type: 'video' },
-  { label: 'Condition report photos (4 corners + interior)', type: 'photo' },
+  { label: 'Verify purchaser', type: 'check' },
+  { label: 'Photograph vehicle', type: 'photo' },
+  { label: 'Photograph odometer', type: 'photo' },
+  { label: 'Obtain signature at pickup', type: 'signature' },
+  { label: 'Upload photos', type: 'photo' },
   { label: 'Upload registration', type: 'upload' },
   { label: 'Upload out-of-province safety (if applicable)', type: 'upload' },
+  { label: 'Complete checklist', type: 'check' },
   { label: 'Customer walkthrough at delivery', type: 'check' },
   { label: 'Photo with customer', type: 'photo' },
   { label: 'Customer signs consent & satisfaction form', type: 'signature' },
