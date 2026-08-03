@@ -7,6 +7,7 @@ import DriverActiveToggle from '@/components/DriverActiveToggle'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import ApplicationCard from '@/components/ApplicationCard'
 import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
+import CollapsibleSection from '@/components/CollapsibleSection'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -240,47 +241,55 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Application &amp; Documents</p>
-            {application?.contract_signed_at && (
-              <Link href={`/admin/drivers/${driver.id}/agreement`} className="text-xs text-blue-600 hover:underline" target="_blank">
-                Print signed agreement →
-              </Link>
+          <CollapsibleSection
+            title="Application & Documents"
+            subtitle={
+              application?.contract_signed_at ? (
+                <Link
+                  href={`/admin/drivers/${driver.id}/agreement`}
+                  className="text-xs text-blue-600 hover:underline"
+                  target="_blank"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Print signed agreement →
+                </Link>
+              ) : null
+            }
+          >
+            {application ? (
+              <ApplicationCard
+                table="driver_applications"
+                id={application.id}
+                title={application.full_name || driver.full_name || 'Unnamed applicant'}
+                subtitle={`${application.email ?? ''} · ${application.cell_phone ?? ''}`}
+                status={application.status}
+                bucket="driver-documents"
+                userId={application.user_id}
+                profilePhotoPath={application.profile_photo_path}
+                docs={[
+                  { label: 'Profile photo', path: application.profile_photo_path },
+                  { label: "Driver's license", path: application.drivers_license_path },
+                  { label: "Driver's abstract", path: application.drivers_abstract_path },
+                  { label: 'Background check', path: application.criminal_background_check_path },
+                  { label: 'VSA license', path: application.vsa_license_path },
+                  { label: 'Medical fitness', path: application.medical_fitness_path },
+                  { label: 'Drug & alcohol test', path: application.drug_alcohol_test_path },
+                  { label: 'Optical test', path: application.optical_test_path },
+                  { label: 'Void cheque', path: application.void_cheque_path },
+                  { label: 'Vehicle registration', path: application.vehicle_registration_path },
+                  { label: 'Vehicle insurance', path: application.vehicle_insurance_path },
+                  { label: 'Signed contract', path: application.contract_signature_path },
+                ]}
+              />
+            ) : (
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-400 mb-4">
+                  No application on file for this driver yet — you can fill it in here on their behalf.
+                </p>
+                <DriverApplicationEditForm userId={driver.id} userEmail={driver.email ?? ''} application={null} />
+              </div>
             )}
-          </div>
-          {application ? (
-            <ApplicationCard
-              table="driver_applications"
-              id={application.id}
-              title={application.full_name || driver.full_name || 'Unnamed applicant'}
-              subtitle={`${application.email ?? ''} · ${application.cell_phone ?? ''}`}
-              status={application.status}
-              bucket="driver-documents"
-              userId={application.user_id}
-              profilePhotoPath={application.profile_photo_path}
-              docs={[
-                { label: 'Profile photo', path: application.profile_photo_path },
-                { label: "Driver's license", path: application.drivers_license_path },
-                { label: "Driver's abstract", path: application.drivers_abstract_path },
-                { label: 'Background check', path: application.criminal_background_check_path },
-                { label: 'VSA license', path: application.vsa_license_path },
-                { label: 'Medical fitness', path: application.medical_fitness_path },
-                { label: 'Drug & alcohol test', path: application.drug_alcohol_test_path },
-                { label: 'Optical test', path: application.optical_test_path },
-                { label: 'Void cheque', path: application.void_cheque_path },
-                { label: 'Vehicle registration', path: application.vehicle_registration_path },
-                { label: 'Vehicle insurance', path: application.vehicle_insurance_path },
-                { label: 'Signed contract', path: application.contract_signature_path },
-              ]}
-            />
-          ) : (
-            <div className="border border-gray-200 rounded-xl p-4">
-              <p className="text-xs text-gray-400 mb-4">
-                No application on file for this driver yet — you can fill it in here on their behalf.
-              </p>
-              <DriverApplicationEditForm userId={driver.id} userEmail={driver.email ?? ''} application={null} />
-            </div>
-          )}
+          </CollapsibleSection>
         </div>
 
         <div>
