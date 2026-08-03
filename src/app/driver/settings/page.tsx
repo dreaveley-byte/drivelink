@@ -51,6 +51,7 @@ export default async function DriverSettingsPage() {
               userId={user.id}
               initialFullName={profile?.full_name ?? ''}
               initialPhone={profile?.phone ?? ''}
+              initialEmail={user.email ?? ''}
               initialSmsOptIn={profile?.sms_notifications_opt_in ?? true}
               showSmsToggle
               photoTarget={{
@@ -63,11 +64,7 @@ export default async function DriverSettingsPage() {
             />
           }
           application={
-            application ? (
-              <DriverApplicationEditForm userId={user.id} application={application} />
-            ) : (
-              <p className="text-sm text-gray-400 py-8 text-center">No application on file yet.</p>
-            )
+            <DriverApplicationEditForm userId={user.id} userEmail={user.email ?? ''} application={application ?? null} />
           }
         />
       </main>

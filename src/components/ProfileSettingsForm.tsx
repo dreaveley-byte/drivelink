@@ -9,6 +9,7 @@ export default function ProfileSettingsForm({
   userId,
   initialFullName,
   initialPhone,
+  initialEmail,
   initialSmsOptIn,
   showSmsToggle,
   photoTarget,
@@ -16,6 +17,7 @@ export default function ProfileSettingsForm({
   userId: string
   initialFullName: string
   initialPhone: string
+  initialEmail: string
   initialSmsOptIn: boolean
   showSmsToggle: boolean
   photoTarget?: {
@@ -35,6 +37,12 @@ export default function ProfileSettingsForm({
   const [profileError, setProfileError] = useState('')
   const [photoUrl, setPhotoUrl] = useState(photoTarget?.currentUrl ?? null)
   const [photoSaved, setPhotoSaved] = useState(false)
+
+  const [email, setEmail] = useState(initialEmail)
+  const [savingEmail, setSavingEmail] = useState(false)
+  const [emailSaved, setEmailSaved] = useState(false)
+  const [emailError, setEmailError] = useState('')
+
 
   async function handlePhotoCaptured(blob: Blob) {
     if (!photoTarget) return
@@ -61,6 +69,21 @@ export default function ProfileSettingsForm({
     setPhotoUrl(freshUrl)
     setPhotoSaved(true)
     router.refresh()
+  }
+
+  async function saveEmail(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingEmail(true)
+    setEmailError('')
+    setEmailSaved(false)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ email })
+    setSavingEmail(false)
+    if (error) {
+      setEmailError(error.message)
+      return
+    }
+    setEmailSaved(true)
   }
 
   const [newPassword, setNewPassword] = useState('')
@@ -159,6 +182,28 @@ export default function ProfileSettingsForm({
           className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
         >
           {savingProfile ? 'Saving…' : 'Save profile'}
+        </button>
+      </form>
+
+      <form onSubmit={saveEmail} className="space-y-4 border-t border-gray-100 pt-6">
+        <p className="text-xs text-gray-400 uppercase tracking-wide">Login email</p>
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        {emailError && <p className="text-sm text-red-600">{emailError}</p>}
+        {emailSaved && <p className="text-sm text-green-700">Check both your old and new inbox to confirm the change.</p>}
+        <button
+          type="submit"
+          disabled={savingEmail}
+          className="border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+        >
+          {savingEmail ? 'Saving…' : 'Update email'}
         </button>
       </form>
 

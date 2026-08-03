@@ -61,6 +61,7 @@ export default async function DealerSettingsPage() {
               userId={user.id}
               initialFullName={profile?.full_name ?? ''}
               initialPhone={profile?.phone ?? ''}
+              initialEmail={user.email ?? ''}
               initialSmsOptIn={false}
               showSmsToggle={false}
               photoTarget={{
@@ -73,13 +74,7 @@ export default async function DealerSettingsPage() {
             />
           }
           application={
-            application ? (
-              <DealerApplicationEditForm userId={user.id} application={application} />
-            ) : (
-              <p className="text-sm text-gray-400 py-8 text-center">
-                No application on file yet — only the person who originally submitted it can edit it here.
-              </p>
-            )
+            <DealerApplicationEditForm userId={user.id} organizationId={profile?.organization_id ?? null} application={application ?? null} />
           }
         />
       </main>

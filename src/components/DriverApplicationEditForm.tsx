@@ -26,15 +26,15 @@ type DriverApp = {
   void_cheque_path: string | null
 }
 
-export default function DriverApplicationEditForm({ userId, application }: { userId: string; application: DriverApp }) {
-  const [fullName, setFullName] = useState(application.full_name ?? '')
-  const [address, setAddress] = useState(application.address ?? '')
-  const [cellPhone, setCellPhone] = useState(application.cell_phone ?? '')
-  const [homePhone, setHomePhone] = useState(application.home_phone ?? '')
-  const [email, setEmail] = useState(application.email ?? '')
-  const [payoutMethod, setPayoutMethod] = useState<'individual' | 'company'>((application.payout_method as 'individual' | 'company') ?? 'individual')
-  const [companyName, setCompanyName] = useState(application.company_name ?? '')
-  const [gstNumber, setGstNumber] = useState(application.gst_number ?? '')
+export default function DriverApplicationEditForm({ userId, userEmail, application }: { userId: string; userEmail: string; application: DriverApp | null }) {
+  const [fullName, setFullName] = useState(application?.full_name ?? '')
+  const [address, setAddress] = useState(application?.address ?? '')
+  const [cellPhone, setCellPhone] = useState(application?.cell_phone ?? '')
+  const [homePhone, setHomePhone] = useState(application?.home_phone ?? '')
+  const [email, setEmail] = useState(application?.email ?? userEmail)
+  const [payoutMethod, setPayoutMethod] = useState<'individual' | 'company'>((application?.payout_method as 'individual' | 'company') ?? 'individual')
+  const [companyName, setCompanyName] = useState(application?.company_name ?? '')
+  const [gstNumber, setGstNumber] = useState(application?.gst_number ?? '')
   const [docs, setDocs] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -50,28 +50,31 @@ export default function DriverApplicationEditForm({ userId, application }: { use
     setError('')
     setSaved(false)
     const supabase = createClient()
-    const { error } = await supabase
-      .from('driver_applications')
-      .update({
-        full_name: fullName,
-        address,
-        cell_phone: cellPhone,
-        home_phone: homePhone,
-        email,
-        payout_method: payoutMethod,
-        company_name: payoutMethod === 'company' ? companyName : null,
-        gst_number: payoutMethod === 'company' ? gstNumber : null,
-        ...(docs.profile_photo_path && { profile_photo_path: docs.profile_photo_path }),
-        ...(docs.drivers_license_path && { drivers_license_path: docs.drivers_license_path }),
-        ...(docs.drivers_abstract_path && { drivers_abstract_path: docs.drivers_abstract_path }),
-        ...(docs.criminal_background_check_path && { criminal_background_check_path: docs.criminal_background_check_path }),
-        ...(docs.vsa_license_path && { vsa_license_path: docs.vsa_license_path }),
-        ...(docs.medical_fitness_path && { medical_fitness_path: docs.medical_fitness_path }),
-        ...(docs.drug_alcohol_test_path && { drug_alcohol_test_path: docs.drug_alcohol_test_path }),
-        ...(docs.optical_test_path && { optical_test_path: docs.optical_test_path }),
-        ...(docs.void_cheque_path && { void_cheque_path: docs.void_cheque_path }),
-      })
-      .eq('id', application.id)
+
+    const fields = {
+      full_name: fullName,
+      address,
+      cell_phone: cellPhone,
+      home_phone: homePhone,
+      email,
+      payout_method: payoutMethod,
+      company_name: payoutMethod === 'company' ? companyName : null,
+      gst_number: payoutMethod === 'company' ? gstNumber : null,
+      ...(docs.profile_photo_path && { profile_photo_path: docs.profile_photo_path }),
+      ...(docs.drivers_license_path && { drivers_license_path: docs.drivers_license_path }),
+      ...(docs.drivers_abstract_path && { drivers_abstract_path: docs.drivers_abstract_path }),
+      ...(docs.criminal_background_check_path && { criminal_background_check_path: docs.criminal_background_check_path }),
+      ...(docs.vsa_license_path && { vsa_license_path: docs.vsa_license_path }),
+      ...(docs.medical_fitness_path && { medical_fitness_path: docs.medical_fitness_path }),
+      ...(docs.drug_alcohol_test_path && { drug_alcohol_test_path: docs.drug_alcohol_test_path }),
+      ...(docs.optical_test_path && { optical_test_path: docs.optical_test_path }),
+      ...(docs.void_cheque_path && { void_cheque_path: docs.void_cheque_path }),
+    }
+
+    const { error } = application
+      ? await supabase.from('driver_applications').update(fields).eq('id', application.id)
+      : await supabase.from('driver_applications').insert({ user_id: userId, ...fields })
+
     setSaving(false)
     if (error) {
       setError(error.message)
@@ -83,11 +86,20 @@ export default function DriverApplicationEditForm({ userId, application }: { use
   return (
     <form onSubmit={handleSave} className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400 uppercase tracking-wide">Your submitted application</p>
-        <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 capitalize">
-          {application.status.replace('_', ' ')}
-        </span>
+        <p className="text-xs text-gray-400 uppercase tracking-wide">
+          {application ? 'Your submitted application' : 'Complete your application'}
+        </p>
+        {application && (
+          <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 capitalize">
+            {application.status.replace('_', ' ')}
+          </span>
+        )}
       </div>
+      {!application && (
+        <p className="text-xs text-gray-400 -mt-3">
+          No application on file yet — fill in what you can below and save. An admin will review it once submitted.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

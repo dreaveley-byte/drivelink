@@ -21,16 +21,16 @@ type DealerApp = {
   pre_authorized_debit_form_path: string | null
 }
 
-export default function DealerApplicationEditForm({ userId, application }: { userId: string; application: DealerApp }) {
-  const [businessName, setBusinessName] = useState(application.business_name ?? '')
-  const [businessAddress, setBusinessAddress] = useState(application.business_address ?? '')
-  const [pstNumber, setPstNumber] = useState(application.pst_number ?? '')
-  const [gstNumber, setGstNumber] = useState(application.gst_number ?? '')
-  const [dealerNumber, setDealerNumber] = useState(application.dealer_number ?? '')
-  const [contactFullName, setContactFullName] = useState(application.contact_full_name ?? '')
-  const [contactPosition, setContactPosition] = useState(application.contact_position ?? '')
-  const [storePhone, setStorePhone] = useState(application.store_phone ?? '')
-  const [contactCellPhone, setContactCellPhone] = useState(application.contact_cell_phone ?? '')
+export default function DealerApplicationEditForm({ userId, organizationId, application }: { userId: string; organizationId: string | null; application: DealerApp | null }) {
+  const [businessName, setBusinessName] = useState(application?.business_name ?? '')
+  const [businessAddress, setBusinessAddress] = useState(application?.business_address ?? '')
+  const [pstNumber, setPstNumber] = useState(application?.pst_number ?? '')
+  const [gstNumber, setGstNumber] = useState(application?.gst_number ?? '')
+  const [dealerNumber, setDealerNumber] = useState(application?.dealer_number ?? '')
+  const [contactFullName, setContactFullName] = useState(application?.contact_full_name ?? '')
+  const [contactPosition, setContactPosition] = useState(application?.contact_position ?? '')
+  const [storePhone, setStorePhone] = useState(application?.store_phone ?? '')
+  const [contactCellPhone, setContactCellPhone] = useState(application?.contact_cell_phone ?? '')
   const [padPath, setPadPath] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -42,26 +42,29 @@ export default function DealerApplicationEditForm({ userId, application }: { use
     setError('')
     setSaved(false)
     const supabase = createClient()
-    const { error } = await supabase
-      .from('dealer_applications')
-      .update({
-        business_name: businessName,
-        business_address: businessAddress,
-        pst_number: pstNumber || null,
-        gst_number: gstNumber || null,
-        dealer_number: dealerNumber || null,
-        contact_full_name: contactFullName,
-        contact_position: contactPosition,
-        store_phone: storePhone,
-        contact_cell_phone: contactCellPhone,
-        ...(padPath && { pre_authorized_debit_form_path: padPath }),
-      })
-      .eq('id', application.id)
+
+    const fields = {
+      business_name: businessName,
+      business_address: businessAddress,
+      pst_number: pstNumber || null,
+      gst_number: gstNumber || null,
+      dealer_number: dealerNumber || null,
+      contact_full_name: contactFullName,
+      contact_position: contactPosition,
+      store_phone: storePhone,
+      contact_cell_phone: contactCellPhone,
+      ...(padPath && { pre_authorized_debit_form_path: padPath }),
+    }
+
+    const { error } = application
+      ? await supabase.from('dealer_applications').update(fields).eq('id', application.id)
+      : await supabase.from('dealer_applications').insert({ submitted_by: userId, organization_id: organizationId, ...fields })
 
     // Keep the organization's display name in sync since that's what shows
     // everywhere else in the app (admin dealer list, job cards, etc).
-    if (!error) {
-      await supabase.from('organizations').update({ name: businessName }).eq('id', application.organization_id)
+    const orgId = application?.organization_id ?? organizationId
+    if (!error && orgId) {
+      await supabase.from('organizations').update({ name: businessName }).eq('id', orgId)
     }
 
     setSaving(false)
@@ -75,11 +78,20 @@ export default function DealerApplicationEditForm({ userId, application }: { use
   return (
     <form onSubmit={handleSave} className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400 uppercase tracking-wide">Your submitted application</p>
-        <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 capitalize">
-          {application.status.replace('_', ' ')}
-        </span>
+        <p className="text-xs text-gray-400 uppercase tracking-wide">
+          {application ? 'Your submitted application' : 'Complete your application'}
+        </p>
+        {application && (
+          <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 capitalize">
+            {application.status.replace('_', ' ')}
+          </span>
+        )}
       </div>
+      {!application && (
+        <p className="text-xs text-gray-400 -mt-3">
+          No application on file yet — fill in what you can below and save. An admin will review it once submitted.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">

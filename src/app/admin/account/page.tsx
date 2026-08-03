@@ -43,6 +43,7 @@ export default async function AdminAccountPage() {
           userId={user.id}
           initialFullName={profile?.full_name ?? ''}
           initialPhone={profile?.phone ?? ''}
+          initialEmail={user.email ?? ''}
           initialSmsOptIn={false}
           showSmsToggle={false}
         />
