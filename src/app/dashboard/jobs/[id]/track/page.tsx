@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
 import ChatPanel from '@/components/ChatPanel'
+import CustomerSmsThread from '@/components/CustomerSmsThread'
 import CloseButton from '@/components/CloseButton'
 import CopyLinkButton from '@/components/CopyLinkButton'
 import Logo from '@/components/Logo'
@@ -28,7 +29,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, job_types(name), driver:driver_id(full_name, photo_url)')
+    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, customer_phone, job_types(name), driver:driver_id(full_name, photo_url)')
     .eq('id', jobId)
     .single()
 
@@ -126,6 +127,11 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
             currentUserName={myProfile?.full_name || 'You'}
             currentUserRole={myProfile?.role || 'org_member'}
           />
+        </div>
+
+        <div className="mt-6">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Text the Customer</p>
+          <CustomerSmsThread jobId={job.id} hasCustomerPhone={!!job.customer_phone} />
         </div>
 
         <div className="mt-4 text-sm text-gray-500">

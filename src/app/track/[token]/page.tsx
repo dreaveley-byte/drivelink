@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
-import CustomerChatWidget from '@/components/CustomerChatWidget'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 import Logo from '@/components/Logo'
 
@@ -67,8 +66,6 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
           jobStatus={info.status}
           publicToken={token}
         />
-
-        {info.status !== 'cancelled' && <CustomerChatWidget token={token} />}
 
         <p className="text-xs text-gray-400 mt-6 text-center">
           Powered by Drivflo

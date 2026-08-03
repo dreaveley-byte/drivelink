@@ -7,6 +7,9 @@ import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import SettingsGearLink from '@/components/SettingsGearLink'
+import ChatBadgeLink from '@/components/ChatBadgeLink'
+import JobMessageWatcher from '@/components/JobMessageWatcher'
+import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -119,6 +122,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .select('id, status, scheduled_for, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
+
+  const trackableJobIds = (jobs ?? [])
+    .filter((j) => ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(j.status))
+    .map((j) => j.id)
+  const unreadChatJobs = await getUnreadJobChatSet(supabase, user.id, trackableJobIds)
 
   return (
     <div className="min-h-screen bg-white">
@@ -233,10 +241,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   {statusLabels[job.status] ?? job.status}
                 </span>
                 <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
+                {isTrackable && <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />}
               </div>
             </div>
           )})}
         </div>
+        <JobMessageWatcher jobIds={trackableJobIds} currentUserId={user.id} />
       </main>
     </div>
   )

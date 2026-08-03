@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
@@ -8,6 +7,9 @@ import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import SettingsGearLink from '@/components/SettingsGearLink'
+import ChatBadgeLink from '@/components/ChatBadgeLink'
+import JobMessageWatcher from '@/components/JobMessageWatcher'
+import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -107,6 +109,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
 
   const pendingCount = myJobs?.length ?? 0
   const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.estimated_driver_pay_cents ?? 0), 0)
+  const unreadChatJobs = await getUnreadJobChatSet(supabase, user.id, (myJobs ?? []).map((j) => j.id))
 
   return (
     <div className="min-h-screen bg-white">
@@ -151,13 +154,12 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
                   <DriverJobActions job={job} isActive />
                   <div className="mt-2 flex items-center gap-3">
                     <LocationSharer jobId={job.id} />
-                    <Link href={`/dashboard/jobs/${job.id}/track`} className="text-xs text-blue-600 hover:underline whitespace-nowrap">
-                      Map &amp; chat
-                    </Link>
+                    <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />
                   </div>
                 </div>
               ))}
             </div>
+            <JobMessageWatcher jobIds={myJobs.map((j) => j.id)} currentUserId={user.id} />
           </div>
         )}
 
