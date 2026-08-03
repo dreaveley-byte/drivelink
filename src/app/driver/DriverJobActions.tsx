@@ -413,6 +413,14 @@ export default function DriverJobActions({
       changed_by: user?.id,
     })
 
+    if (newStatus === 'in_progress') {
+      fetch('/api/customer-sms/notify-in-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(() => {})
+    }
+
     router.refresh()
     setLoading(false)
   }
