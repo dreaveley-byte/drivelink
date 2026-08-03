@@ -128,6 +128,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="text-xs text-gray-500 mt-1">{org?.name}</p>
         </div>
         <div className="flex items-center gap-4">
+          <SignOutButton />
+          <SettingsGearLink href="/dashboard/settings" />
+        </div>
+      </header>
+
+      <div className="border-b border-gray-100 px-6 py-3">
+        <div className="max-w-3xl mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
             Archived
           </Link>
@@ -139,10 +146,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Link href="/dashboard/team" className="text-sm text-gray-600 hover:text-gray-900">
             Team
           </Link>
-          <SignOutButton />
-          <SettingsGearLink href="/dashboard/settings" />
         </div>
-      </header>
+      </div>
 
       <div className="max-w-3xl mx-auto px-6 pt-4 flex items-center justify-between">
         <Link

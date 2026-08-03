@@ -110,16 +110,21 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
           <p className="text-xs text-gray-500 mt-0.5">Driver profile</p>
         </div>
         <div className="flex items-center gap-4">
+          <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
+        </div>
+      </header>
+
+      <div className="border-b border-gray-100 px-6 py-3">
+        <div className="max-w-2xl mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
             Drivers
           </Link>
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
             Admin
           </Link>
-          <SignOutButton />
-          <SettingsGearLink href="/admin/account" />
         </div>
-      </header>
+      </div>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
         <div>

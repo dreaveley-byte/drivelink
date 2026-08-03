@@ -93,6 +93,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <p className="text-xs text-gray-500 mt-0.5">All dealers, all jobs</p>
         </div>
         <div className="flex items-center gap-4">
+          <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
+        </div>
+      </header>
+
+      <div className="border-b border-gray-100 px-6 py-3">
+        <div className="max-w-4xl mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/admin/settings" className="text-sm text-gray-600 hover:text-gray-900">
             Pricing
           </Link>
@@ -108,10 +115,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href="/admin/archived" className="text-sm text-gray-600 hover:text-gray-900">
             Archived
           </Link>
-          <SignOutButton />
-          <SettingsGearLink href="/admin/account" />
         </div>
-      </header>
+      </div>
 
       <div className="max-w-4xl mx-auto px-6 pt-4 flex justify-end">
         <SortSelect />

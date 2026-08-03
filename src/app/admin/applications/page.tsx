@@ -45,6 +45,13 @@ export default async function AdminApplicationsPage() {
           <p className="text-xs text-gray-500 mt-0.5">Review driver and dealer applications</p>
         </div>
         <div className="flex items-center gap-4">
+          <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
+        </div>
+      </header>
+
+      <div className="border-b border-gray-100 px-6 py-3">
+        <div className="max-w-3xl mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
             Admin
           </Link>
@@ -57,10 +64,8 @@ export default async function AdminApplicationsPage() {
           <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
             Dealers
           </Link>
-          <SignOutButton />
-          <SettingsGearLink href="/admin/account" />
         </div>
-      </header>
+      </div>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
         <div>
