@@ -65,6 +65,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .from('organizations')
     .select('id', { count: 'exact', head: true })
 
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+  const { data: mtdJobs } = await supabase
+    .from('jobs')
+    .select('estimated_dealer_cost_cents, estimated_driver_pay_cents, final_driver_pay_cents')
+    .eq('status', 'completed')
+    .gte('updated_at', monthStart)
+
+  let dealerSpendMtd = 0
+  let driverEarningsMtd = 0
+  for (const job of mtdJobs ?? []) {
+    dealerSpendMtd += job.estimated_dealer_cost_cents ?? 0
+    driverEarningsMtd += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
+  }
+  const drivfloProfitMtd = dealerSpendMtd - driverEarningsMtd
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -105,8 +122,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="grid grid-cols-4 gap-4 mb-4">
           {[
             { label: 'Total Jobs', value: total },
-            { label: 'Awaiting Driver', value: awaiting },
-            { label: 'Active', value: active },
+            { label: 'Awaiting a Driver', value: awaiting },
+            { label: 'In Progress', value: active },
             { label: 'Completed', value: completed },
           ].map((stat) => (
             <div key={stat.label} className="border border-gray-200 rounded-xl px-4 py-3">
@@ -114,6 +131,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <p className="text-xl font-semibold text-gray-900 mt-1">{stat.value}</p>
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="border border-gray-200 rounded-xl px-4 py-3">
+            <p className="text-xs text-gray-500">Dealer Spend (MTD)</p>
+            <p className="text-xl font-semibold text-gray-900 mt-1">{formatCents(dealerSpendMtd)}</p>
+          </div>
+          <div className="border border-gray-200 rounded-xl px-4 py-3">
+            <p className="text-xs text-gray-500">Driver Earnings (MTD)</p>
+            <p className="text-xl font-semibold text-gray-900 mt-1">{formatCents(driverEarningsMtd)}</p>
+          </div>
+          <div className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-900">
+            <p className="text-xs text-gray-300">Drivflo Profit (MTD)</p>
+            <p className="text-xl font-semibold text-white mt-1">{formatCents(drivfloProfitMtd)}</p>
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
           <Link href="/admin/drivers" className="border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50">
