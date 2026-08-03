@@ -8,6 +8,7 @@ import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
+import PendingInvitesList from '@/components/PendingInvitesList'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -58,6 +59,13 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     .eq('organization_id', dealerId)
     .in('role', ['org_admin', 'org_member'])
     .order('full_name')
+
+  const { data: pendingInvites } = await supabase
+    .from('org_invites')
+    .select('id, invitee_name, invitee_phone, created_at')
+    .eq('organization_id', dealerId)
+    .is('accepted_at', null)
+    .order('created_at', { ascending: false })
 
   const { data: application } = await supabase
     .from('dealer_applications')
@@ -210,6 +218,10 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
             </div>
           </div>
         </div>
+
+        {pendingInvites && pendingInvites.length > 0 && (
+          <PendingInvitesList invites={pendingInvites} />
+        )}
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Team Members</p>
