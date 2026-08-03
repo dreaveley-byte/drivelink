@@ -63,6 +63,37 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     .limit(1)
     .maybeSingle()
 
+  const { data: statsJobs } = await supabase
+    .from('jobs')
+    .select('status, created_at, updated_at, estimated_dealer_cost_cents, customer_rating')
+    .eq('organization_id', dealerId)
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  let requestedThisMonth = 0
+  let completedThisMonth = 0
+  let spentThisMonth = 0
+  let totalCompleted = 0
+  let ratingSum = 0
+  let ratingCount = 0
+
+  for (const job of statsJobs ?? []) {
+    if (job.created_at && new Date(job.created_at) >= monthStart) requestedThisMonth += 1
+    if (job.status === 'completed') {
+      totalCompleted += 1
+      if (job.customer_rating != null) {
+        ratingSum += job.customer_rating
+        ratingCount += 1
+      }
+      if (job.updated_at && new Date(job.updated_at) >= monthStart) {
+        completedThisMonth += 1
+        spentThisMonth += job.estimated_dealer_cost_cents ?? 0
+      }
+    }
+  }
+  const avgCustomerRating = ratingCount > 0 ? ratingSum / ratingCount : null
+
   const { data: jobs } = await supabase
     .from('jobs')
     .select('id, status, scheduled_for, pickup_address, dropoff_address, estimated_dealer_cost_cents, driver:driver_id(full_name)')
@@ -104,6 +135,30 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
           <p className="text-sm text-gray-500 mt-0.5">{dealer.address || 'No address on file'}</p>
           {dealer.phone && <p className="text-sm text-gray-500">{dealer.phone}</p>}
           <p className="text-xs text-gray-400 mt-1">Member since {fmtDate(dealer.created_at)}</p>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <p className="text-gray-400">Requested this month</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{requestedThisMonth}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Completed this month</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{completedThisMonth}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Spent this month</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(spentThisMonth)}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Avg. customer rating</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">
+              {avgCustomerRating != null ? `${avgCustomerRating.toFixed(1)} / 5` : '—'}
+            </p>
+          </div>
+          <div className="col-span-2 sm:col-span-4">
+            <p className="text-gray-400">{totalCompleted} completed job{totalCompleted === 1 ? '' : 's'} all-time</p>
+          </div>
         </div>
 
         <div>

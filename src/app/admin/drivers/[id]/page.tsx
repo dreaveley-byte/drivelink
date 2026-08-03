@@ -73,6 +73,23 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
   }
   const s = (stats ?? []).find((row: DriverStat) => row.driver_id === driverId) as DriverStat | undefined
 
+  const { data: monthJobs } = await supabase
+    .from('jobs')
+    .select('status, updated_at, final_driver_pay_cents, estimated_driver_pay_cents')
+    .eq('driver_id', driverId)
+    .eq('status', 'completed')
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  let jobsThisMonth = 0
+  let earnedThisMonth = 0
+  for (const job of monthJobs ?? []) {
+    if (job.updated_at && new Date(job.updated_at) >= monthStart) {
+      jobsThisMonth += 1
+      earnedThisMonth += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
+    }
+  }
+
   const { data: jobs } = await supabase
     .from('jobs')
     .select('id, status, scheduled_for, pickup_address, dropoff_address, estimated_driver_pay_cents, organizations(name)')
@@ -139,6 +156,11 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
           <div>
             <p className="text-gray-400">Completed jobs</p>
             <p className="text-gray-900 font-medium text-sm mt-0.5">{s?.total_completed ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Earned this month</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(earnedThisMonth)}</p>
+            <p className="text-gray-400 text-[10px] mt-0.5">{jobsThisMonth} job{jobsThisMonth === 1 ? '' : 's'} this month</p>
           </div>
           <div>
             <p className="text-gray-400">Checklist completion</p>

@@ -50,6 +50,21 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const active = jobs?.filter((j) => ['assigned', 'picked_up', 'in_progress'].includes(j.status)).length ?? 0
   const completed = jobs?.filter((j) => j.status === 'completed').length ?? 0
 
+  const { count: driverCount } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'driver')
+
+  const { count: activeDriverCount } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'driver')
+    .eq('is_active', true)
+
+  const { count: dealerCount } = await supabase
+    .from('organizations')
+    .select('id', { count: 'exact', head: true })
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -87,7 +102,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         <AutoRefresh />
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-4 mb-4">
           {[
             { label: 'Total Jobs', value: total },
             { label: 'Awaiting Driver', value: awaiting },
@@ -99,6 +114,21 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <p className="text-xl font-semibold text-gray-900 mt-1">{stat.value}</p>
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+          <Link href="/admin/drivers" className="border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50">
+            <p className="text-xs text-gray-500">Driver Accounts</p>
+            <p className="text-xl font-semibold text-gray-900 mt-1">{driverCount ?? 0}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{activeDriverCount ?? 0} active</p>
+          </Link>
+          <Link href="/admin/dealers" className="border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50">
+            <p className="text-xs text-gray-500">Dealer Accounts</p>
+            <p className="text-xl font-semibold text-gray-900 mt-1">{dealerCount ?? 0}</p>
+          </Link>
+          <Link href="/admin/coverage" className="border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50 flex flex-col justify-center">
+            <p className="text-sm text-gray-700 font-medium">View coverage map →</p>
+            <p className="text-xs text-gray-400 mt-0.5">Drivers vs. dealers by location</p>
+          </Link>
         </div>
 
         <div className="flex items-center justify-between mb-4">
