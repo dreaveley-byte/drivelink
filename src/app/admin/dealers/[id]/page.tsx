@@ -264,15 +264,17 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                   { label: 'Signed contract', path: application.contract_signature_path },
                 ]}
               />
-            ) : members && members.length > 0 ? (
+            ) : (
               <div className="border border-gray-200 rounded-xl p-4">
                 <p className="text-xs text-gray-400 mb-4">
                   No application on file for this dealer yet — you can fill it in here on their behalf.
                 </p>
-                <DealerApplicationEditForm userId={members[0].id} organizationId={dealer.id} application={null} />
+                <DealerApplicationEditForm
+                  userId={members && members.length > 0 ? members[0].id : user.id}
+                  organizationId={dealer.id}
+                  application={null}
+                />
               </div>
-            ) : (
-              <p className="text-sm text-gray-400 py-4 text-center">No application on file yet.</p>
             )}
           </CollapsibleSection>
         </div>
