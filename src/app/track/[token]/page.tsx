@@ -56,16 +56,23 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
           </div>
         </div>
 
-        <GoogleMapView
-          jobId=""
-          pickupAddress={info.pickup_address}
-          dropoffAddress={info.dropoff_address}
-          initialDriverLat={info.driver_lat}
-          initialDriverLng={info.driver_lng}
-          initialLocationUpdatedAt={info.driver_location_updated_at}
-          jobStatus={info.status}
-          publicToken={token}
-        />
+        {info.status === 'delivered' || info.status === 'completed' ? (
+          <div className="border border-gray-200 rounded-xl p-6 text-center">
+            <p className="text-sm text-gray-700 font-medium">Your vehicle has been delivered.</p>
+            <p className="text-xs text-gray-400 mt-1">Live tracking for this delivery has ended.</p>
+          </div>
+        ) : (
+          <GoogleMapView
+            jobId=""
+            pickupAddress={info.pickup_address}
+            dropoffAddress={info.dropoff_address}
+            initialDriverLat={info.driver_lat}
+            initialDriverLng={info.driver_lng}
+            initialLocationUpdatedAt={info.driver_location_updated_at}
+            jobStatus={info.status}
+            publicToken={token}
+          />
+        )}
 
         <p className="text-xs text-gray-400 mt-6 text-center">
           Powered by Drivflo
