@@ -78,7 +78,15 @@ export default function ChatPanel({ jobId, currentUserId, currentUserName, curre
       sender_name: currentUserName,
       body,
     })
-    if (error) setDraft(body)
+    if (error) {
+      setDraft(body)
+    } else {
+      fetch('/api/job-chat/notify-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, senderRole: currentUserRole, senderName: currentUserName, body }),
+      }).catch(() => {})
+    }
     setSending(false)
   }
 

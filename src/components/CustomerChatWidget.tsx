@@ -48,8 +48,16 @@ export default function CustomerChatWidget({ token }: { token: string }) {
     setSending(true)
     setDraft('')
     const { error } = await supabase.rpc('send_tracking_message', { p_token: token, p_body: body })
-    if (!error) await load()
-    else setDraft(body)
+    if (!error) {
+      await load()
+      fetch('/api/job-chat/notify-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, senderRole: 'customer', body }),
+      }).catch(() => {})
+    } else {
+      setDraft(body)
+    }
     setSending(false)
   }
 
