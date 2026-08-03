@@ -51,7 +51,7 @@ export default function CustomerFeedbackForm({ token }: { token: string }) {
       <button
         onClick={submit}
         disabled={saving || !rating}
-        className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+        className="text-sm bg-[#378ADD] text-white px-4 py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
       >
         {saving ? 'Submitting...' : 'Submit feedback'}
       </button>

@@ -568,7 +568,7 @@ export default function DriverJobActions({
           <button
             onClick={advanceStatus}
             disabled={loading}
-            className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
           >
             {loading ? '...' : nextStatusLabel[job.status]}
           </button>
@@ -579,7 +579,7 @@ export default function DriverJobActions({
             <button
               onClick={claimJob}
               disabled={loading || disabled}
-              className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
             >              {loading ? '...' : 'Claim'}
             </button>
             {disabled && (
@@ -657,7 +657,7 @@ export default function DriverJobActions({
                           type="button"
                           onClick={() => setTristateValue(item, opt)}
                           className={`text-xs px-3 py-1.5 rounded-lg border ${
-                            item.notes === opt ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600'
+                            item.notes === opt ? 'bg-[#378ADD] text-white border-[#378ADD]' : 'border-gray-300 text-gray-600'
                           }`}
                         >
                           {opt}
@@ -675,7 +675,7 @@ export default function DriverJobActions({
                           type="button"
                           onClick={() => setTristateValue(item, opt)}
                           className={`text-xs px-3 py-1.5 rounded-lg border ${
-                            item.notes === opt ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600'
+                            item.notes === opt ? 'bg-[#378ADD] text-white border-[#378ADD]' : 'border-gray-300 text-gray-600'
                           }`}
                         >
                           {opt}
@@ -744,7 +744,7 @@ export default function DriverJobActions({
                                   <button
                                     type="button"
                                     onClick={() => deleteFileFromItem(item, path)}
-                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#378ADD] text-white text-xs flex items-center justify-center hover:bg-red-600"
                                     title="Remove"
                                   >
                                     ✕
@@ -847,7 +847,7 @@ export default function DriverJobActions({
                         )}
 
                         {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
-                          <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
+                          <label className="inline-block text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] cursor-pointer">
                             {uploadingItemId === item.id
                               ? 'Uploading...'
                               : item.item_type === 'video'

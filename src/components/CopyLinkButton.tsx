@@ -28,7 +28,7 @@ export default function CopyLinkButton({ url }: { url: string }) {
         <button
           type="button"
           onClick={copy}
-          className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 whitespace-nowrap"
+          className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] whitespace-nowrap"
         >
           {copied ? 'Copied ✓' : 'Copy link'}
         </button>

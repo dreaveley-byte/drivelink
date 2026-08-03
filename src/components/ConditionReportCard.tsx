@@ -70,7 +70,7 @@ export default function ConditionReportCard({
               type="button"
               onClick={() => onChange({ ...data, cleanliness: n })}
               className={`w-8 h-8 rounded-lg border text-sm ${
-                data.cleanliness === n ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600'
+                data.cleanliness === n ? 'bg-[#378ADD] text-white border-[#378ADD]' : 'border-gray-300 text-gray-600'
               }`}
             >
               {n}
@@ -169,7 +169,7 @@ export default function ConditionReportCard({
                 <button
                   type="button"
                   onClick={() => onDeleteFile(path)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center hover:bg-red-600"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#378ADD] text-white text-xs flex items-center justify-center hover:bg-red-600"
                 >
                   ✕
                 </button>
@@ -177,7 +177,7 @@ export default function ConditionReportCard({
             ))}
           </div>
         )}
-        <label className="inline-block text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 cursor-pointer">
+        <label className="inline-block text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] cursor-pointer">
           {uploading ? 'Uploading...' : 'Take / upload photo'}
           <input
             type="file"

@@ -275,7 +275,7 @@ export default function DriverApplyPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gray-900 text-white text-sm font-medium px-5 py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            className="w-full bg-[#378ADD] text-white text-sm font-medium px-5 py-3 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Application'}
           </button>

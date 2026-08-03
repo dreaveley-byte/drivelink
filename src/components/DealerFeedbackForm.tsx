@@ -51,7 +51,7 @@ export default function DealerFeedbackForm({
       <button
         onClick={submit}
         disabled={saving}
-        className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+        className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
       >
         {saving ? 'Saving...' : saved ? 'Saved ✓' : 'Save feedback'}
       </button>

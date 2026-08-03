@@ -92,7 +92,7 @@ export default function ChatPanel({ jobId, currentUserId, currentUserName, curre
           const isMine = m.sender_id === currentUserId
           return (
             <div key={m.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isMine ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-900'}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isMine ? 'bg-[#378ADD] text-white' : 'bg-white border border-gray-200 text-gray-900'}`}>
                 {!isMine && (
                   <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">
                     {m.sender_name} · {roleLabels[m.sender_role] ?? m.sender_role}
@@ -121,7 +121,7 @@ export default function ChatPanel({ jobId, currentUserId, currentUserName, curre
         <button
           onClick={send}
           disabled={sending || !draft.trim()}
-          className="text-sm bg-gray-900 text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
+          className="text-sm bg-[#378ADD] text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
         >
           Send
         </button>

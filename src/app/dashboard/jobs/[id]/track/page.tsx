@@ -152,7 +152,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-1 first:mt-0">{phase}</p>
                   )}
                   <div className="flex items-center gap-2 text-sm">
-                    <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs shrink-0 ${item.completed_at ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-300'}`}>
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs shrink-0 ${item.completed_at ? 'bg-[#378ADD] border-[#378ADD] text-white' : 'border-gray-300'}`}>
                       {item.completed_at ? '✓' : ''}
                     </span>
                     <span className={item.completed_at ? 'text-gray-400' : 'text-gray-700'}>

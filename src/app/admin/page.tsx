@@ -141,7 +141,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <p className="text-xs text-gray-500">Driver Earnings (MTD)</p>
             <p className="text-xl font-semibold text-gray-900 mt-1">{formatCents(driverEarningsMtd)}</p>
           </div>
-          <div className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-900">
+          <div className="border border-gray-200 rounded-xl px-4 py-3 bg-[#378ADD]">
             <p className="text-xs text-gray-300">Drivflo Profit (MTD)</p>
             <p className="text-xl font-semibold text-white mt-1">{formatCents(drivfloProfitMtd)}</p>
           </div>
@@ -167,7 +167,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/post-job"
-              className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800"
+              className="bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead]"
             >
               + Post a new job
             </Link>

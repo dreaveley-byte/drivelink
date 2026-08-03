@@ -617,7 +617,7 @@ export default function PostJobPage() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-gray-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              className="bg-[#378ADD] text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
             >
               {loading ? 'Posting...' : 'Post job'}
             </button>
