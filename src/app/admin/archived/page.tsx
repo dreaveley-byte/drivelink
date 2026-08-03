@@ -38,7 +38,7 @@ export default async function AdminArchivedJobsPage() {
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Logo height={22} />
+            <Link href="/admin"><Logo height={22} /></Link>
             <span className="text-sm text-gray-400">— Archived Jobs</span>
           </div>
         </div>

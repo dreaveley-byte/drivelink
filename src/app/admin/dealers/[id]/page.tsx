@@ -73,7 +73,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Logo height={22} />
+            <Link href="/admin"><Logo height={22} /></Link>
             <span className="text-sm text-gray-400">— Dealer</span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">Dealer profile</p>
@@ -101,6 +101,52 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
           <p className="text-sm text-gray-500 mt-0.5">{dealer.address || 'No address on file'}</p>
           {dealer.phone && <p className="text-sm text-gray-500">{dealer.phone}</p>}
           <p className="text-xs text-gray-400 mt-1">Member since {fmtDate(dealer.created_at)}</p>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Company Info</p>
+          <div className="border border-gray-200 rounded-xl px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <div>
+              <p className="text-gray-400 text-xs">Business name</p>
+              <p className="text-gray-900">{application?.business_name || dealer.name || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Business address</p>
+              <p className="text-gray-900">{application?.business_address || dealer.address || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Store phone</p>
+              <p className="text-gray-900">{application?.store_phone || dealer.phone || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Dealer number</p>
+              <p className="text-gray-900">{application?.dealer_number || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">PST number</p>
+              <p className="text-gray-900">{application?.pst_number || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">GST number</p>
+              <p className="text-gray-900">{application?.gst_number || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Contact name</p>
+              <p className="text-gray-900">{application?.contact_full_name || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Contact position</p>
+              <p className="text-gray-900">{application?.contact_position || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Contact cell phone</p>
+              <p className="text-gray-900">{application?.contact_cell_phone || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Payment method</p>
+              <p className="text-gray-900 capitalize">{application?.payment_method?.replace(/_/g, ' ') || '—'}</p>
+            </div>
+          </div>
         </div>
 
         <div>

@@ -83,7 +83,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Logo height={22} />
+            <Link href="/admin"><Logo height={22} /></Link>
             <span className="text-sm text-gray-400">— Driver</span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">Driver profile</p>
@@ -162,6 +162,54 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               </p>
             </div>
           )}
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Driver Info</p>
+          <div className="border border-gray-200 rounded-xl px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <div>
+              <p className="text-gray-400 text-xs">Full name</p>
+              <p className="text-gray-900">{application?.full_name || driver.full_name || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Address</p>
+              <p className="text-gray-900">{application?.address || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Cell phone</p>
+              <p className="text-gray-900">{application?.cell_phone || driver.phone || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Home phone</p>
+              <p className="text-gray-900">{application?.home_phone || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Email</p>
+              <p className="text-gray-900">{application?.email || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Payout method</p>
+              <p className="text-gray-900 capitalize">{application?.payout_method || '—'}</p>
+            </div>
+            {application?.payout_method === 'company' && (
+              <>
+                <div>
+                  <p className="text-gray-400 text-xs">Company name</p>
+                  <p className="text-gray-900">{application?.company_name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs">GST number</p>
+                  <p className="text-gray-900">{application?.gst_number || '—'}</p>
+                </div>
+              </>
+            )}
+            {application?.sin_number && (
+              <div>
+                <p className="text-gray-400 text-xs">SIN on file</p>
+                <p className="text-gray-900">•••-•••-{application.sin_number.slice(-3)}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {application && (
