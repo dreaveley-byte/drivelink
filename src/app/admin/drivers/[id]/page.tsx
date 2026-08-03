@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import ApplicationCard from '@/components/ApplicationCard'
@@ -97,6 +98,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             Admin
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 

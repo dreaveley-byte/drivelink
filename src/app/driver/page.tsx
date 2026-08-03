@@ -7,6 +7,7 @@ import LocationSharer from '@/components/LocationSharer'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -115,13 +116,14 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           <span className="text-sm text-gray-400">— Driver</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/driver/settings" className="text-sm text-gray-600 hover:text-gray-900">
-            Settings
-          </Link>
-          <SortSelect />
           <SignOutButton />
+          <SettingsGearLink href="/driver/settings" />
         </div>
       </header>
+
+      <div className="max-w-2xl mx-auto px-6 pt-4 flex justify-end">
+        <SortSelect />
+      </div>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
         <AutoRefresh />

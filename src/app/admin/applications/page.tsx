@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import ApplicationCard from '@/components/ApplicationCard'
 import Logo from '@/components/Logo'
 
@@ -57,6 +58,7 @@ export default async function AdminApplicationsPage() {
             Dealers
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 

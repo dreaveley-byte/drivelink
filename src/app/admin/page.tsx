@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
@@ -76,6 +77,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             Archived
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 

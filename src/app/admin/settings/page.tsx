@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import Logo from '@/components/Logo'
 
 type Settings = {
@@ -133,6 +134,7 @@ export default function PricingSettingsPage() {
             Applications
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 

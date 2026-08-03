@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import JobActions from '@/components/JobActions'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
@@ -59,6 +60,7 @@ export default async function AdminArchivedJobsPage() {
             Applications
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 

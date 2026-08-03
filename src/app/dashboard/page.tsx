@@ -6,6 +6,7 @@ import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -127,6 +128,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="flex items-center gap-4">
           <SortSelect />
           <SignOutButton />
+          <SettingsGearLink href="/dashboard/settings" />
         </div>
       </header>
 
@@ -140,9 +142,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </Link>
             <Link href="/dashboard/org-settings" className="text-sm text-gray-600 hover:text-gray-900">
               Business Info
-            </Link>
-            <Link href="/dashboard/settings" className="text-sm text-gray-600 hover:text-gray-900">
-              Settings
             </Link>
             <Link
               href="/dashboard/post-job"

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import SettingsGearLink from '@/components/SettingsGearLink'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
 import Logo from '@/components/Logo'
 
@@ -68,6 +69,7 @@ export default async function AdminDriversPage() {
             Applications
           </Link>
           <SignOutButton />
+          <SettingsGearLink href="/admin/account" />
         </div>
       </header>
 
