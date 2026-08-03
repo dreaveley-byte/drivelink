@@ -9,6 +9,8 @@ export default function TeamInviteGenerator({ organizationId, userId }: { organi
   const [phone, setPhone] = useState('')
   const [link, setLink] = useState<string | null>(null)
   const [smsSent, setSmsSent] = useState(false)
+  const [smsNotConfigured, setSmsNotConfigured] = useState(false)
+  const [smsError, setSmsError] = useState('')
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
@@ -38,15 +40,24 @@ export default function TeamInviteGenerator({ organizationId, userId }: { organi
     const inviteLink = `${window.location.origin}/join/${data.token}`
     setLink(inviteLink)
 
-    // Auto-text isn't wired up yet — needs a Twilio account connected first.
-    // For now the link always shows below so it can be sent manually.
     if (phone) {
-      const res = await fetch('/api/team-invites/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, link: inviteLink, fullName }),
-      }).catch(() => null)
-      if (res?.ok) setSmsSent(true)
+      try {
+        const res = await fetch('/api/team-invites/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, link: inviteLink, fullName }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (res.ok) {
+          setSmsSent(true)
+        } else if (res.status === 501) {
+          setSmsNotConfigured(true)
+        } else {
+          setSmsError(body.error || 'Could not send the text.')
+        }
+      } catch {
+        setSmsError('Could not send the text — check your connection and try again.')
+      }
     }
 
     setGenerating(false)
@@ -55,6 +66,8 @@ export default function TeamInviteGenerator({ organizationId, userId }: { organi
   function reset() {
     setLink(null)
     setSmsSent(false)
+    setSmsNotConfigured(false)
+    setSmsError('')
     setFullName('')
     setPhone('')
     setShowForm(false)
@@ -76,11 +89,15 @@ export default function TeamInviteGenerator({ organizationId, userId }: { organi
       <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
         {smsSent ? (
           <p className="text-xs text-green-700 mb-1.5">Texted to {phone}.</p>
+        ) : smsNotConfigured ? (
+          <p className="text-xs text-gray-500 mb-1.5">
+            Texting isn't turned on yet — copy this link and send it to them yourself for now.
+          </p>
+        ) : smsError ? (
+          <p className="text-xs text-red-600 mb-1.5">Couldn't text them: {smsError}. Copy the link below instead.</p>
         ) : (
           <p className="text-xs text-gray-500 mb-1.5">
-            {phone
-              ? "Texting isn't turned on yet — copy this link and send it to them yourself for now."
-              : "Send this link to your new team member — they'll sign up and be added to your dealership automatically."}
+            Send this link to your new team member — they'll sign up and be added to your dealership automatically.
           </p>
         )}
         <div className="flex items-center gap-2">

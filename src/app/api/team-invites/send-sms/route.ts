@@ -17,6 +17,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing phone or link' }, { status: 400 })
   }
 
+  // Twilio requires E.164 format (e.g. +16045551234). Normalize common
+  // North American formats like "(604) 555-1234" or "6045551234".
+  const digits = phone.replace(/\D/g, '')
+  let toNumber: string
+  if (phone.trim().startsWith('+')) {
+    toNumber = phone.trim()
+  } else if (digits.length === 10) {
+    toNumber = `+1${digits}`
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    toNumber = `+${digits}`
+  } else {
+    return NextResponse.json({ error: `"${phone}" doesn't look like a valid phone number.` }, { status: 400 })
+  }
+
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
   const fromNumber = process.env.TWILIO_FROM_NUMBER
@@ -33,12 +47,20 @@ export async function POST(req: NextRequest) {
       Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({ To: phone, From: fromNumber, Body: body }),
+    body: new URLSearchParams({ To: toNumber, From: fromNumber, Body: body }),
   })
 
   if (!res.ok) {
     const detail = await res.text()
-    return NextResponse.json({ error: `Twilio error: ${detail}` }, { status: 502 })
+    console.error('Twilio send failed:', detail)
+    let message = 'Could not send the text.'
+    try {
+      const parsed = JSON.parse(detail)
+      if (parsed.message) message = parsed.message
+    } catch {
+      // Twilio didn't return JSON — fall back to the generic message
+    }
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 
   return NextResponse.json({ ok: true })
