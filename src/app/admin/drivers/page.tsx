@@ -61,6 +61,9 @@ export default async function AdminDriversPage() {
           <Link href="/admin/settings" className="text-sm text-gray-600 hover:text-gray-900">
             Pricing
           </Link>
+          <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
+            Dealers
+          </Link>
           <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
             Applications
           </Link>
@@ -78,13 +81,13 @@ export default async function AdminDriversPage() {
             return (
             <div
               key={driver.id}
-              className="border border-gray-200 rounded-xl px-4 py-3"
+              className="border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50"
             >
               <div className="flex items-center justify-between">
-                <div>
+                <Link href={`/admin/drivers/${driver.id}`} className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{driver.full_name || 'Unnamed driver'}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{driver.phone || 'No phone on file'}</p>
-                </div>
+                </Link>
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-xs border rounded-full px-2.5 py-1 ${
@@ -132,7 +135,8 @@ export default async function AdminDriversPage() {
                 </div>
               )}
             </div>
-          )})}
+          )
+          })}
         </div>
       </main>
     </div>

@@ -1,0 +1,185 @@
+import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import SignOutButton from '@/components/SignOutButton'
+import ApplicationCard from '@/components/ApplicationCard'
+import Logo from '@/components/Logo'
+import { formatCents } from '@/lib/pricing'
+
+export const dynamic = 'force-dynamic'
+
+const statusLabels: Record<string, string> = {
+  awaiting_driver: 'Awaiting Driver',
+  assigned: 'Assigned',
+  picked_up: 'Picked Up',
+  in_progress: 'In Progress',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-CA', { dateStyle: 'medium' })
+}
+
+export default async function AdminDealerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: dealerId } = await params
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'platform_admin') {
+    redirect('/dashboard')
+  }
+
+  const { data: dealer } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('id', dealerId)
+    .single()
+
+  if (!dealer) notFound()
+
+  const { data: members } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('organization_id', dealerId)
+    .order('full_name')
+
+  const { data: application } = await supabase
+    .from('dealer_applications')
+    .select('*')
+    .eq('organization_id', dealerId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: jobs } = await supabase
+    .from('jobs')
+    .select('id, status, scheduled_for, pickup_address, dropoff_address, estimated_dealer_cost_cents, driver:driver_id(full_name)')
+    .eq('organization_id', dealerId)
+    .order('scheduled_for', { ascending: false, nullsFirst: false })
+    .limit(25)
+
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Dealer</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Dealer profile</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
+            Dealers
+          </Link>
+          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
+            Admin
+          </Link>
+          <SignOutButton />
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+        <div>
+          <Link href="/admin/dealers" className="text-xs text-gray-400 hover:text-gray-600">
+            ← Back to dealers
+          </Link>
+        </div>
+
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">{dealer.name}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{dealer.address || 'No address on file'}</p>
+          {dealer.phone && <p className="text-sm text-gray-500">{dealer.phone}</p>}
+          <p className="text-xs text-gray-400 mt-1">Member since {fmtDate(dealer.created_at)}</p>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Team Members</p>
+          <div className="space-y-2">
+            {(!members || members.length === 0) && (
+              <p className="text-sm text-gray-400 py-4 text-center">No team members yet.</p>
+            )}
+            {members?.map((m) => (
+              <div key={m.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{m.full_name || 'Unnamed'}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{m.phone || 'No phone on file'}</p>
+                </div>
+                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                  {m.role === 'org_admin' ? 'Admin' : 'Member'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {application && (
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Application &amp; Documents</p>
+            <ApplicationCard
+              table="dealer_applications"
+              id={application.id}
+              title={application.business_name || dealer.name}
+              subtitle={`${application.contact_full_name ?? ''} · ${application.contact_position ?? ''}`}
+              status={application.status}
+              bucket="dealer-documents"
+              docs={[
+                { label: 'Pre-authorized debit form', path: application.pre_authorized_debit_form_path },
+                { label: 'Signed contract', path: application.contract_signature_path },
+              ]}
+            />
+          </div>
+        )}
+
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Recent Jobs</p>
+          <div className="space-y-2">
+            {(!jobs || jobs.length === 0) && (
+              <p className="text-sm text-gray-400 py-4 text-center">No jobs yet.</p>
+            )}
+            {jobs?.map((job) => (
+              <Link
+                key={job.id}
+                href={`/dashboard/jobs/${job.id}/receipt`}
+                target="_blank"
+                className="block border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {(job.driver as unknown as { full_name: string } | null)?.full_name ?? 'Unassigned'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {job.pickup_address} → {job.dropoff_address}
+                    </p>
+                    {job.scheduled_for && (
+                      <p className="text-xs text-gray-400 mt-0.5">{fmtDate(job.scheduled_for)}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                      {statusLabels[job.status] ?? job.status}
+                    </span>
+                    {job.estimated_dealer_cost_cents != null && (
+                      <span className="text-xs text-gray-500">{formatCents(job.estimated_dealer_cost_cents)}</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}

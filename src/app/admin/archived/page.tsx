@@ -52,6 +52,9 @@ export default async function AdminArchivedJobsPage() {
           <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
             Drivers
           </Link>
+          <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
+            Dealers
+          </Link>
           <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
             Applications
           </Link>

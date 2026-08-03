@@ -5,6 +5,7 @@ import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
 import { buildDeliveryDisclosureText } from '@/lib/checklist'
 import DealerFeedbackForm from '@/components/DealerFeedbackForm'
+import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
@@ -251,9 +252,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                     </p>
                   )}
                   {item.condition_data && item.condition_data.markers?.length > 0 && (
-                    <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
-                      {item.condition_data.markers.map((m: { note: string }, i: number) => <li key={i}>{m.note}</li>)}
-                    </ul>
+                    <ConditionReportView data={item.condition_data} />
                   )}
                   <FileThumbs files={item.files} />
                 </div>
@@ -265,6 +264,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         {/* Delivery Disclosure: the full acknowledgement / condition acceptance / media consent document */}
         {disclosureItem && (() => {
           const odometerItem = checklistWithUrls.find((i) => i.label === 'Delivery: Enter the odometer reading')
+          const deliveryConditionItem = conditionItems.find((i) => i.label.startsWith('Delivery:'))
           const disclosureText = buildDeliveryDisclosureText({
             customerName: job.customer_full_name || job.recipient_name,
             customerAddress: job.customer_address,
@@ -287,6 +287,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
                 {disclosureText}
               </p>
+              {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-1">Condition at delivery</p>
+                  <ConditionReportView data={deliveryConditionItem.condition_data} />
+                </div>
+              )}
               <p className="text-sm text-gray-700">
                 {disclosureItem.completed_at ? `Signed by ${job.customer_full_name || 'customer'} on ${fmtDateTime(disclosureItem.completed_at)}` : 'Not yet signed'}
               </p>
