@@ -6,6 +6,7 @@ import SettingsGearLink from '@/components/SettingsGearLink'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import ApplicationCard from '@/components/ApplicationCard'
+import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -238,9 +239,16 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
           </div>
         </div>
 
-        {application && (
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Application &amp; Documents</p>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-400 uppercase tracking-wide">Application &amp; Documents</p>
+            {application?.contract_signed_at && (
+              <Link href={`/admin/drivers/${driver.id}/agreement`} className="text-xs text-blue-600 hover:underline" target="_blank">
+                Print signed agreement →
+              </Link>
+            )}
+          </div>
+          {application ? (
             <ApplicationCard
               table="driver_applications"
               id={application.id}
@@ -260,11 +268,20 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                 { label: 'Drug & alcohol test', path: application.drug_alcohol_test_path },
                 { label: 'Optical test', path: application.optical_test_path },
                 { label: 'Void cheque', path: application.void_cheque_path },
+                { label: 'Vehicle registration', path: application.vehicle_registration_path },
+                { label: 'Vehicle insurance', path: application.vehicle_insurance_path },
                 { label: 'Signed contract', path: application.contract_signature_path },
               ]}
             />
-          </div>
-        )}
+          ) : (
+            <div className="border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-4">
+                No application on file for this driver yet — you can fill it in here on their behalf.
+              </p>
+              <DriverApplicationEditForm userId={driver.id} userEmail={driver.email ?? ''} application={null} />
+            </div>
+          )}
+        </div>
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Recent Jobs</p>

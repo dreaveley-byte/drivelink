@@ -24,6 +24,8 @@ type DriverApp = {
   drug_alcohol_test_path: string | null
   optical_test_path: string | null
   void_cheque_path: string | null
+  vehicle_registration_path: string | null
+  vehicle_insurance_path: string | null
 }
 
 export default function DriverApplicationEditForm({ userId, userEmail, application }: { userId: string; userEmail: string; application: DriverApp | null }) {
@@ -69,6 +71,8 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
       ...(docs.drug_alcohol_test_path && { drug_alcohol_test_path: docs.drug_alcohol_test_path }),
       ...(docs.optical_test_path && { optical_test_path: docs.optical_test_path }),
       ...(docs.void_cheque_path && { void_cheque_path: docs.void_cheque_path }),
+      ...(docs.vehicle_registration_path && { vehicle_registration_path: docs.vehicle_registration_path }),
+      ...(docs.vehicle_insurance_path && { vehicle_insurance_path: docs.vehicle_insurance_path }),
     }
 
     const { error } = application
@@ -155,6 +159,8 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
         <FileUploadField label="Drug & alcohol test" bucket="driver-documents" folder={userId} fileName="drug-alcohol-test" onUploaded={setDoc('drug_alcohol_test_path')} optional />
         <FileUploadField label="Optical test" bucket="driver-documents" folder={userId} fileName="optical-test" onUploaded={setDoc('optical_test_path')} optional />
         <FileUploadField label="Void cheque" bucket="driver-documents" folder={userId} fileName="void-cheque" onUploaded={setDoc('void_cheque_path')} optional />
+        <FileUploadField label="Vehicle registration" bucket="driver-documents" folder={userId} fileName="vehicle-registration" onUploaded={setDoc('vehicle_registration_path')} optional />
+        <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance_path')} optional />
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

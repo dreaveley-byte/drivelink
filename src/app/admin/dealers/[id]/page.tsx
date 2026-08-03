@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import SettingsGearLink from '@/components/SettingsGearLink'
 import ApplicationCard from '@/components/ApplicationCard'
+import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
@@ -230,9 +231,16 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
           </div>
         </div>
 
-        {application && (
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Application &amp; Documents</p>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-400 uppercase tracking-wide">Application &amp; Documents</p>
+            {application?.contract_signed_at && (
+              <Link href={`/admin/dealers/${dealer.id}/agreement`} className="text-xs text-blue-600 hover:underline" target="_blank">
+                Print signed agreement →
+              </Link>
+            )}
+          </div>
+          {application ? (
             <ApplicationCard
               table="dealer_applications"
               id={application.id}
@@ -248,8 +256,17 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                 { label: 'Signed contract', path: application.contract_signature_path },
               ]}
             />
-          </div>
-        )}
+          ) : members && members.length > 0 ? (
+            <div className="border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-4">
+                No application on file for this dealer yet — you can fill it in here on their behalf.
+              </p>
+              <DealerApplicationEditForm userId={members[0].id} organizationId={dealer.id} application={null} />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 py-4 text-center">No application on file yet.</p>
+          )}
+        </div>
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Recent Jobs</p>

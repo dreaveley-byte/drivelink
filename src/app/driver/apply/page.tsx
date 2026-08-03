@@ -95,6 +95,8 @@ export default function DriverApplyPage() {
       gst_number: payoutMethod === 'company' ? gstNumber || null : null,
       sin_number: payoutMethod === 'individual' ? sinNumber || null : null,
       void_cheque_path: docs.void_cheque ?? null,
+      vehicle_registration_path: docs.vehicle_registration ?? null,
+      vehicle_insurance_path: docs.vehicle_insurance ?? null,
       profile_photo_path: docs.profile_photo ?? null,
       drivers_license_path: docs.drivers_license ?? null,
       drivers_abstract_path: docs.drivers_abstract ?? null,
@@ -236,6 +238,8 @@ export default function DriverApplyPage() {
               <FileUploadField label="Medical fitness to drive assessment" bucket="driver-documents" folder={userId} fileName="medical-fitness" onUploaded={setDoc('medical_fitness')} />
               <FileUploadField label="Drug & alcohol test results" bucket="driver-documents" folder={userId} fileName="drug-alcohol-test" onUploaded={setDoc('drug_alcohol_test')} />
               <FileUploadField label="Optical test assessment" bucket="driver-documents" folder={userId} fileName="optical-test" onUploaded={setDoc('optical_test')} />
+              <FileUploadField label="Vehicle registration" bucket="driver-documents" folder={userId} fileName="vehicle-registration" onUploaded={setDoc('vehicle_registration')} />
+              <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance')} />
             </section>
           )}
 

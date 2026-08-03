@@ -90,6 +90,8 @@ export default async function AdminApplicationsPage() {
                   { label: 'Drug & alcohol test', path: app.drug_alcohol_test_path },
                   { label: 'Optical test', path: app.optical_test_path },
                   { label: 'Void cheque', path: app.void_cheque_path },
+                  { label: 'Vehicle registration', path: app.vehicle_registration_path },
+                  { label: 'Vehicle insurance', path: app.vehicle_insurance_path },
                   { label: 'Signed contract', path: app.contract_signature_path },
                 ]}
               />
