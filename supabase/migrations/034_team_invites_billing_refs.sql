@@ -19,9 +19,11 @@ create table if not exists org_invites (
 
 alter table org_invites enable row level security;
 
+drop policy if exists "org members view own org invites" on org_invites;
 create policy "org members view own org invites" on org_invites
   for select using (organization_id = my_org_id() or my_role() = 'platform_admin');
 
+drop policy if exists "org members create invites" on org_invites;
 create policy "org members create invites" on org_invites
   for insert with check (organization_id = my_org_id() and invited_by = auth.uid());
 
@@ -64,6 +66,37 @@ end;
 $$;
 
 grant execute on function accept_org_invite(uuid) to authenticated;
+
+-- Lets a dealer's own org_admin (or platform_admin) remove a team member. This
+-- unlinks them from the organization rather than deleting their account —
+-- they keep their login but lose access to this dealership's jobs/dashboard.
+create or replace function remove_org_member(p_member_id uuid)
+returns void language plpgsql security definer as $$
+declare
+  v_caller_org uuid;
+  v_caller_role text;
+  v_target_org uuid;
+begin
+  select organization_id, role into v_caller_org, v_caller_role from profiles where id = auth.uid();
+  select organization_id into v_target_org from profiles where id = p_member_id;
+
+  if v_target_org is null then
+    raise exception 'Member not found or already removed';
+  end if;
+
+  if p_member_id = auth.uid() then
+    raise exception 'You cannot remove yourself';
+  end if;
+
+  if not (v_caller_role = 'platform_admin' or (v_caller_org = v_target_org and v_caller_role = 'org_admin')) then
+    raise exception 'Not authorized to remove this member';
+  end if;
+
+  update profiles set organization_id = null where id = p_member_id;
+end;
+$$;
+
+grant execute on function remove_org_member(uuid) to authenticated;
 
 -- ============================================
 -- BILLING (references only — no card numbers ever stored here)

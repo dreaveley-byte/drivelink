@@ -7,6 +7,7 @@ import ApplicationCard from '@/components/ApplicationCard'
 import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
+import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -227,6 +228,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                     {m.role === 'org_admin' ? 'Admin' : 'Member'}
                   </span>
                   <ResetPasswordButton email={m.email} />
+                  <RemoveTeamMemberButton memberId={m.id} memberName={m.full_name || 'this person'} />
                 </div>
               </div>
             ))}

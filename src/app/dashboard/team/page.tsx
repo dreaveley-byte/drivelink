@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import SettingsGearLink from '@/components/SettingsGearLink'
 import TeamInviteGenerator from '@/components/TeamInviteGenerator'
+import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
 import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,7 @@ export default async function DealerTeamPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('organization_id')
+    .select('organization_id, role')
     .eq('id', user.id)
     .single()
 
@@ -66,9 +67,14 @@ export default async function DealerTeamPage() {
                 <p className="text-sm font-medium text-gray-900">{m.full_name || 'Unnamed'}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{m.phone || 'No phone on file'}</p>
               </div>
-              <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
-                {m.role === 'org_admin' ? 'Admin' : 'Member'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                  {m.role === 'org_admin' ? 'Admin' : 'Member'}
+                </span>
+                {profile.role === 'org_admin' && m.id !== user.id && (
+                  <RemoveTeamMemberButton memberId={m.id} memberName={m.full_name || 'this person'} />
+                )}
+              </div>
             </div>
           ))}
         </div>
