@@ -55,6 +55,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     redirect('/admin')
   }
 
+  const isOrgAdmin = profile?.role === 'org_admin'
+
   if (!profile?.organization_id) {
     const intendedRole = (user.user_metadata?.intended_role as string | undefined) ?? null
 
@@ -122,37 +124,40 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <Logo height={24} />
+          <Link href="/dashboard"><Logo height={24} /></Link>
           <p className="text-xs text-gray-500 mt-1">{org?.name}</p>
         </div>
         <div className="flex items-center gap-4">
-          <SortSelect />
+          <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
+            Archived
+          </Link>
+          {isOrgAdmin && (
+            <Link href="/dashboard/org-settings" className="text-sm text-gray-600 hover:text-gray-900">
+              Business Info
+            </Link>
+          )}
+          <Link href="/dashboard/team" className="text-sm text-gray-600 hover:text-gray-900">
+            Team
+          </Link>
           <SignOutButton />
           <SettingsGearLink href="/dashboard/settings" />
         </div>
       </header>
 
+      <div className="max-w-3xl mx-auto px-6 pt-4 flex items-center justify-between">
+        <Link
+          href="/dashboard/post-job"
+          className="bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead]"
+        >
+          + Post a new job
+        </Link>
+        <SortSelect />
+      </div>
+
       <main className="max-w-3xl mx-auto px-6 py-8">
         <AutoRefresh />
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/archived" className="text-sm text-gray-600 hover:text-gray-900">
-              Archived
-            </Link>
-            <Link href="/dashboard/org-settings" className="text-sm text-gray-600 hover:text-gray-900">
-              Business Info
-            </Link>
-            <Link href="/dashboard/team" className="text-sm text-gray-600 hover:text-gray-900">
-              Team
-            </Link>
-            <Link
-              href="/dashboard/post-job"
-              className="bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead]"
-            >
-              + Post a new job
-            </Link>
-          </div>
         </div>
 
         <div className="space-y-3">

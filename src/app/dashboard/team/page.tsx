@@ -55,7 +55,11 @@ export default async function DealerTeamPage() {
           </p>
         </div>
 
-        <TeamInviteGenerator organizationId={profile.organization_id} userId={user.id} />
+        {profile.role === 'org_admin' ? (
+          <TeamInviteGenerator organizationId={profile.organization_id} userId={user.id} />
+        ) : (
+          <p className="text-xs text-gray-400">Only dealership admins can invite new team members.</p>
+        )}
 
         <div className="space-y-2">
           {(!members || members.length === 0) && (

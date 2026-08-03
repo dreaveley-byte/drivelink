@@ -27,6 +27,10 @@ export default function OrgSettingsPage() {
         router.push('/dashboard')
         return
       }
+      if (profile.role !== 'org_admin') {
+        router.push('/dashboard')
+        return
+      }
       const { data: org } = await supabase.from('organizations').select('id, name, address, phone').eq('id', profile.organization_id).single()
       if (org) {
         setOrgId(org.id)

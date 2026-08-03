@@ -17,9 +17,11 @@ export default async function DealerSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone, organization_id')
+    .select('full_name, phone, organization_id, role')
     .eq('id', user.id)
     .single()
+
+  const isOrgAdmin = profile?.role === 'org_admin'
 
   let logoUrl: string | null = null
   if (profile?.organization_id) {
@@ -55,28 +57,39 @@ export default async function DealerSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto px-6 py-8">
-        <SettingsTabs
-          profile={
-            <ProfileSettingsForm
-              userId={user.id}
-              initialFullName={profile?.full_name ?? ''}
-              initialPhone={profile?.phone ?? ''}
-              initialEmail={user.email ?? ''}
-              initialSmsOptIn={false}
-              showSmsToggle={false}
-              photoTarget={{
-                kind: 'dealer',
-                currentUrl: logoUrl,
-                bucket: 'dealer-logos',
-                folder: user.id,
-                label: 'Business logo or photo — shown to drivers, admin, and customers',
-              }}
-            />
-          }
-          application={
-            <DealerApplicationEditForm userId={user.id} organizationId={profile?.organization_id ?? null} application={application ?? null} />
-          }
-        />
+        {isOrgAdmin ? (
+          <SettingsTabs
+            profile={
+              <ProfileSettingsForm
+                userId={user.id}
+                initialFullName={profile?.full_name ?? ''}
+                initialPhone={profile?.phone ?? ''}
+                initialEmail={user.email ?? ''}
+                initialSmsOptIn={false}
+                showSmsToggle={false}
+                photoTarget={{
+                  kind: 'dealer',
+                  currentUrl: logoUrl,
+                  bucket: 'dealer-logos',
+                  folder: user.id,
+                  label: 'Business logo or photo — shown to drivers, admin, and customers',
+                }}
+              />
+            }
+            application={
+              <DealerApplicationEditForm userId={user.id} organizationId={profile?.organization_id ?? null} application={application ?? null} />
+            }
+          />
+        ) : (
+          <ProfileSettingsForm
+            userId={user.id}
+            initialFullName={profile?.full_name ?? ''}
+            initialPhone={profile?.phone ?? ''}
+            initialEmail={user.email ?? ''}
+            initialSmsOptIn={false}
+            showSmsToggle={false}
+          />
+        )}
       </main>
     </div>
   )
