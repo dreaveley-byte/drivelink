@@ -55,6 +55,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     .from('profiles')
     .select('*')
     .eq('organization_id', dealerId)
+    .in('role', ['org_admin', 'org_member'])
     .order('full_name')
 
   const { data: application } = await supabase
