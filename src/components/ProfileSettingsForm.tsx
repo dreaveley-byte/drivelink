@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import PhotoCaptureField from '@/components/PhotoCaptureField'
 
 export default function ProfileSettingsForm({
   userId,
@@ -10,12 +11,20 @@ export default function ProfileSettingsForm({
   initialPhone,
   initialSmsOptIn,
   showSmsToggle,
+  photoTarget,
 }: {
   userId: string
   initialFullName: string
   initialPhone: string
   initialSmsOptIn: boolean
   showSmsToggle: boolean
+  photoTarget?: {
+    kind: 'driver' | 'dealer'
+    currentUrl: string | null
+    bucket: 'driver-photos' | 'dealer-logos'
+    folder: string
+    label: string
+  }
 }) {
   const router = useRouter()
   const [fullName, setFullName] = useState(initialFullName)
@@ -24,6 +33,35 @@ export default function ProfileSettingsForm({
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const [photoUrl, setPhotoUrl] = useState(photoTarget?.currentUrl ?? null)
+  const [photoSaved, setPhotoSaved] = useState(false)
+
+  async function handlePhotoCaptured(blob: Blob) {
+    if (!photoTarget) return
+    const supabase = createClient()
+    const path = `${photoTarget.folder}/photo.jpg`
+    const { error } = await supabase.storage.from(photoTarget.bucket).upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+    if (error) {
+      setProfileError(error.message)
+      return
+    }
+    const { data: urlData } = supabase.storage.from(photoTarget.bucket).getPublicUrl(path)
+    // Cache-bust so the new photo shows immediately instead of a stale cached image
+    const freshUrl = `${urlData.publicUrl}?t=${Date.now()}`
+
+    if (photoTarget.kind === 'driver') {
+      await supabase.from('profiles').update({ photo_url: freshUrl }).eq('id', userId)
+    } else {
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', userId).single()
+      if (profile?.organization_id) {
+        await supabase.from('organizations').update({ logo_url: freshUrl }).eq('id', profile.organization_id)
+      }
+    }
+
+    setPhotoUrl(freshUrl)
+    setPhotoSaved(true)
+    router.refresh()
+  }
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -77,6 +115,18 @@ export default function ProfileSettingsForm({
 
   return (
     <div className="space-y-8">
+      {photoTarget && (
+        <div className="pb-6 border-b border-gray-100">
+          <PhotoCaptureField
+            label={photoTarget.label}
+            currentUrl={photoUrl}
+            shape={photoTarget.kind === 'driver' ? 'circle' : 'square'}
+            onCaptured={handlePhotoCaptured}
+          />
+          {photoSaved && <p className="text-sm text-green-700 mt-2">Photo updated.</p>}
+        </div>
+      )}
+
       <form onSubmit={saveProfile} className="space-y-4">
         <p className="text-xs text-gray-400 uppercase tracking-wide">Profile</p>
         <div>

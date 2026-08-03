@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import ProfileSettingsForm from '@/components/ProfileSettingsForm'
+import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
+import SettingsTabs from '@/components/SettingsTabs'
 import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
@@ -15,9 +17,17 @@ export default async function DriverSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone, sms_notifications_opt_in')
+    .select('full_name, phone, photo_url, sms_notifications_opt_in')
     .eq('id', user.id)
     .single()
+
+  const { data: application } = await supabase
+    .from('driver_applications')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   return (
     <div className="min-h-screen bg-white">
@@ -35,12 +45,30 @@ export default async function DriverSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto px-6 py-8">
-        <ProfileSettingsForm
-          userId={user.id}
-          initialFullName={profile?.full_name ?? ''}
-          initialPhone={profile?.phone ?? ''}
-          initialSmsOptIn={profile?.sms_notifications_opt_in ?? true}
-          showSmsToggle
+        <SettingsTabs
+          profile={
+            <ProfileSettingsForm
+              userId={user.id}
+              initialFullName={profile?.full_name ?? ''}
+              initialPhone={profile?.phone ?? ''}
+              initialSmsOptIn={profile?.sms_notifications_opt_in ?? true}
+              showSmsToggle
+              photoTarget={{
+                kind: 'driver',
+                currentUrl: profile?.photo_url ?? null,
+                bucket: 'driver-photos',
+                folder: user.id,
+                label: 'Profile photo — shown to dealers and customers',
+              }}
+            />
+          }
+          application={
+            application ? (
+              <DriverApplicationEditForm userId={user.id} application={application} />
+            ) : (
+              <p className="text-sm text-gray-400 py-8 text-center">No application on file yet.</p>
+            )
+          }
         />
       </main>
     </div>

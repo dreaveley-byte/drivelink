@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import ProfileSettingsForm from '@/components/ProfileSettingsForm'
+import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
+import SettingsTabs from '@/components/SettingsTabs'
 import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
@@ -15,9 +17,27 @@ export default async function DealerSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone')
+    .select('full_name, phone, organization_id')
     .eq('id', user.id)
     .single()
+
+  let logoUrl: string | null = null
+  if (profile?.organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('logo_url')
+      .eq('id', profile.organization_id)
+      .single()
+    logoUrl = org?.logo_url ?? null
+  }
+
+  const { data: application } = await supabase
+    .from('dealer_applications')
+    .select('*')
+    .eq('submitted_by', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   return (
     <div className="min-h-screen bg-white">
@@ -35,12 +55,32 @@ export default async function DealerSettingsPage() {
       </header>
 
       <main className="max-w-md mx-auto px-6 py-8">
-        <ProfileSettingsForm
-          userId={user.id}
-          initialFullName={profile?.full_name ?? ''}
-          initialPhone={profile?.phone ?? ''}
-          initialSmsOptIn={false}
-          showSmsToggle={false}
+        <SettingsTabs
+          profile={
+            <ProfileSettingsForm
+              userId={user.id}
+              initialFullName={profile?.full_name ?? ''}
+              initialPhone={profile?.phone ?? ''}
+              initialSmsOptIn={false}
+              showSmsToggle={false}
+              photoTarget={{
+                kind: 'dealer',
+                currentUrl: logoUrl,
+                bucket: 'dealer-logos',
+                folder: user.id,
+                label: 'Business logo or photo — shown to drivers, admin, and customers',
+              }}
+            />
+          }
+          application={
+            application ? (
+              <DealerApplicationEditForm userId={user.id} application={application} />
+            ) : (
+              <p className="text-sm text-gray-400 py-8 text-center">
+                No application on file yet — only the person who originally submitted it can edit it here.
+              </p>
+            )
+          }
         />
       </main>
     </div>

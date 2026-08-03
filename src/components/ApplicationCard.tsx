@@ -16,6 +16,9 @@ export default function ApplicationCard({
   docs,
   userId,
   profilePhotoPath,
+  dealerSubmittedBy,
+  dealerOrganizationId,
+  dealerBusinessName,
 }: {
   table: 'driver_applications' | 'dealer_applications'
   id: string
@@ -26,6 +29,9 @@ export default function ApplicationCard({
   docs: Doc[]
   userId?: string
   profilePhotoPath?: string | null
+  dealerSubmittedBy?: string
+  dealerOrganizationId?: string | null
+  dealerBusinessName?: string | null
 }) {
   const router = useRouter()
   const [showDocs, setShowDocs] = useState(false)
@@ -62,16 +68,45 @@ export default function ApplicationCard({
     setUpdating(true)
     const supabase = createClient()
 
-    // On driver approval, copy their profile photo to the public bucket so it can be
-    // shown on job cards without needing a signed URL every time.
-    if (newStatus === 'approved' && table === 'driver_applications' && userId && profilePhotoPath) {
-      const { data: fileBlob } = await supabase.storage.from('driver-documents').download(profilePhotoPath)
-      if (fileBlob) {
-        const ext = profilePhotoPath.split('.').pop() || 'jpg'
-        const publicPath = `${userId}/photo.${ext}`
-        await supabase.storage.from('driver-photos').upload(publicPath, fileBlob, { upsert: true })
-        const { data: urlData } = supabase.storage.from('driver-photos').getPublicUrl(publicPath)
-        await supabase.from('profiles').update({ photo_url: urlData.publicUrl }).eq('id', userId)
+    if (newStatus === 'approved') {
+      if (table === 'driver_applications' && userId) {
+        // Copy their profile photo to the public bucket so it can be shown on job
+        // cards without needing a signed URL every time.
+        if (profilePhotoPath) {
+          const { data: fileBlob } = await supabase.storage.from('driver-documents').download(profilePhotoPath)
+          if (fileBlob) {
+            const ext = profilePhotoPath.split('.').pop() || 'jpg'
+            const publicPath = `${userId}/photo.${ext}`
+            await supabase.storage.from('driver-photos').upload(publicPath, fileBlob, { upsert: true })
+            const { data: urlData } = supabase.storage.from('driver-photos').getPublicUrl(publicPath)
+            await supabase.from('profiles').update({ photo_url: urlData.publicUrl }).eq('id', userId)
+          }
+        }
+        // This is the actual activation step — without it, an "approved" driver
+        // never shows up in the admin drivers list or is able to claim jobs.
+        await supabase.from('profiles').update({ role: 'driver' }).eq('id', userId)
+      }
+
+      if (table === 'dealer_applications' && dealerSubmittedBy) {
+        let orgId = dealerOrganizationId ?? null
+
+        if (!orgId) {
+          const { data: newOrg, error: orgError } = await supabase
+            .from('organizations')
+            .insert({ name: dealerBusinessName || 'New Dealer', org_type: 'dealer_customer' })
+            .select('id')
+            .single()
+          if (!orgError && newOrg) {
+            orgId = newOrg.id
+            await supabase.from('dealer_applications').update({ organization_id: orgId }).eq('id', id)
+          }
+        }
+
+        // Same idea as the driver activation above — without linking the org,
+        // an "approved" dealer never gets a working dashboard or shows up for admin.
+        if (orgId) {
+          await supabase.from('profiles').update({ organization_id: orgId, role: 'org_admin' }).eq('id', dealerSubmittedBy)
+        }
       }
     }
 

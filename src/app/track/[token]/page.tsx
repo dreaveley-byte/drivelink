@@ -33,14 +33,28 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
       <div className="max-w-lg mx-auto px-6 py-8">
         <div className="mb-6">
           <Logo height={24} />
-          <h1 className="text-lg font-semibold text-gray-900 mt-3">
-            {info.organization_name ? `${info.organization_name} — ` : ''}Your delivery
-          </h1>
-          {vehicleDesc && <p className="text-sm text-gray-600 mt-1">{vehicleDesc}</p>}
-          <p className="text-sm text-gray-500 mt-1">
-            {statusLabels[info.status] ?? info.status}
-            {info.driver_name && ` · Driver: ${info.driver_name}`}
-          </p>
+          <div className="flex items-center gap-3 mt-3">
+            {info.organization_logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={info.organization_logo_url} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+            )}
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">
+                {info.organization_name ? `${info.organization_name} — ` : ''}Your delivery
+              </h1>
+              {vehicleDesc && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            {info.driver_photo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={info.driver_photo_url} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+            )}
+            <p className="text-sm text-gray-500">
+              {statusLabels[info.status] ?? info.status}
+              {info.driver_name && ` · Driver: ${info.driver_name}`}
+            </p>
+          </div>
         </div>
 
         <GoogleMapView

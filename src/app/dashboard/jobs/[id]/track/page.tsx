@@ -28,7 +28,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, job_types(name), driver:driver_id(full_name)')
+    .select('id, status, pickup_address, dropoff_address, driver_lat, driver_lng, driver_location_updated_at, tracking_token, job_types(name), driver:driver_id(full_name, photo_url)')
     .eq('id', jobId)
     .single()
 
@@ -78,6 +78,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
   )
 
   const driverName = Array.isArray(job.driver) ? job.driver[0]?.full_name : (job.driver as { full_name: string } | null)?.full_name
+  const driverPhoto = Array.isArray(job.driver) ? job.driver[0]?.photo_url : (job.driver as { photo_url: string | null } | null)?.photo_url
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
 
   return (
@@ -89,10 +90,16 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
               <Logo height={18} />
             </div>
             <h1 className="text-lg font-semibold text-gray-900">{jobTypeName}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {statusLabels[job.status] ?? job.status}
-              {driverName && ` · Driver: ${driverName}`}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {driverPhoto && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={driverPhoto} alt="" className="w-6 h-6 rounded-full object-cover border border-gray-200" />
+              )}
+              <p className="text-sm text-gray-500">
+                {statusLabels[job.status] ?? job.status}
+                {driverName && ` · Driver: ${driverName}`}
+              </p>
+            </div>
           </div>
           <CloseButton />
         </div>

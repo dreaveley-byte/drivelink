@@ -112,6 +112,9 @@ export default async function AdminApplicationsPage() {
                 subtitle={`${app.contact_full_name ?? ''} · ${app.contact_position ?? ''}`}
                 status={app.status}
                 bucket="dealer-documents"
+                dealerSubmittedBy={app.submitted_by}
+                dealerOrganizationId={app.organization_id}
+                dealerBusinessName={app.business_name}
                 docs={[
                   { label: 'Pre-authorized debit form', path: app.pre_authorized_debit_form_path },
                   { label: 'Signed contract', path: app.contract_signature_path },
