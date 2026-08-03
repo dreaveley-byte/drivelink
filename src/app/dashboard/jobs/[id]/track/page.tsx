@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
 import ChatPanel from '@/components/ChatPanel'
 import CustomerSmsThread from '@/components/CustomerSmsThread'
+import CollapsibleSection from '@/components/CollapsibleSection'
 import CloseButton from '@/components/CloseButton'
 import CopyLinkButton from '@/components/CopyLinkButton'
 import Logo from '@/components/Logo'
@@ -119,8 +120,12 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           <CopyLinkButton url={publicTrackingUrl} />
         </div>
 
-        <div className="mt-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Chat</p>
+        <div className="mt-6 p-3 rounded-xl border-2 border-[#378ADD] bg-blue-50">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-[#378ADD]" />
+            <p className="text-xs font-semibold text-[#2d6ead] uppercase tracking-wide">Internal Chat</p>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-2">Driver, dealer &amp; admin only — the customer can't see this.</p>
           <ChatPanel
             jobId={job.id}
             currentUserId={user.id}
@@ -129,8 +134,12 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           />
         </div>
 
-        <div className="mt-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Text the Customer</p>
+        <div className="mt-6 p-3 rounded-xl border-2 border-amber-400 bg-amber-50">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Customer Text Thread</p>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-2">Real text messages sent to the customer's phone — they can reply.</p>
           <CustomerSmsThread jobId={job.id} hasCustomerPhone={!!job.customer_phone} />
         </div>
 
@@ -142,9 +151,9 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
         {checklistWithUrls.length > 0 && (
           <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Checklist ({checklistWithUrls.filter((i) => i.completed_at).length}/{checklistWithUrls.length})
-            </p>
+            <CollapsibleSection
+              title={`Checklist (${checklistWithUrls.filter((i) => i.completed_at).length}/${checklistWithUrls.length})`}
+            >
             <div className="space-y-1.5">
               {checklistWithUrls.map((item, idx) => {
                 const phase = item.label.startsWith('Delivery:') ? 'Delivery' : item.label.startsWith('Pickup:') ? 'Pickup' : null
@@ -178,6 +187,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
                 </div>
               )})}
             </div>
+            </CollapsibleSection>
           </div>
         )}
       </div>
