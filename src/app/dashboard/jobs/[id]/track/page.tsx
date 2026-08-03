@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import GoogleMapView from '@/components/GoogleMapView'
+import ChatPanel from '@/components/ChatPanel'
 import CloseButton from '@/components/CloseButton'
 import CopyLinkButton from '@/components/CopyLinkButton'
 import Logo from '@/components/Logo'
@@ -46,6 +47,12 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
   }
 
   if (!job) notFound()
+
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('full_name, role')
+    .eq('id', user.id)
+    .single()
 
   const headersList = await headers()
   const host = headersList.get('host')
@@ -102,6 +109,16 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
 
         <div className="mt-4">
           <CopyLinkButton url={publicTrackingUrl} />
+        </div>
+
+        <div className="mt-6">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Chat</p>
+          <ChatPanel
+            jobId={job.id}
+            currentUserId={user.id}
+            currentUserName={myProfile?.full_name || 'You'}
+            currentUserRole={myProfile?.role || 'org_member'}
+          />
         </div>
 
         <div className="mt-4 text-sm text-gray-500">

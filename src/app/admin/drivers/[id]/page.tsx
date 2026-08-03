@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
+import ResetPasswordButton from '@/components/ResetPasswordButton'
 import ApplicationCard from '@/components/ApplicationCard'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
@@ -119,7 +120,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               <p className="text-sm text-gray-500">{driver.phone || 'No phone on file'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
             <span
               className={`text-xs border rounded-full px-2.5 py-1 ${
                 driver.is_active ? 'border-green-300 text-green-700' : 'border-gray-300 text-gray-500'
@@ -128,6 +129,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               {driver.is_active ? 'Active' : 'Inactive'}
             </span>
             <DriverActiveToggle driverId={driver.id} isActive={driver.is_active} />
+            <ResetPasswordButton email={driver.email} />
           </div>
         </div>
 

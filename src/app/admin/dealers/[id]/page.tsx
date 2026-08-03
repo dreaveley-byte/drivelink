@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import ApplicationCard from '@/components/ApplicationCard'
+import ResetPasswordButton from '@/components/ResetPasswordButton'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -156,14 +157,17 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
               <p className="text-sm text-gray-400 py-4 text-center">No team members yet.</p>
             )}
             {members?.map((m) => (
-              <div key={m.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div key={m.id} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{m.full_name || 'Unnamed'}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{m.phone || 'No phone on file'}</p>
                 </div>
-                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
-                  {m.role === 'org_admin' ? 'Admin' : 'Member'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                    {m.role === 'org_admin' ? 'Admin' : 'Member'}
+                  </span>
+                  <ResetPasswordButton email={m.email} />
+                </div>
               </div>
             ))}
           </div>

@@ -94,7 +94,7 @@ export default function ApplicationCard({
 
       <div className="flex items-center gap-3 mt-3">
         <button onClick={toggleDocs} className="text-xs text-gray-600 hover:text-gray-900 underline">
-          {loadingDocs ? 'Loading...' : showDocs ? 'Hide documents' : 'View documents'}
+          {loadingDocs ? 'Loading...' : showDocs ? 'Collapse documents' : 'Expand all documents & uploads'}
         </button>
 
         {status !== 'approved' && (
@@ -118,23 +118,34 @@ export default function ApplicationCard({
       </div>
 
       {showDocs && (
-        <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
-          {docs.filter((d) => d.path).length === 0 && (
-            <p className="text-xs text-gray-400 col-span-2">No documents uploaded.</p>
-          )}
-          {docs.map((doc) =>
-            doc.path && links[doc.label] ? (
-              <a
-                key={doc.label}
-                href={links[doc.label]}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline"
-              >
-                {doc.label}
-              </a>
-            ) : null
-          )}
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+          {docs.map((doc) => {
+            const url = doc.path ? links[doc.label] : undefined
+            const isImage = doc.path ? /\.(jpe?g|png|webp|gif)$/i.test(doc.path) : false
+            return (
+              <div key={doc.label} className="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${doc.path ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {doc.path ? '✓' : '–'}
+                  </span>
+                  <span className={`text-xs truncate ${doc.path ? 'text-gray-900' : 'text-gray-400'}`}>{doc.label}</span>
+                </div>
+                {url ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={url} alt={doc.label} className="w-10 h-10 object-cover rounded border border-gray-200" />
+                    )}
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                      View
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-300 shrink-0">Not uploaded</span>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

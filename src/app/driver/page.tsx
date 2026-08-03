@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
@@ -114,6 +115,9 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           <span className="text-sm text-gray-400">— Driver</span>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/driver/settings" className="text-sm text-gray-600 hover:text-gray-900">
+            Settings
+          </Link>
           <SortSelect />
           <SignOutButton />
         </div>
@@ -143,8 +147,11 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
               {myJobs.map((job) => (
                 <div key={job.id}>
                   <DriverJobActions job={job} isActive />
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center gap-3">
                     <LocationSharer jobId={job.id} />
+                    <Link href={`/dashboard/jobs/${job.id}/track`} className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                      Map &amp; chat
+                    </Link>
                   </div>
                 </div>
               ))}

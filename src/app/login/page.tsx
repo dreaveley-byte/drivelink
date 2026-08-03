@@ -13,6 +13,24 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const [resetSent, setResetSent] = useState(false)
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError('Enter your email above first, then click "Forgot password?"')
+      return
+    }
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) {
+      setError(error.message)
+      return
+    }
+    setResetSent(true)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -111,6 +129,7 @@ export default function LoginPage() {
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {resetSent && <p className="text-sm text-green-700">Reset email sent — check your inbox.</p>}
 
           <button
             type="submit"
@@ -120,6 +139,15 @@ export default function LoginPage() {
             {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Sign up'}
           </button>
         </form>
+
+        {mode === 'login' && (
+          <button
+            onClick={handleForgotPassword}
+            className="w-full text-center text-xs text-gray-400 mt-3 hover:text-gray-700"
+          >
+            Forgot password?
+          </button>
+        )}
 
         <button
           onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
