@@ -12,6 +12,7 @@ export default function ReturnOptionsComparison({
   pricingSettings,
   originAddress,
   destinationAddress,
+  scheduledFor,
 }: {
   distanceKm: number
   durationMinutes: number
@@ -21,6 +22,7 @@ export default function ReturnOptionsComparison({
   pricingSettings: PricingSettings
   originAddress: string
   destinationAddress: string
+  scheduledFor?: string
 }) {
   const [busFare, setBusFare] = useState('')
   const [flightPriceCents, setFlightPriceCents] = useState<number | null>(null)
@@ -35,7 +37,11 @@ export default function ReturnOptionsComparison({
     const res = await fetch('/api/flights/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originAddress, destinationAddress }),
+      body: JSON.stringify({
+        originAddress,
+        destinationAddress,
+        departureDate: scheduledFor ? scheduledFor.slice(0, 10) : undefined,
+      }),
     })
     const body = await res.json().catch(() => ({}))
     setSearching(false)

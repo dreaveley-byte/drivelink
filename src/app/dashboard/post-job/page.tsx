@@ -163,7 +163,11 @@ export default function PostJobPage() {
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+          body: JSON.stringify({
+            originAddress: filledStops[0],
+            destinationAddress: filledStops[filledStops.length - 1],
+            departureDate: scheduledFor ? scheduledFor.slice(0, 10) : undefined,
+          }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
         if (flightRes.ok && flightBody.flight) {
@@ -705,6 +709,7 @@ export default function PostJobPage() {
               pricingSettings={pricingSettings}
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
               destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+              scheduledFor={scheduledFor}
             />
           )}
 
