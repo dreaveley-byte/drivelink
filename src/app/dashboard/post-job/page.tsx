@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
-import FlightSearchButton from '@/components/FlightSearchButton'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 
 type JobType = { id: string; name: string }
@@ -146,6 +145,31 @@ export default function PostJobPage() {
       setDistanceKm(data.distanceKm)
       setDurationMinutes(data.durationMinutes)
 
+      let charges = additionalCharges.filter((c) => !c.description.startsWith('Flight back:'))
+
+      if (flyingBack) {
+        const flightRes = await fetch('/api/flights/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+        })
+        const flightBody = await flightRes.json().catch(() => ({}))
+        if (flightRes.ok && flightBody.flight) {
+          charges = [
+            ...charges,
+            {
+              description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
+              dealerAmountCents: flightBody.flight.priceCents,
+              hoursAdded: flightBody.flight.hoursToAdd,
+              paidToDriver: false,
+            },
+          ]
+        } else {
+          setCalcError(flightBody.error ? `Flight search: ${flightBody.error}` : 'Could not find a flight price — add one manually below if needed.')
+        }
+        setAdditionalCharges(charges)
+      }
+
       const result = calculatePricing(
         {
           distanceKm: data.distanceKm,
@@ -154,7 +178,7 @@ export default function PostJobPage() {
           numDrivers: secondDriver ? 2 : 1,
           outOfProvinceInspection,
           registryVisit,
-          additionalCharges,
+          additionalCharges: charges,
           oneWayFlightBack: flyingBack,
         },
         pricingSettings
@@ -541,13 +565,9 @@ export default function PostJobPage() {
                 lets you add the actual flight cost below instead.
               </p>
               {flyingBack && (
-                <div className="ml-6 mt-2">
-                  <FlightSearchButton
-                    originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
-                    destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
-                    onSelect={(charge) => setAdditionalCharges((prev) => [...prev, charge])}
-                  />
-                </div>
+                <p className="ml-6 mt-2 text-xs text-gray-400">
+                  Flight price and hours will be looked up and added automatically when you click "Calculate distance & cost" below.
+                </p>
               )}
             </div>
           </div>
@@ -622,7 +642,11 @@ export default function PostJobPage() {
           {pricing && (
             <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
               <p className="text-xs text-gray-500">
-                {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'} {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
+                {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'}
+                {durationMinutes ? ` · ${Math.round(pricing.baseDrivingHours * 10) / 10} hrs driving` : ''}
+                {pricing.dealerBilledHours !== pricing.baseDrivingHours && (
+                  <> · <span className="font-medium">{Math.round(pricing.dealerBilledHours * 10) / 10} hrs total billed</span></>
+                )}
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
 
