@@ -160,13 +160,25 @@ export default function PostJobPage() {
           },
         ]
 
+        // If the one-way drive exceeds the overnight threshold, the driver can't
+        // complete it same-day — they arrive (and are free to fly) the day after
+        // they set out, not the scheduled start date itself.
+        const oneWayHours = data.durationMinutes / 60
+        const overnightNeeded = oneWayHours > pricingSettings.max_driving_hours_before_overnight
+        let flightDepartureDate: string | undefined
+        if (scheduledFor) {
+          const d = new Date(scheduledFor)
+          if (overnightNeeded) d.setDate(d.getDate() + 1)
+          flightDepartureDate = d.toISOString().slice(0, 10)
+        }
+
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originAddress: filledStops[0],
             destinationAddress: filledStops[filledStops.length - 1],
-            departureDate: scheduledFor ? scheduledFor.slice(0, 10) : undefined,
+            departureDate: flightDepartureDate,
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))

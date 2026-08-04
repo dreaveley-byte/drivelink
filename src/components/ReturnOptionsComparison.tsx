@@ -34,13 +34,25 @@ export default function ReturnOptionsComparison({
   async function searchFlight() {
     setSearching(true)
     setSearchError('')
+
+    // If the one-way drive exceeds the overnight threshold, the driver arrives
+    // (and is free to fly) the day after they set out, not the start date itself.
+    const oneWayHours = durationMinutes / 60
+    const overnightNeeded = oneWayHours > pricingSettings.max_driving_hours_before_overnight
+    let flightDepartureDate: string | undefined
+    if (scheduledFor) {
+      const d = new Date(scheduledFor)
+      if (overnightNeeded) d.setDate(d.getDate() + 1)
+      flightDepartureDate = d.toISOString().slice(0, 10)
+    }
+
     const res = await fetch('/api/flights/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         originAddress,
         destinationAddress,
-        departureDate: scheduledFor ? scheduledFor.slice(0, 10) : undefined,
+        departureDate: flightDepartureDate,
       }),
     })
     const body = await res.json().catch(() => ({}))
