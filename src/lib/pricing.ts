@@ -59,7 +59,7 @@ export type PricingResult = {
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
-  extrasDriverCents: number
+  reimbursementCents: number
   costBasisCents: number // everything before markup
   estimatedDealerCostCents: number // costBasis × markup
   estimatedDriverPayCents: number
@@ -133,13 +133,16 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const registryFeeCents = registryVisit ? settings.registry_visit_fee_cents : 0
 
   const extrasDealerCents = additionalCharges.reduce((sum, c) => sum + c.dealerAmountCents, 0)
-  const extrasDriverCents = additionalCharges
+  // Reimbursements (e.g. Uber/bus the driver paid for out of pocket) are tracked
+  // separately from pay — they're money owed back for real costs, not wages.
+  const reimbursementCents = additionalCharges
     .filter((c) => c.paidToDriver)
     .reduce((sum, c) => sum + c.dealerAmountCents, 0)
 
   // Guarantee a minimum total payout per job, regardless of how short the trip is.
-  const computedDriverPayCents =
-    hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents + extrasDriverCents
+  // Reimbursements are intentionally excluded — the floor is about fair pay for
+  // time worked, not about the size of an unrelated expense reimbursement.
+  const computedDriverPayCents = hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents
   const estimatedDriverPayCents = Math.max(computedDriverPayCents, settings.minimum_driver_pay_cents)
   // If the floor kicked in, the dealer's cost basis needs to cover that extra amount
   // too, before markup is applied on top.
@@ -170,7 +173,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,
-    extrasDriverCents,
+    reimbursementCents,
     costBasisCents,
     estimatedDealerCostCents,
     estimatedDriverPayCents,

@@ -345,6 +345,7 @@ export default function PostJobPage() {
       estimated_duration_minutes: durationMinutes,
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: pricing?.estimatedDriverPayCents ?? null,
+      estimated_driver_reimbursement_cents: pricing?.reimbursementCents ?? null,
       notes: notes || null,
     }).select('id').single()
 
@@ -730,7 +731,6 @@ export default function PostJobPage() {
                     <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
                     <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
-                    <BreakdownRow label="Reimbursed extras (ground transport, etc.)" cents={pricing.extrasDriverCents} />
                     <p className="text-[11px] text-gray-400">
                       Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
                     </p>
@@ -738,6 +738,18 @@ export default function PostJobPage() {
                       <span>Total driver pay</span>
                       <span>{formatCents(pricing.estimatedDriverPayCents)}</span>
                     </div>
+                    {pricing.reimbursementCents > 0 && (
+                      <>
+                        <div className="flex items-center justify-between pt-1 text-xs text-gray-600">
+                          <span>+ Reimbursements (Uber/bus, etc. — separate from pay)</span>
+                          <span>{formatCents(pricing.reimbursementCents)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-medium text-gray-900">
+                          <span>Total driver receives</span>
+                          <span>{formatCents(pricing.estimatedDriverPayCents + pricing.reimbursementCents)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">

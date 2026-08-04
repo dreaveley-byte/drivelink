@@ -19,6 +19,7 @@ type Job = {
   recipient_name: string | null
   customer_full_name: string | null
   estimated_driver_pay_cents: number | null
+  estimated_driver_reimbursement_cents?: number | null
   estimated_distance_km: number | null
   vehicle_year: number | null
   vehicle_make: string | null
@@ -552,6 +553,9 @@ export default function DriverJobActions({
         {job.estimated_driver_pay_cents != null && (
           <p className="text-xs text-green-700 font-medium mt-0.5">
             Est. pay: {formatCents(job.estimated_driver_pay_cents)}
+            {!!job.estimated_driver_reimbursement_cents && (
+              <span className="text-gray-500 font-normal"> + {formatCents(job.estimated_driver_reimbursement_cents)} reimbursement</span>
+            )}
           </p>
         )}
       </div>
