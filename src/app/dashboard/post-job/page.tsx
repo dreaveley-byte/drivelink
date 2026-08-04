@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
+import FlightSearchButton from '@/components/FlightSearchButton'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -41,6 +42,7 @@ export default function PostJobPage() {
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
+  const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
@@ -152,6 +154,7 @@ export default function PostJobPage() {
           outOfProvinceInspection,
           registryVisit,
           additionalCharges,
+          oneWayFlightBack: flyingBack,
         },
         pricingSettings
       )
@@ -160,7 +163,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, pricingSettings])
+  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -246,6 +249,7 @@ export default function PostJobPage() {
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
       is_first_nations_delivery: isFirstNationsDelivery,
+      one_way_flight_back: flyingBack,
       vehicle_mode: vehicleMode,
       used_own_vehicle: true,
       out_of_province_inspection: outOfProvinceInspection,
@@ -499,6 +503,30 @@ export default function PostJobPage() {
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
             </label>
+            <div className="pt-2 border-t border-gray-100">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={flyingBack}
+                  onChange={(e) => setFlyingBack(e.target.checked)}
+                />
+                One-way trip — driver flies back (no return drive)
+              </label>
+              <p className="text-xs text-gray-400 mt-1 ml-6">
+                For long one-way runs with no trade-in or second driver to justify driving back.
+                This removes the automatic return-drive charges (hours, fuel, wear &amp; tear) and
+                lets you add the actual flight cost below instead.
+              </p>
+              {flyingBack && (
+                <div className="ml-6 mt-2">
+                  <FlightSearchButton
+                    originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+                    destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+                    onSelect={(charge) => setAdditionalCharges((prev) => [...prev, charge])}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -571,7 +599,7 @@ export default function PostJobPage() {
           {pricing && (
             <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
               <p className="text-xs text-gray-500">
-                {pricing.tripDistanceKm} km round trip {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
+                {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'} {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
 

@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
+import FlightSearchButton from '@/components/FlightSearchButton'
 
 type JobType = { id: string; name: string }
 
@@ -40,6 +41,7 @@ export default function EditJobPage() {
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
+  const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
@@ -118,6 +120,7 @@ export default function EditJobPage() {
       setChaseVehicle(job.chase_vehicle_required ?? false)
       setIsTradeIn(job.is_trade_in_pickup ?? false)
       setIsFirstNationsDelivery(job.is_first_nations_delivery ?? false)
+      setFlyingBack(job.one_way_flight_back ?? false)
       setVehicleMode(job.vehicle_mode ?? 'driven')
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
@@ -189,6 +192,7 @@ export default function EditJobPage() {
           outOfProvinceInspection,
           registryVisit,
           additionalCharges,
+          oneWayFlightBack: flyingBack,
         },
         pricingSettings
       )
@@ -197,7 +201,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, pricingSettings])
+  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -236,6 +240,7 @@ export default function EditJobPage() {
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
       is_first_nations_delivery: isFirstNationsDelivery,
+      one_way_flight_back: flyingBack,
       vehicle_mode: vehicleMode,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
@@ -483,6 +488,26 @@ export default function EditJobPage() {
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
             </label>
+            <div className="pt-2 border-t border-gray-100">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={flyingBack} onChange={(e) => setFlyingBack(e.target.checked)} />
+                One-way trip — driver flies back (no return drive)
+              </label>
+              <p className="text-xs text-gray-400 mt-1 ml-6">
+                For long one-way runs with no trade-in or second driver to justify driving back.
+                This removes the automatic return-drive charges (hours, fuel, wear &amp; tear) and
+                lets you add the actual flight cost below instead.
+              </p>
+              {flyingBack && (
+                <div className="ml-6 mt-2">
+                  <FlightSearchButton
+                    originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+                    destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+                    onSelect={(charge) => setAdditionalCharges((prev) => [...prev, charge])}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">

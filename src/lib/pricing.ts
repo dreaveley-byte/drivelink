@@ -34,10 +34,12 @@ export type PricingInput = {
   outOfProvinceInspection: boolean
   registryVisit: boolean
   additionalCharges: AdditionalCharge[]
+  oneWayFlightBack: boolean // driver flies back instead of driving back — bill/pay one-way only
 }
 
 export type PricingResult = {
   overnightRequired: boolean
+  oneWayFlightBack: boolean
   tripDistanceKm: number
   baseDrivingHours: number
   dealerBilledHours: number
@@ -62,12 +64,14 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, additionalCharges,
+    outOfProvinceInspection, registryVisit, additionalCharges, oneWayFlightBack,
   } = input
 
-  // Every delivery is a round trip — the driver (and trailer, if towing) always has to get back.
-  const tripDistanceKm = distanceKm * 2
-  const baseDrivingHours = (durationMinutes * 2) / 60
+  // Normally every delivery is a round trip — the driver (and trailer, if towing)
+  // has to drive back. If the driver is flying back instead, only bill/pay for
+  // the one-way drive; the flight itself gets added as a flat charge below.
+  const tripDistanceKm = oneWayFlightBack ? distanceKm : distanceKm * 2
+  const baseDrivingHours = oneWayFlightBack ? durationMinutes / 60 : (durationMinutes * 2) / 60
 
   const overnightRequired = baseDrivingHours > settings.max_driving_hours_before_overnight
 
@@ -140,6 +144,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
 
   return {
     overnightRequired,
+    oneWayFlightBack,
     tripDistanceKm,
     baseDrivingHours,
     dealerBilledHours,
