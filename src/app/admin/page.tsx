@@ -131,22 +131,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             { label: 'In Progress', value: active },
             { label: 'Completed', value: completed },
           ].map((stat) => (
-            <div key={stat.label} className="border border-gray-200 rounded-xl px-4 py-3">
+            <div key={stat.label} className="border border-gray-200 rounded-xl px-4 py-3 flex flex-col items-center justify-between text-center min-h-[84px]">
               <p className="text-xs text-gray-500">{stat.label}</p>
               <p className="text-xl font-semibold text-gray-900 mt-1">{stat.value}</p>
             </div>
           ))}
         </div>
         <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="border border-gray-200 rounded-xl px-4 py-3">
+          <div className="border border-gray-200 rounded-xl px-4 py-3 flex flex-col items-center justify-between text-center min-h-[84px]">
             <p className="text-xs text-gray-500">Dealer Spend (MTD)</p>
             <p className="text-xl font-semibold text-gray-900 mt-1">{formatCents(dealerSpendMtd)}</p>
           </div>
-          <div className="border border-gray-200 rounded-xl px-4 py-3">
+          <div className="border border-gray-200 rounded-xl px-4 py-3 flex flex-col items-center justify-between text-center min-h-[84px]">
             <p className="text-xs text-gray-500">Driver Earnings (MTD)</p>
             <p className="text-xl font-semibold text-gray-900 mt-1">{formatCents(driverEarningsMtd)}</p>
           </div>
-          <div className="border border-gray-200 rounded-xl px-4 py-3 bg-[#378ADD]">
+          <div className="border border-gray-200 rounded-xl px-4 py-3 bg-[#378ADD] flex flex-col items-center justify-between text-center min-h-[84px]">
             <p className="text-xs text-gray-300">Drivflo Profit (MTD)</p>
             <p className="text-xl font-semibold text-white mt-1">{formatCents(drivfloProfitMtd)}</p>
           </div>
