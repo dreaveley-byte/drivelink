@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import FlightSearchButton from '@/components/FlightSearchButton'
+import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 
 type JobType = { id: string; name: string }
 
@@ -49,6 +50,7 @@ export default function EditJobPage() {
   const [notes, setNotes] = useState('')
 
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [calcError, setCalcError] = useState('')
@@ -181,6 +183,7 @@ export default function EditJobPage() {
         return
       }
 
+      setDistanceKm(data.distanceKm)
       setDurationMinutes(data.durationMinutes)
 
       const result = calculatePricing(
@@ -580,7 +583,7 @@ export default function EditJobPage() {
           {pricing && (
             <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
               <p className="text-xs text-gray-500">
-                {pricing.tripDistanceKm} km round trip {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
+                {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'} {durationMinutes ? '· ' + (Math.round(pricing.baseDrivingHours * 10) / 10) + ' hrs drive time' : ''}
                 {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
               </p>
 
@@ -618,6 +621,19 @@ export default function EditJobPage() {
                 Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
               </p>
             </div>
+          )}
+
+          {pricing && isAdmin && distanceKm != null && durationMinutes != null && pricingSettings && (
+            <ReturnOptionsComparison
+              distanceKm={distanceKm}
+              durationMinutes={durationMinutes}
+              vehicleMode={vehicleMode}
+              outOfProvinceInspection={outOfProvinceInspection}
+              registryVisit={registryVisit}
+              pricingSettings={pricingSettings}
+              originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+              destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+            />
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}

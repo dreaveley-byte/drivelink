@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import FlightSearchButton from '@/components/FlightSearchButton'
+import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -637,6 +638,19 @@ export default function PostJobPage() {
                 Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
               </p>
             </div>
+          )}
+
+          {pricing && isAdmin && distanceKm != null && durationMinutes != null && pricingSettings && (
+            <ReturnOptionsComparison
+              distanceKm={distanceKm}
+              durationMinutes={durationMinutes}
+              vehicleMode={vehicleMode}
+              outOfProvinceInspection={outOfProvinceInspection}
+              registryVisit={registryVisit}
+              pricingSettings={pricingSettings}
+              originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+              destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+            />
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
