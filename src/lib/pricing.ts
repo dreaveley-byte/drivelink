@@ -75,11 +75,14 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const tripDistanceKm = oneWayFlightBack ? distanceKm : distanceKm * 2
   const baseDrivingHours = oneWayFlightBack ? durationMinutes / 60 : (durationMinutes * 2) / 60
 
-  const overnightRequired = baseDrivingHours > settings.max_driving_hours_before_overnight
-
   // Extra fixed-minimum hours (billed to dealer, not paid to driver — not "real hours worked")
   const inspectionHours = outOfProvinceInspection ? settings.out_of_province_inspection_min_hours : 0
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
+
+  // Overnight isn't just about drive time — the inspection and registry stops
+  // add real hours on the ground too, and together they can push the driver
+  // past the point where they can safely finish same-day.
+  const overnightRequired = baseDrivingHours + inspectionHours + registryHours > settings.max_driving_hours_before_overnight
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether

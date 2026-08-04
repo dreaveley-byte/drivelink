@@ -35,10 +35,13 @@ export default function ReturnOptionsComparison({
     setSearching(true)
     setSearchError('')
 
-    // If the one-way drive exceeds the overnight threshold, the driver arrives
-    // (and is free to fly) the day after they set out, not the start date itself.
+    // If the total time on the ground (driving + inspection + registry) exceeds
+    // the overnight threshold, the driver is free to fly the day after they set
+    // out, not the scheduled start date itself.
     const oneWayHours = durationMinutes / 60
-    const overnightNeeded = oneWayHours > pricingSettings.max_driving_hours_before_overnight
+    const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
+    const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
+    const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings.max_driving_hours_before_overnight
     let flightDepartureDate: string | undefined
     if (scheduledFor) {
       const d = new Date(scheduledFor)
