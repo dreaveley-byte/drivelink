@@ -8,6 +8,7 @@ import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
+import { sortJobsActiveFirst } from '@/lib/sortJobs'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,11 +40,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     redirect('/dashboard')
   }
 
-  const { data: jobs } = await supabase
+  const { data: jobsRaw } = await supabase
     .from('jobs')
     .select('*, job_types(name), organizations(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
+
+  const jobs = sortJobsActiveFirst(jobsRaw ?? [], ascending)
 
   const total = jobs?.length ?? 0
   const awaiting = jobs?.filter((j) => j.status === 'awaiting_driver').length ?? 0

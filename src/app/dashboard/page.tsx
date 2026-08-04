@@ -11,6 +11,7 @@ import ChatBadgeLink from '@/components/ChatBadgeLink'
 import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
+import { sortJobsActiveFirst } from '@/lib/sortJobs'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,11 +118,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .eq('id', profile.organization_id)
     .single()
 
-  const { data: jobs } = await supabase
+  const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
+    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
+
+  const jobs = sortJobsActiveFirst(jobsRaw ?? [], ascending)
 
   const trackableJobIds = (jobs ?? [])
     .filter((j) => ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(j.status))
