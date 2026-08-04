@@ -597,24 +597,6 @@ export default function EditJobPage() {
                   Flight price and hours will be looked up and added automatically when you click "Calculate distance & cost" below.
                 </p>
               )}
-              {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
-                <div className="ml-6">
-                  <NearbyDatesFlightCheck
-                    scheduledFor={scheduledFor}
-                    distanceKm={distanceKm}
-                    durationMinutes={durationMinutes}
-                    pricingSettings={pricingSettings}
-                    originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
-                    destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
-                    outOfProvinceInspection={outOfProvinceInspection}
-                    registryVisit={registryVisit}
-                    onSelectDate={(d) => {
-                      setScheduledFor(d)
-                      setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')
-                    }}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
@@ -749,6 +731,27 @@ export default function EditJobPage() {
               <p className="text-xs text-gray-400 pt-1">
                 Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
               </p>
+              {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
+                <NearbyDatesFlightCheck
+                  scheduledFor={scheduledFor}
+                  distanceKm={distanceKm}
+                  durationMinutes={durationMinutes}
+                  vehicleMode={vehicleMode}
+                  numDrivers={secondDriver ? 2 : 1}
+                  pricingSettings={pricingSettings}
+                  originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+                  destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+                  outOfProvinceInspection={outOfProvinceInspection}
+                  registryVisit={registryVisit}
+                  manualCharges={additionalCharges.filter(
+                    (c) => !c.description.startsWith('Flight back:') && c.description !== 'Return ground transport' && c.description !== 'Ground transport to airport'
+                  )}
+                  onSelectDate={(d) => {
+                    setScheduledFor(d)
+                    setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')
+                  }}
+                />
+              )}
             </div>
           )}
 

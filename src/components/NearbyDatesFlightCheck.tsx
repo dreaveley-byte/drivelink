@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { formatCents, type PricingSettings } from '@/lib/pricing'
+import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
 
 type DayResult = {
   offset: number
   startDate: Date
-  flightDepartureDate: string
-  priceCents: number | null
-  currency: string | null
+  totalCents: number | null
+  totalHours: number | null
+  flightSummary: string | null
   error: string | null
 }
 
@@ -16,21 +16,27 @@ export default function NearbyDatesFlightCheck({
   scheduledFor,
   distanceKm,
   durationMinutes,
+  vehicleMode,
+  numDrivers,
   pricingSettings,
   originAddress,
   destinationAddress,
   outOfProvinceInspection,
   registryVisit,
+  manualCharges,
   onSelectDate,
 }: {
   scheduledFor: string
   distanceKm: number
   durationMinutes: number
+  vehicleMode: 'driven' | 'towed'
+  numDrivers: 1 | 2
   pricingSettings: PricingSettings
   originAddress: string
   destinationAddress: string
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  manualCharges: AdditionalCharge[]
   onSelectDate: (newScheduledFor: string) => void
 }) {
   const [results, setResults] = useState<DayResult[] | null>(null)
@@ -65,13 +71,55 @@ export default function NearbyDatesFlightCheck({
         })
         const body = await res.json().catch(() => ({}))
 
-        const result: DayResult = { offset, startDate, flightDepartureDate, priceCents: null, currency: null, error: null }
-        if (res.ok && body.flight) {
-          result.priceCents = body.flight.priceCents
-          result.currency = body.flight.currency
-        } else {
+        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null }
+
+        if (!res.ok || !body.flight) {
           result.error = body.error || 'No flight found'
+          return result
         }
+
+        const charges: AdditionalCharge[] = [
+          ...manualCharges,
+          {
+            description: 'Return ground transport',
+            dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
+            hoursAdded: pricingSettings.return_ground_transport_hours,
+            paidToDriver: true,
+          },
+        ]
+        if (body.groundToAirport) {
+          const km = body.groundToAirport.distanceKm
+          charges.push({
+            description: 'Ground transport to airport',
+            dealerAmountCents: Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents),
+            hoursAdded: Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100,
+            paidToDriver: true,
+          })
+        }
+        charges.push({
+          description: `Flight back: ${body.origin.code} → ${body.destination.code}`,
+          dealerAmountCents: body.flight.priceCents,
+          hoursAdded: body.flight.hoursToAdd,
+          paidToDriver: false,
+        })
+
+        const pricing = calculatePricing(
+          {
+            distanceKm,
+            durationMinutes,
+            vehicleMode,
+            numDrivers,
+            outOfProvinceInspection,
+            registryVisit,
+            additionalCharges: charges,
+            oneWayFlightBack: true,
+          },
+          pricingSettings
+        )
+
+        result.totalCents = pricing.estimatedDealerCostCents
+        result.totalHours = Math.round(pricing.dealerBilledHours * 10) / 10
+        result.flightSummary = `${body.origin.code} → ${body.destination.code} · ${formatCents(body.flight.priceCents)} ${body.flight.currency}`
         return result
       })
     )
@@ -81,44 +129,49 @@ export default function NearbyDatesFlightCheck({
   }
 
   const cheapestCents = results
-    ? Math.min(...results.filter((r) => r.priceCents != null).map((r) => r.priceCents as number))
+    ? Math.min(...results.filter((r) => r.totalCents != null).map((r) => r.totalCents as number))
     : null
 
   return (
-    <div className="mt-2">
+    <div className="mt-3 pt-3 border-t border-gray-200">
       <button
         type="button"
         onClick={checkDates}
         disabled={checking || !scheduledFor}
         className="text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
       >
-        {checking ? 'Checking nearby dates…' : 'Check nearby dates for a cheaper flight'}
+        {checking ? 'Checking nearby dates…' : 'Compare total price across nearby dates'}
       </button>
       {!scheduledFor && <p className="text-xs text-gray-400 mt-1">Set a scheduled date first.</p>}
 
       {results && (
         <div className="mt-2 space-y-1.5">
           {results.map((r) => {
-            const isCheapest = r.priceCents != null && r.priceCents === cheapestCents
+            const isCheapest = r.totalCents != null && r.totalCents === cheapestCents
             return (
               <div
                 key={r.offset}
                 className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg border ${isCheapest ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
               >
-                <span className={isCheapest ? 'text-green-800 font-medium' : 'text-gray-700'}>
-                  {r.startDate.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  {r.offset === 0 && ' (current)'}
-                </span>
+                <div>
+                  <p className={isCheapest ? 'text-green-800 font-medium' : 'text-gray-700'}>
+                    {r.startDate.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {r.offset === 0 && ' (current)'}
+                  </p>
+                  {r.flightSummary && <p className="text-gray-400 mt-0.5">{r.flightSummary}</p>}
+                </div>
                 <div className="flex items-center gap-2">
-                  {r.priceCents != null ? (
-                    <span className={isCheapest ? 'text-green-800 font-semibold' : 'text-gray-600'}>
-                      {formatCents(r.priceCents)} {r.currency}
-                      {isCheapest && ' ✓'}
-                    </span>
+                  {r.totalCents != null ? (
+                    <div className="text-right">
+                      <p className={isCheapest ? 'text-green-800 font-semibold' : 'text-gray-900 font-medium'}>
+                        {formatCents(r.totalCents)}{isCheapest && ' ✓'}
+                      </p>
+                      <p className="text-gray-400">≈ {r.totalHours} hrs</p>
+                    </div>
                   ) : (
                     <span className="text-gray-400">{r.error}</span>
                   )}
-                  {r.offset !== 0 && r.priceCents != null && (
+                  {r.offset !== 0 && r.totalCents != null && (
                     <button
                       type="button"
                       onClick={() => {
