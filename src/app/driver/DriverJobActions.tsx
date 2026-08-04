@@ -44,9 +44,26 @@ type Job = {
 
 // Pulls a city out of a full address string like "123 Main St, Coquitlam, BC, Canada".
 // Falls back to the full address if it doesn't look like a standard formatted address.
+const PROVINCE_CODES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
+
 function extractCity(address: string): string {
-  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
-  if (parts.length >= 3) return parts[parts.length - 3]
+  const commaParts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  if (commaParts.length >= 3) return commaParts[commaParts.length - 3]
+  if (commaParts.length === 2) return commaParts[0]
+
+  // No (or one) commas — strip postal code and province off the end, then take
+  // the last couple words as the best guess at the city name.
+  const stripped = address
+    .replace(/[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d\s*$/, '')
+    .replace(/\b\d{5}(-\d{4})?\s*$/, '')
+    .trim()
+
+  const words = stripped.split(/\s+/).filter(Boolean)
+  const last = words[words.length - 1]?.toUpperCase().replace(/[^A-Z]/g, '')
+  if (last && PROVINCE_CODES.includes(last)) words.pop()
+
+  if (words.length >= 2) return words.slice(-2).join(' ')
+  if (words.length === 1) return words[0]
   return address
 }
 
