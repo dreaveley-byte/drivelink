@@ -179,32 +179,20 @@ export default function PostJobPage() {
         } else {
           setCalcError(flightBody.error ? `Flight search: ${flightBody.error}` : 'Could not find a flight price — add one manually below if needed.')
         }
-        setAdditionalCharges(charges)
       }
 
-      const result = calculatePricing(
-        {
-          distanceKm: data.distanceKm,
-          durationMinutes: data.durationMinutes,
-          vehicleMode,
-          numDrivers: secondDriver ? 2 : 1,
-          outOfProvinceInspection,
-          registryVisit,
-          additionalCharges: charges,
-          oneWayFlightBack: flyingBack,
-        },
-        pricingSettings
-      )
-      setPricing(result)
+      // Always update the saved charges — this is what clears stale flight/ground
+      // transport entries if "flying back" gets unchecked, and what the sync
+      // effect below uses for every later recompute.
+      setAdditionalCharges(charges)
     } catch {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
   }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
 
-  // Once a distance has been calculated once, keep the pricing summary in sync
-  // with later changes (like adding a flight charge) without needing another
-  // network round-trip to re-fetch the same distance.
+  // Single source of truth for the pricing summary — recomputes any time the
+  // relevant inputs change, using the last-fetched distance/duration.
   useEffect(() => {
     if (distanceKm == null || durationMinutes == null || !pricingSettings) return
     const result = calculatePricing(
@@ -222,7 +210,7 @@ export default function PostJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, flyingBack])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -594,7 +582,10 @@ export default function PostJobPage() {
             <p className="text-xs text-gray-400">
               Use this for flights, ferries, Ubers, or anything else that adds cost or time.
             </p>
-            {additionalCharges.map((charge, i) => (
+            {additionalCharges
+              .map((charge, i) => ({ charge, i }))
+              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && charge.description !== 'Return ground transport')
+              .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
                   <input
@@ -653,17 +644,17 @@ export default function PostJobPage() {
 
           {pricing && (
             <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
-              <p className="text-xs text-gray-500">
-                {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'}
-                {durationMinutes ? ` · ${Math.round(pricing.baseDrivingHours * 10) / 10} hrs driving` : ''}
-                {pricing.dealerBilledHours !== pricing.baseDrivingHours && (
-                  <> · <span className="font-medium">{Math.round(pricing.dealerBilledHours * 10) / 10} hrs total billed</span></>
-                )}
-                {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
-              </p>
-
               {isAdmin && (
                 <>
+                  <p className="text-xs text-gray-500">
+                    {pricing.tripDistanceKm} km {pricing.oneWayFlightBack ? 'one-way' : 'round trip'}
+                    {durationMinutes ? ` · ${Math.round(pricing.baseDrivingHours * 10) / 10} hrs driving` : ''}
+                    {pricing.dealerBilledHours !== pricing.baseDrivingHours && (
+                      <> · <span className="font-medium">{Math.round(pricing.dealerBilledHours * 10) / 10} hrs total billed</span></>
+                    )}
+                    {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
+                  </p>
+
                   <div className="space-y-1 pt-2 border-t border-gray-200">
                     <BreakdownRow label="Driving pay" cents={pricing.hourlyDealerCents} />
                     <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
@@ -686,6 +677,12 @@ export default function PostJobPage() {
                     <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
                   </div>
                 </>
+              )}
+
+              {!isAdmin && (
+                <p className="text-xs text-gray-500">
+                  ≈ {Math.round(pricing.dealerBilledHours * 10) / 10} hrs total
+                </p>
               )}
 
               <div className="flex items-center justify-between pt-2 border-t border-gray-200">
