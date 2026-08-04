@@ -15,23 +15,57 @@ async function duffelFetch(path: string, token: string, init?: RequestInit) {
   })
 }
 
-// Extracts a plausible city name from a street address for airport lookup —
-// takes the segment before the province/postal code (e.g. "123 Main St,
-// Coquitlam, BC V3B 1A1" -> "Coquitlam").
-function guessCity(address: string): string {
-  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
-  if (parts.length >= 2) return parts[parts.length - 2]
-  return parts[0] ?? address
+const PROVINCE_CODES = ['BC', 'AB', 'SK', 'MB', 'ON', 'QC', 'NB', 'NS', 'PE', 'NL', 'YT', 'NT', 'NU']
+
+// Extracts plausible city-name candidates from a street address for airport
+// lookup, most-specific first. Handles both comma-separated addresses
+// ("123 Main St, Coquitlam, BC V3B 1A1") and plain ones without commas
+// ("19237 122A Ave Pitt Meadows BC").
+function guessCityCandidates(address: string): string[] {
+  const commaParts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  if (commaParts.length >= 2) {
+    // e.g. ["123 Main St", "Coquitlam", "BC V3B 1A1"] -> "Coquitlam"
+    return [commaParts[commaParts.length - 2]]
+  }
+
+  // No commas — strip postal code and province code off the end, then try
+  // progressively shorter word groups from what's left.
+  let stripped = address
+    .replace(/[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d\s*$/, '') // Canadian postal code
+    .replace(/\b\d{5}(-\d{4})?\s*$/, '') // US zip code
+    .trim()
+
+  const words = stripped.split(/\s+/)
+  const last = words[words.length - 1]?.toUpperCase().replace(/[^A-Z]/g, '')
+  if (last && PROVINCE_CODES.includes(last)) {
+    words.pop()
+  }
+
+  const candidates: string[] = []
+  if (words.length >= 2) candidates.push(words.slice(-2).join(' '))
+  if (words.length >= 1) candidates.push(words[words.length - 1])
+  return candidates.length > 0 ? candidates : [address]
 }
 
-async function findAirportCode(token: string, address: string): Promise<{ code: string; name: string } | null> {
-  const query = guessCity(address)
-  const res = await duffelFetch(`/places/suggestions?query=${encodeURIComponent(query)}`, token)
-  if (!res.ok) return null
-  const data = await res.json()
-  const suggestion = data?.data?.[0]
-  if (!suggestion?.iata_code) return null
-  return { code: suggestion.iata_code, name: suggestion.name }
+async function findAirportCode(token: string, address: string): Promise<{ code: string; name: string } | { error: string }> {
+  const candidates = guessCityCandidates(address)
+  let lastError = ''
+
+  for (const query of candidates) {
+    const res = await duffelFetch(`/places/suggestions?query=${encodeURIComponent(query)}`, token)
+    if (!res.ok) {
+      lastError = await res.text().catch(() => `HTTP ${res.status}`)
+      console.error(`Duffel places lookup failed for "${query}":`, lastError)
+      continue
+    }
+    const data = await res.json()
+    const suggestion = data?.data?.[0]
+    if (suggestion?.iata_code) {
+      return { code: suggestion.iata_code, name: suggestion.name }
+    }
+  }
+
+  return { error: lastError || `No airport match found for: ${candidates.join(', ')}` }
 }
 
 export async function POST(req: NextRequest) {
@@ -50,8 +84,11 @@ export async function POST(req: NextRequest) {
     findAirportCode(token, destinationAddress),
   ])
 
-  if (!origin || !destination) {
-    return NextResponse.json({ error: 'Could not find an airport near one of those addresses.' }, { status: 404 })
+  if ('error' in origin) {
+    return NextResponse.json({ error: `Origin airport: ${origin.error}` }, { status: 404 })
+  }
+  if ('error' in destination) {
+    return NextResponse.json({ error: `Destination airport: ${destination.error}` }, { status: 404 })
   }
 
   const date = departureDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
