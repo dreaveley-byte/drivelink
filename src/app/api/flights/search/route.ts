@@ -180,7 +180,19 @@ export async function POST(req: NextRequest) {
 
   // Prefer a direct flight; if none exist, prefer the fewest total stops.
   // Within the same stop-count, prefer the cheapest.
-  type Offer = { total_amount: string; total_currency: string; slices: { segments: unknown[]; duration?: string }[] }
+  type Segment = {
+    marketing_carrier?: { name?: string; iata_code?: string }
+    marketing_carrier_flight_number?: string
+    origin?: { iata_code?: string }
+    destination?: { iata_code?: string }
+    departing_at?: string
+    arriving_at?: string
+  }
+  type Offer = {
+    total_amount: string
+    total_currency: string
+    slices: { segments: Segment[]; duration?: string }[]
+  }
   const stopCount = (offer: Offer) =>
     offer.slices.reduce((sum, slice) => sum + Math.max(slice.segments.length - 1, 0), 0)
 
@@ -204,6 +216,17 @@ export async function POST(req: NextRequest) {
   const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
   const AIRPORT_BUFFER_MINUTES = 3 * 60
 
+  const segments = (best.slices[0]?.segments ?? []).map((s) => ({
+    airline: s.marketing_carrier?.name ?? null,
+    flightNumber: s.marketing_carrier_flight_number
+      ? `${s.marketing_carrier?.iata_code ?? ''}${s.marketing_carrier_flight_number}`
+      : null,
+    from: s.origin?.iata_code ?? null,
+    to: s.destination?.iata_code ?? null,
+    departingAt: s.departing_at ?? null,
+    arrivingAt: s.arriving_at ?? null,
+  }))
+
   return NextResponse.json({
     origin: flightFrom,
     destination: flightTo,
@@ -214,6 +237,7 @@ export async function POST(req: NextRequest) {
       isDirect: stopCount(best) === 0,
       flightDurationMinutes,
       hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
+      segments,
     },
     groundToAirport,
   })

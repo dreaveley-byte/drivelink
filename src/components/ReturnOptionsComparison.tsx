@@ -71,7 +71,7 @@ export default function ReturnOptionsComparison({
     setFlightPriceCents(body.flight.priceCents)
     setFlightHours(body.flight.hoursToAdd ?? 0)
     setFlightSummary(
-      `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`}`
+      `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`} · ${body.flight.currency}`
     )
   }
 

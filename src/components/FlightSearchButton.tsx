@@ -24,6 +24,7 @@ export default function FlightSearchButton({
       isDirect: boolean
       flightDurationMinutes: number
       hoursToAdd: number
+      segments: { airline: string | null; flightNumber: string | null; from: string | null; to: string | null; departingAt: string | null; arrivingAt: string | null }[]
     } | null
   } | null>(null)
   const [added, setAdded] = useState(false)
@@ -82,8 +83,22 @@ export default function FlightSearchButton({
               <p className="text-gray-700">
                 {result.origin.code} → {result.destination.code} ·{' '}
                 {result.flight.isDirect ? 'Direct flight' : `${result.flight.stops} stop${result.flight.stops === 1 ? '' : 's'}`} ·{' '}
-                <span className="font-medium">{formatCents(result.flight.priceCents)}</span>
+                <span className="font-medium">{formatCents(result.flight.priceCents)} {result.flight.currency}</span>
               </p>
+              {result.flight.segments.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {result.flight.segments.map((seg, i) => (
+                    <p key={i} className="text-gray-500">
+                      {seg.airline ?? 'Unknown airline'} {seg.flightNumber ?? ''} · {seg.from} → {seg.to}
+                      {seg.departingAt && (
+                        <>
+                          {' '}· {new Date(seg.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
               <p className="text-gray-400 mt-0.5">
                 Flight time {Math.floor(result.flight.flightDurationMinutes / 60)}h {result.flight.flightDurationMinutes % 60}m
                 {' '}+ 3h airport buffer = {result.flight.hoursToAdd} hrs added to the job
