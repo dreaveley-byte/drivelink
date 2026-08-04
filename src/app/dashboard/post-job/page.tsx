@@ -145,9 +145,21 @@ export default function PostJobPage() {
       setDistanceKm(data.distanceKm)
       setDurationMinutes(data.durationMinutes)
 
-      let charges = additionalCharges.filter((c) => !c.description.startsWith('Flight back:'))
+      let charges = additionalCharges.filter(
+        (c) => !c.description.startsWith('Flight back:') && c.description !== 'Return ground transport'
+      )
 
       if (flyingBack) {
+        charges = [
+          ...charges,
+          {
+            description: 'Return ground transport',
+            dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
+            hoursAdded: pricingSettings.return_ground_transport_hours,
+            paidToDriver: true,
+          },
+        ]
+
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

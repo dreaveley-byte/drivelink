@@ -68,7 +68,15 @@ export default function ReturnOptionsComparison({
             ...baseInput,
             numDrivers: 1,
             oneWayFlightBack: true,
-            additionalCharges: [{ description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: false }],
+            additionalCharges: [
+              { description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: false },
+              {
+                description: 'Return ground transport',
+                dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
+                hoursAdded: pricingSettings.return_ground_transport_hours,
+                paidToDriver: true,
+              },
+            ],
           },
           pricingSettings
         )

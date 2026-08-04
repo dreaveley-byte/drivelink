@@ -26,6 +26,8 @@ type Settings = {
   out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
   registry_visit_fee_cents: number
+  return_ground_transport_hours: number
+  return_ground_transport_fee_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -272,6 +274,20 @@ export default function PricingSettingsPage() {
               <label className="block text-sm text-gray-700 mb-1">Registry visit fee ($)</label>
               <input type="number" step="0.01" value={dollars(settings.registry_visit_fee_cents)}
                 onChange={(e) => updateDollarField('registry_visit_fee_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Return ground transport time (hrs)</label>
+              <p className="text-xs text-gray-400 mb-1">Airport → dealership (to drop paperwork) → home, when the driver flies back</p>
+              <input type="number" step="0.5" value={settings.return_ground_transport_hours}
+                onChange={(e) => updateNumberField('return_ground_transport_hours', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Return ground transport cost ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Covers Uber, bus, or a combination — reimbursed to the driver</p>
+              <input type="number" step="0.01" value={dollars(settings.return_ground_transport_fee_cents)}
+                onChange={(e) => updateDollarField('return_ground_transport_fee_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>

@@ -17,6 +17,8 @@ export type PricingSettings = {
   registry_visit_min_hours: number
   registry_visit_fee_cents: number
   max_driving_hours_before_overnight: number
+  return_ground_transport_hours: number
+  return_ground_transport_fee_cents: number
 }
 
 export type AdditionalCharge = {
