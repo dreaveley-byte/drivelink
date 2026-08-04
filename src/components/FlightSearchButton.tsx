@@ -17,7 +17,14 @@ export default function FlightSearchButton({
   const [result, setResult] = useState<{
     origin: { code: string; name: string }
     destination: { code: string; name: string }
-    flight: { priceCents: number; currency: string; stops: number; isDirect: boolean } | null
+    flight: {
+      priceCents: number
+      currency: string
+      stops: number
+      isDirect: boolean
+      flightDurationMinutes: number
+      hoursToAdd: number
+    } | null
   } | null>(null)
   const [added, setAdded] = useState(false)
 
@@ -49,7 +56,7 @@ export default function FlightSearchButton({
     onSelect({
       description: `Flight back: ${result.origin.code} → ${result.destination.code} (${result.flight.isDirect ? 'direct' : `${result.flight.stops} stop${result.flight.stops === 1 ? '' : 's'}`})`,
       dealerAmountCents: result.flight.priceCents,
-      hoursAdded: 0,
+      hoursAdded: result.flight.hoursToAdd,
       paidToDriver: true,
     })
     setAdded(true)
@@ -76,6 +83,10 @@ export default function FlightSearchButton({
                 {result.origin.code} → {result.destination.code} ·{' '}
                 {result.flight.isDirect ? 'Direct flight' : `${result.flight.stops} stop${result.flight.stops === 1 ? '' : 's'}`} ·{' '}
                 <span className="font-medium">{formatCents(result.flight.priceCents)}</span>
+              </p>
+              <p className="text-gray-400 mt-0.5">
+                Flight time {Math.floor(result.flight.flightDurationMinutes / 60)}h {result.flight.flightDurationMinutes % 60}m
+                {' '}+ 3h airport buffer = {result.flight.hoursToAdd} hrs added to the job
               </p>
               {added ? (
                 <p className="text-green-700 mt-1">Added to quote.</p>

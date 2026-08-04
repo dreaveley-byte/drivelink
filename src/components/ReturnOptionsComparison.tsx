@@ -24,6 +24,7 @@ export default function ReturnOptionsComparison({
 }) {
   const [busFare, setBusFare] = useState('')
   const [flightPriceCents, setFlightPriceCents] = useState<number | null>(null)
+  const [flightHours, setFlightHours] = useState(0)
   const [flightSummary, setFlightSummary] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
@@ -47,6 +48,7 @@ export default function ReturnOptionsComparison({
       return
     }
     setFlightPriceCents(body.flight.priceCents)
+    setFlightHours(body.flight.hoursToAdd ?? 0)
     setFlightSummary(
       `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`}`
     )
@@ -66,7 +68,7 @@ export default function ReturnOptionsComparison({
             ...baseInput,
             numDrivers: 1,
             oneWayFlightBack: true,
-            additionalCharges: [{ description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: 0, paidToDriver: true }],
+            additionalCharges: [{ description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: true }],
           },
           pricingSettings
         )

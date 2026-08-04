@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
 
   // Prefer a direct flight; if none exist, prefer the fewest total stops.
   // Within the same stop-count, prefer the cheapest.
-  type Offer = { total_amount: string; total_currency: string; slices: { segments: unknown[] }[] }
+  type Offer = { total_amount: string; total_currency: string; slices: { segments: unknown[]; duration?: string }[] }
   const stopCount = (offer: Offer) =>
     offer.slices.reduce((sum, slice) => sum + Math.max(slice.segments.length - 1, 0), 0)
 
@@ -158,6 +158,18 @@ export async function POST(req: NextRequest) {
 
   const best = sorted[0]
 
+  // Duffel returns slice duration as an ISO 8601 duration string, e.g. "PT2H15M"
+  function parseIsoDurationMinutes(iso: string | undefined): number {
+    if (!iso) return 0
+    const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
+    const hours = parseInt(match?.[1] ?? '0', 10)
+    const minutes = parseInt(match?.[2] ?? '0', 10)
+    return hours * 60 + minutes
+  }
+
+  const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
+  const AIRPORT_BUFFER_MINUTES = 3 * 60
+
   return NextResponse.json({
     origin: flightFrom,
     destination: flightTo,
@@ -166,6 +178,8 @@ export async function POST(req: NextRequest) {
       currency: best.total_currency,
       stops: stopCount(best),
       isDirect: stopCount(best) === 0,
+      flightDurationMinutes,
+      hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
     },
   })
 }
