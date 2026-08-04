@@ -684,7 +684,7 @@ export default function EditJobPage() {
                   </p>
 
                   <div className="space-y-1 pt-2 border-t border-gray-200">
-                    <BreakdownRow label="Driving pay" cents={pricing.hourlyDealerCents} />
+                    <BreakdownRow label="Driving pay (dealer billed hours)" cents={pricing.hourlyDealerCents} />
                     <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
                     <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
                     <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
@@ -705,6 +705,22 @@ export default function EditJobPage() {
                         (additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0)
                       }
                     />
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t border-gray-200">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Driver payout (what the driver actually receives)</p>
+                    <BreakdownRow label="Driving pay (driver hours)" cents={pricing.hourlyDriverCents} />
+                    <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
+                    <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
+                    <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
+                    <BreakdownRow label="Reimbursed extras (ground transport, etc.)" cents={pricing.extrasDriverCents} />
+                    <p className="text-[11px] text-gray-400">
+                      Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
+                    </p>
+                    <div className="flex items-center justify-between pt-1 text-xs font-medium text-gray-700">
+                      <span>Total driver pay</span>
+                      <span>{formatCents(pricing.estimatedDriverPayCents)}</span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
