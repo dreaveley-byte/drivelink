@@ -216,8 +216,11 @@ export async function POST(req: NextRequest) {
   const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
   const AIRPORT_BUFFER_MINUTES = 3 * 60
 
+  console.log('Duffel best offer segments (raw):', JSON.stringify(best.slices[0]?.segments))
+
   const segments = (best.slices[0]?.segments ?? []).map((s) => ({
-    airline: s.marketing_carrier?.name ?? null,
+    airline: s.marketing_carrier?.name ?? s.marketing_carrier?.iata_code ?? null,
+    airlineCode: s.marketing_carrier?.iata_code ?? null,
     flightNumber: s.marketing_carrier_flight_number
       ? `${s.marketing_carrier?.iata_code ?? ''}${s.marketing_carrier_flight_number}`
       : null,
