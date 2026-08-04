@@ -47,8 +47,32 @@ function guessCityCandidates(address: string): string[] {
   return candidates.length > 0 ? candidates : [address]
 }
 
+// Uses Google's Geocoding API (already used elsewhere in the app for the
+// live map) to reliably pull the city name out of an arbitrary address —
+// far more robust than guessing from raw text.
+async function geocodeCity(address: string): Promise<string | null> {
+  const key = process.env.GOOGLE_MAPS_API_KEY
+  if (!key) return null
+
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${key}`
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+  if (data.status !== 'OK') {
+    console.error('Google Geocoding failed:', data.status, data.error_message)
+    return null
+  }
+
+  const components = data.results?.[0]?.address_components ?? []
+  const findType = (type: string) => components.find((c: { types: string[] }) => c.types.includes(type))?.long_name
+
+  return findType('locality') || findType('postal_town') || findType('administrative_area_level_3') || null
+}
+
 async function findAirportCode(token: string, address: string): Promise<{ code: string; name: string } | { error: string }> {
-  const candidates = guessCityCandidates(address)
+  const geocodedCity = await geocodeCity(address)
+  const candidates = geocodedCity ? [geocodedCity, ...guessCityCandidates(address)] : guessCityCandidates(address)
   let lastError = ''
 
   for (const query of candidates) {
@@ -65,7 +89,13 @@ async function findAirportCode(token: string, address: string): Promise<{ code: 
     }
   }
 
-  return { error: lastError || `No airport match found for: ${candidates.join(', ')}` }
+  return {
+    error:
+      lastError ||
+      (geocodedCity
+        ? `No airport match found near "${geocodedCity}"`
+        : `Could not determine a city for that address, and no airport match found for: ${candidates.join(', ')}`),
+  }
 }
 
 export async function POST(req: NextRequest) {
