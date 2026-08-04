@@ -68,7 +68,7 @@ export default function ReturnOptionsComparison({
             ...baseInput,
             numDrivers: 1,
             oneWayFlightBack: true,
-            additionalCharges: [{ description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: true }],
+            additionalCharges: [{ description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: false }],
           },
           pricingSettings
         )
@@ -82,7 +82,7 @@ export default function ReturnOptionsComparison({
             ...baseInput,
             numDrivers: 1,
             oneWayFlightBack: true,
-            additionalCharges: [{ description: 'Bus back', dealerAmountCents: busFareCents, hoursAdded: 0, paidToDriver: true }],
+            additionalCharges: [{ description: 'Bus back', dealerAmountCents: busFareCents, hoursAdded: 0, paidToDriver: false }],
           },
           pricingSettings
         )

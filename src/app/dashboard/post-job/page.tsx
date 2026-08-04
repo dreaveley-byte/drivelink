@@ -166,6 +166,28 @@ export default function PostJobPage() {
     setCalculating(false)
   }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
 
+  // Once a distance has been calculated once, keep the pricing summary in sync
+  // with later changes (like adding a flight charge) without needing another
+  // network round-trip to re-fetch the same distance.
+  useEffect(() => {
+    if (distanceKm == null || durationMinutes == null || !pricingSettings) return
+    const result = calculatePricing(
+      {
+        distanceKm,
+        durationMinutes,
+        vehicleMode,
+        numDrivers: secondDriver ? 2 : 1,
+        outOfProvinceInspection,
+        registryVisit,
+        additionalCharges,
+        oneWayFlightBack: flyingBack,
+      },
+      pricingSettings
+    )
+    setPricing(result)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, flyingBack])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')

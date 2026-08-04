@@ -57,7 +57,7 @@ export default function FlightSearchButton({
       description: `Flight back: ${result.origin.code} → ${result.destination.code} (${result.flight.isDirect ? 'direct' : `${result.flight.stops} stop${result.flight.stops === 1 ? '' : 's'}`})`,
       dealerAmountCents: result.flight.priceCents,
       hoursAdded: result.flight.hoursToAdd,
-      paidToDriver: true,
+      paidToDriver: false,
     })
     setAdded(true)
   }
@@ -88,6 +88,7 @@ export default function FlightSearchButton({
                 Flight time {Math.floor(result.flight.flightDurationMinutes / 60)}h {result.flight.flightDurationMinutes % 60}m
                 {' '}+ 3h airport buffer = {result.flight.hoursToAdd} hrs added to the job
               </p>
+              <p className="text-gray-400">Ticket cost billed to dealer only — driver is still paid for the hours.</p>
               {added ? (
                 <p className="text-green-700 mt-1">Added to quote.</p>
               ) : (

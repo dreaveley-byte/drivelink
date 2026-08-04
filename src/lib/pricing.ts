@@ -79,9 +79,12 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const inspectionHours = outOfProvinceInspection ? settings.out_of_province_inspection_min_hours : 0
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
 
-  const extraDriverPaidHours = additionalCharges
-    .filter((c) => c.paidToDriver)
-    .reduce((sum, c) => sum + c.hoursAdded, 0)
+  // Hours always represent real time the driver spent working (driving, flying,
+  // waiting at the airport, etc.) so they're always paid — separate from whether
+  // the dealerAmountCents dollar figure also gets reimbursed to the driver.
+  // (e.g. a flight ticket: the driver is paid for the hours spent traveling,
+  // but the ticket cost itself is billed to the dealer only, not added to pay.)
+  const extraDriverPaidHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
   const extraDealerOnlyHours = additionalCharges
     .reduce((sum, c) => sum + c.hoursAdded, 0)
 

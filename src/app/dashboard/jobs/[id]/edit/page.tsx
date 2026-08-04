@@ -206,6 +206,27 @@ export default function EditJobPage() {
     setCalculating(false)
   }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
 
+  // Keep the pricing summary in sync with later changes (like adding a flight
+  // charge) without needing another network round-trip to re-fetch distance.
+  useEffect(() => {
+    if (distanceKm == null || durationMinutes == null || !pricingSettings) return
+    const result = calculatePricing(
+      {
+        distanceKm,
+        durationMinutes,
+        vehicleMode,
+        numDrivers: secondDriver ? 2 : 1,
+        outOfProvinceInspection,
+        registryVisit,
+        additionalCharges,
+        oneWayFlightBack: flyingBack,
+      },
+      pricingSettings
+    )
+    setPricing(result)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, flyingBack])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
