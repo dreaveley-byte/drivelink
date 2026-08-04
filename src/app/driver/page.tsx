@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
@@ -119,6 +120,9 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           <span className="text-sm text-gray-400">— Driver</span>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/driver/history" className="text-sm text-gray-600 hover:text-gray-900">
+            History
+          </Link>
           <SignOutButton />
           <SettingsGearLink href="/driver/settings" />
         </div>
