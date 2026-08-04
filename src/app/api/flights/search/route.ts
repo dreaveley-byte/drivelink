@@ -63,7 +63,7 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
-async function nearestAirport(address: string): Promise<{ code: string; name: string } | { error: string }> {
+async function nearestAirport(address: string): Promise<{ code: string; name: string; lat: number; lng: number } | { error: string }> {
   const coords = await geocodeAddress(address)
   if (!coords) return { error: `Could not locate "${address}" on the map.` }
 
@@ -76,7 +76,7 @@ async function nearestAirport(address: string): Promise<{ code: string; name: st
       closest = airport
     }
   }
-  return { code: closest.code, name: closest.name }
+  return { code: closest.code, name: closest.name, lat: closest.lat, lng: closest.lng }
 }
 
 async function duffelFetch(path: string, token: string, init?: RequestInit) {
@@ -90,6 +90,35 @@ async function duffelFetch(path: string, token: string, init?: RequestInit) {
       ...init?.headers,
     },
   })
+}
+
+async function drivingLegToAirport(address: string, airport: { lat: number; lng: number }): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  if (!apiKey) return null
+
+  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+    },
+    body: JSON.stringify({
+      origin: { address },
+      destination: { location: { latLng: { latitude: airport.lat, longitude: airport.lng } } },
+      travelMode: 'DRIVE',
+      units: 'METRIC',
+    }),
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  const route = data.routes?.[0]
+  if (!route) return null
+  const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10)
+  return {
+    distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
+    durationMinutes: Math.round(durationSeconds / 60),
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -118,6 +147,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Return airport: ${flightTo.error}` }, { status: 404 })
   }
 
+  // The driver drops the vehicle off at destinationAddress, then still needs to
+  // get themselves to flightFrom (the departure airport) — often a real drive,
+  // not just "at the airport already."
+  const groundToAirport = await drivingLegToAirport(destinationAddress, flightFrom)
+
   const date = departureDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   const offerRequestRes = await duffelFetch('/air/offer_requests?return_offers=true', token, {
@@ -141,7 +175,7 @@ export async function POST(req: NextRequest) {
   const offers = offerRequestData?.data?.offers ?? []
 
   if (offers.length === 0) {
-    return NextResponse.json({ origin: flightFrom, destination: flightTo, flight: null })
+    return NextResponse.json({ origin: flightFrom, destination: flightTo, flight: null, groundToAirport })
   }
 
   // Prefer a direct flight; if none exist, prefer the fewest total stops.
@@ -181,5 +215,6 @@ export async function POST(req: NextRequest) {
       flightDurationMinutes,
       hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
     },
+    groundToAirport,
   })
 }

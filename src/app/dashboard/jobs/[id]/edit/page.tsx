@@ -186,7 +186,10 @@ export default function EditJobPage() {
       setDurationMinutes(data.durationMinutes)
 
       let charges = additionalCharges.filter(
-        (c) => !c.description.startsWith('Flight back:') && c.description !== 'Return ground transport'
+        (c) =>
+          !c.description.startsWith('Flight back:') &&
+          c.description !== 'Return ground transport' &&
+          c.description !== 'Ground transport to airport'
       )
 
       if (flyingBack) {
@@ -224,6 +227,22 @@ export default function EditJobPage() {
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
+
+        // The drop-off location usually isn't the airport itself — the driver still
+        // needs to get themselves there. This is a real driven distance, not a guess.
+        if (flightBody.groundToAirport) {
+          const km = flightBody.groundToAirport.distanceKm
+          charges = [
+            ...charges,
+            {
+              description: 'Ground transport to airport',
+              dealerAmountCents: Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents),
+              hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
+              paidToDriver: true,
+            },
+          ]
+        }
+
         if (flightRes.ok && flightBody.flight) {
           charges = [
             ...charges,
@@ -585,7 +604,7 @@ export default function EditJobPage() {
             </p>
             {additionalCharges
               .map((charge, i) => ({ charge, i }))
-              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && charge.description !== 'Return ground transport')
+              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && charge.description !== 'Return ground transport' && charge.description !== 'Ground transport to airport')
               .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
@@ -666,7 +685,18 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                    <BreakdownRow label="Additional charges" cents={pricing.extrasDealerCents} />
+                    <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow
+                      label="Other additional charges"
+                      cents={
+                        pricing.extrasDealerCents -
+                        (additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0) -
+                        (additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0) -
+                        (additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0)
+                      }
+                    />
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">

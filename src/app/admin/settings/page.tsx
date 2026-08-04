@@ -28,6 +28,8 @@ type Settings = {
   registry_visit_fee_cents: number
   return_ground_transport_hours: number
   return_ground_transport_fee_cents: number
+  uber_base_fare_cents: number
+  uber_per_km_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -277,14 +279,27 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Return ground transport time (hrs)</label>
-              <p className="text-xs text-gray-400 mb-1">Airport → dealership (to drop paperwork) → home, when the driver flies back</p>
+              <label className="block text-sm text-gray-700 mb-1">Uber/taxi base fare ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Used to estimate the ride from the delivery location to the departure airport (actual distance is calculated automatically)</p>
+              <input type="number" step="0.01" value={dollars(settings.uber_base_fare_cents)}
+                onChange={(e) => updateDollarField('uber_base_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Uber/taxi rate per km ($)</label>
+              <input type="number" step="0.01" value={dollars(settings.uber_per_km_cents)}
+                onChange={(e) => updateDollarField('uber_per_km_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Ground transport home time (hrs)</label>
+              <p className="text-xs text-gray-400 mb-1">Arrival airport → dealership (to drop paperwork) → home, when the driver flies back</p>
               <input type="number" step="0.5" value={settings.return_ground_transport_hours}
                 onChange={(e) => updateNumberField('return_ground_transport_hours', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Return ground transport cost ($)</label>
+              <label className="block text-sm text-gray-700 mb-1">Ground transport home cost ($)</label>
               <p className="text-xs text-gray-400 mb-1">Covers Uber, bus, or a combination — reimbursed to the driver</p>
               <input type="number" step="0.01" value={dollars(settings.return_ground_transport_fee_cents)}
                 onChange={(e) => updateDollarField('return_ground_transport_fee_cents', e.target.value)}

@@ -19,6 +19,8 @@ export type PricingSettings = {
   max_driving_hours_before_overnight: number
   return_ground_transport_hours: number
   return_ground_transport_fee_cents: number
+  uber_base_fare_cents: number
+  uber_per_km_cents: number
 }
 
 export type AdditionalCharge = {
