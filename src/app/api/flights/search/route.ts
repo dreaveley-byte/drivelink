@@ -121,6 +121,29 @@ async function drivingLegToAirport(address: string, airport: { lat: number; lng:
   }
 }
 
+// Converts a price to CAD if it isn't already, using a free ECB-sourced rate
+// (no API key needed). Falls back to the original amount/currency if the
+// conversion service is unreachable, rather than failing the whole search.
+async function convertToCad(amountCents: number, fromCurrency: string): Promise<{ amountCents: number; currency: string; originalAmountCents?: number; originalCurrency?: string }> {
+  if (fromCurrency === 'CAD') return { amountCents, currency: 'CAD' }
+
+  try {
+    const res = await fetch(`https://api.frankfurter.app/latest?from=${fromCurrency}&to=CAD`)
+    if (!res.ok) return { amountCents, currency: fromCurrency }
+    const data = await res.json()
+    const rate = data?.rates?.CAD
+    if (!rate) return { amountCents, currency: fromCurrency }
+    return {
+      amountCents: Math.round(amountCents * rate),
+      currency: 'CAD',
+      originalAmountCents: amountCents,
+      originalCurrency: fromCurrency,
+    }
+  } catch {
+    return { amountCents, currency: fromCurrency }
+  }
+}
+
 export async function POST(req: NextRequest) {
   const token = process.env.DUFFEL_ACCESS_TOKEN
   if (!token) {
@@ -218,6 +241,9 @@ export async function POST(req: NextRequest) {
 
   console.log('Duffel best offer segments (raw):', JSON.stringify(best.slices[0]?.segments))
 
+  const priceCentsRaw = Math.round(parseFloat(best.total_amount) * 100)
+  const converted = await convertToCad(priceCentsRaw, best.total_currency)
+
   const segments = (best.slices[0]?.segments ?? []).map((s) => ({
     airline: s.marketing_carrier?.name ?? s.marketing_carrier?.iata_code ?? null,
     airlineCode: s.marketing_carrier?.iata_code ?? null,
@@ -234,8 +260,10 @@ export async function POST(req: NextRequest) {
     origin: flightFrom,
     destination: flightTo,
     flight: {
-      priceCents: Math.round(parseFloat(best.total_amount) * 100),
-      currency: best.total_currency,
+      priceCents: converted.amountCents,
+      currency: converted.currency,
+      originalPriceCents: converted.originalAmountCents,
+      originalCurrency: converted.originalCurrency,
       stops: stopCount(best),
       isDirect: stopCount(best) === 0,
       flightDurationMinutes,

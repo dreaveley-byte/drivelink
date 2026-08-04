@@ -20,6 +20,8 @@ export default function FlightSearchButton({
     flight: {
       priceCents: number
       currency: string
+      originalPriceCents?: number
+      originalCurrency?: string
       stops: number
       isDirect: boolean
       flightDurationMinutes: number
@@ -84,6 +86,9 @@ export default function FlightSearchButton({
                 {result.origin.code} → {result.destination.code} ·{' '}
                 {result.flight.isDirect ? 'Direct flight' : `${result.flight.stops} stop${result.flight.stops === 1 ? '' : 's'}`} ·{' '}
                 <span className="font-medium">{formatCents(result.flight.priceCents)} {result.flight.currency}</span>
+                {result.flight.originalCurrency && (
+                  <span className="text-gray-400"> (converted from {formatCents(result.flight.originalPriceCents ?? 0)} {result.flight.originalCurrency})</span>
+                )}
               </p>
               {result.flight.segments.length > 0 && (
                 <div className="mt-1 space-y-0.5">

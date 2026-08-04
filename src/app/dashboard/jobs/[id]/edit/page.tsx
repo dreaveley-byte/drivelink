@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
+import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 
 type JobType = { id: string; name: string }
 
@@ -566,6 +567,13 @@ export default function EditJobPage() {
               <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => setOutOfProvinceInspection(e.target.checked)} />
               Out-of-province inspection required
             </label>
+            {outOfProvinceInspection && scheduledFor && [5, 6].includes(new Date(scheduledFor).getDay()) && (
+              <p className="text-xs text-amber-600 -mt-1 ml-6">
+                ⚠️ This is scheduled for a {new Date(scheduledFor).getDay() === 5 ? 'Friday' : 'Saturday'} — most registries and
+                inspection shops are closed Sundays, so the inspection may not complete until Monday. An extra hotel night and
+                flat fees may apply if so.
+              </p>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={registryVisit} onChange={(e) => setRegistryVisit(e.target.checked)} />
               Registry visit required
@@ -588,6 +596,24 @@ export default function EditJobPage() {
                 <p className="ml-6 mt-2 text-xs text-gray-400">
                   Flight price and hours will be looked up and added automatically when you click "Calculate distance & cost" below.
                 </p>
+              )}
+              {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
+                <div className="ml-6">
+                  <NearbyDatesFlightCheck
+                    scheduledFor={scheduledFor}
+                    distanceKm={distanceKm}
+                    durationMinutes={durationMinutes}
+                    pricingSettings={pricingSettings}
+                    originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+                    destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+                    outOfProvinceInspection={outOfProvinceInspection}
+                    registryVisit={registryVisit}
+                    onSelectDate={(d) => {
+                      setScheduledFor(d)
+                      setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>
