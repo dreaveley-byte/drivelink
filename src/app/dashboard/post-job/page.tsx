@@ -595,12 +595,6 @@ export default function PostJobPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-700 mb-1">Scheduled for (pickup time)</label>
-            <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-
-          <div>
             <label className="block text-sm text-gray-700 mb-1">Customer needs vehicle by (optional)</label>
             <input
               type="datetime-local"
