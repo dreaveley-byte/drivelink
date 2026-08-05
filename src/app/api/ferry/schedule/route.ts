@@ -96,24 +96,37 @@ export async function POST(req: NextRequest) {
   ])
 
   if (!fromTerminal || !toTerminal) {
-    return NextResponse.json({ error: 'Could not locate one of those addresses.' }, { status: 404 })
+    const failed = !fromTerminal && !toTerminal ? 'both addresses' : !fromTerminal ? `origin ("${originAddress}")` : `destination ("${destinationAddress}")`
+    return NextResponse.json({ error: `Could not geocode ${failed}.` }, { status: 404 })
   }
 
   // If the nearest terminal is genuinely far from either address, this route
   // likely doesn't actually cross by ferry near these points — bail out rather
   // than return a misleading "route."
   if (fromTerminal.distanceKm > 60 || toTerminal.distanceKm > 60) {
-    return NextResponse.json({ error: 'No nearby ferry terminals found for this route.' }, { status: 404 })
+    return NextResponse.json({
+      error: `Nearest terminals too far away (${fromTerminal.name} ${fromTerminal.distanceKm}km, ${toTerminal.name} ${toTerminal.distanceKm}km) — likely not a ferry route.`,
+      fromTerminal,
+      toTerminal,
+    }, { status: 404 })
+  }
+
+  if (fromTerminal.code === toTerminal.code) {
+    return NextResponse.json({
+      error: `Both addresses matched the same nearest terminal (${fromTerminal.name}) — not a ferry route.`,
+      fromTerminal,
+      toTerminal,
+    }, { status: 404 })
   }
 
   let scheduleRes: Response
   try {
     scheduleRes = await fetch('https://www.bcferriesapi.ca/v2/noncapacity/')
-  } catch {
-    return NextResponse.json({ error: 'Ferry schedule service is unavailable right now.' }, { status: 502 })
+  } catch (e) {
+    return NextResponse.json({ error: `Ferry schedule service unreachable: ${e instanceof Error ? e.message : 'unknown error'}`, fromTerminal, toTerminal }, { status: 502 })
   }
   if (!scheduleRes.ok) {
-    return NextResponse.json({ error: 'Ferry schedule service is unavailable right now.' }, { status: 502 })
+    return NextResponse.json({ error: `Ferry schedule service returned HTTP ${scheduleRes.status}.`, fromTerminal, toTerminal }, { status: 502 })
   }
 
   const scheduleData = await scheduleRes.json()
@@ -125,11 +138,16 @@ export async function POST(req: NextRequest) {
   }
   const routes: Route[] = scheduleData.routes ?? []
 
-  const route = routes.find((r) => r.fromTerminalCode === fromTerminal.code && r.toTerminalCode === toTerminal.code)
+  // Try the direct match first; if that specific direction isn't listed, the
+  // reverse direction's duration/frequency is a reasonable stand-in (crossings
+  // are symmetric in practice) rather than giving up entirely.
+  const route =
+    routes.find((r) => r.fromTerminalCode === fromTerminal.code && r.toTerminalCode === toTerminal.code) ??
+    routes.find((r) => r.fromTerminalCode === toTerminal.code && r.toTerminalCode === fromTerminal.code)
 
   if (!route || route.sailings.some((s) => s.vesselStatus?.includes('No sailings'))) {
     return NextResponse.json({
-      error: `No direct sailings found between ${fromTerminal.name} and ${toTerminal.name}.`,
+      error: `Matched terminals ${fromTerminal.name} (${fromTerminal.code}) → ${toTerminal.name} (${toTerminal.code}), but no route code "${fromTerminal.code}${toTerminal.code}" or "${toTerminal.code}${fromTerminal.code}" found in the ${routes.length}-route schedule.`,
       fromTerminal,
       toTerminal,
     }, { status: 404 })

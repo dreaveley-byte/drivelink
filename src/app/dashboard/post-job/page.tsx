@@ -43,6 +43,7 @@ export default function PostJobPage() {
   const [pickupTimeError, setPickupTimeError] = useState('')
   const [ferryLiveDataUsed, setFerryLiveDataUsed] = useState(false)
   const [decisionNote, setDecisionNote] = useState('')
+  const [ferryDebugNote, setFerryDebugNote] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
@@ -219,10 +220,15 @@ export default function PostJobPage() {
         const ferryBody = await ferryRes.json().catch(() => ({}))
         if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
           ferryInfo = ferryBody
-        } else if (ferryRequired) {
-          setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+          setFerryDebugNote(`Ferry detected: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name}`)
+        } else {
+          setFerryDebugNote(`Ferry check: ${ferryBody.error || 'no route detected'}`)
+          if (ferryRequired) {
+            setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+          }
         }
-      } catch {
+      } catch (e) {
+        setFerryDebugNote(`Ferry check failed: ${e instanceof Error ? e.message : 'unknown error'}`)
         if (ferryRequired) setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
       }
       setFerryLiveDataUsed(!!ferryInfo)
@@ -871,6 +877,7 @@ export default function PostJobPage() {
           >
             {calculating ? 'Calculating...' : 'Calculate distance & cost'}
           </button>
+          {ferryDebugNote && <p className="text-xs text-gray-400">{ferryDebugNote}</p>}
           {decisionNote && <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">{decisionNote}</p>}
           {calcError && <p className="text-sm text-red-600">{calcError}</p>}
 
