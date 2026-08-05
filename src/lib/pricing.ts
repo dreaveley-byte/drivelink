@@ -54,6 +54,11 @@ export type PricingInput = {
   useGarageInsurance: boolean
   additionalCharges: AdditionalCharge[]
   oneWayFlightBack: boolean // driver flies back instead of driving back — bill/pay one-way only
+  // For linked multi-vehicle deals (e.g. 2 trade-ins + 1 purchase): how many
+  // vehicles actually use fuel on each leg. Defaults to numDrivers for both
+  // legs when omitted, matching the normal (non-linked) behavior.
+  outboundVehicleCount?: number
+  returnVehicleCount?: number
 }
 
 export type PricingResult = {
@@ -147,9 +152,15 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const fuelEconomy = vehicleMode === 'towed'
     ? settings.fuel_economy_towed_l_per_100km
     : settings.fuel_economy_driven_l_per_100km
-  // Second driver means a second vehicle (the chase vehicle) covering the same distance —
-  // so fuel gets charged per vehicle, same as hourly pay is charged per driver.
-  const gasCostCents = Math.round((tripDistanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre) * numDrivers
+  // Normally both legs use the same number of vehicles (numDrivers — e.g. a
+  // chase vehicle follows the whole way). For a linked multi-vehicle deal
+  // (2 trade-ins + 1 purchase, or 2 purchases + 1 trade-in), one leg only
+  // needs fuel for 1 vehicle while the other needs 2 — outboundVehicleCount/
+  // returnVehicleCount let the caller override that per leg.
+  const outboundVehicles = input.outboundVehicleCount ?? numDrivers
+  const returnVehicles = oneWayFlightBack ? 0 : (input.returnVehicleCount ?? numDrivers)
+  const perLegGasCents = Math.round((distanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre)
+  const gasCostCents = perLegGasCents * outboundVehicles + perLegGasCents * returnVehicles
 
   // Wear & tear only applies when the driver uses their own vehicle to do the job —
   // that's only true for towed jobs (their own truck pulling the trailer). On a

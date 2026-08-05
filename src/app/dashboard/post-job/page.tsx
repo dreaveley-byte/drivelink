@@ -55,6 +55,12 @@ export default function PostJobPage() {
   const [registryVisit, setRegistryVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
+  const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade'>('none')
+  const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
+  const [linkedJobQuery, setLinkedJobQuery] = useState('')
+  const [linkedJobResults, setLinkedJobResults] = useState<{ id: string; stock_number: string | null; vehicle_year: number | null; vehicle_make: string | null; vehicle_model: string | null }[]>([])
+  const [linkedJobSearching, setLinkedJobSearching] = useState(false)
+  const [ridesAlongWithLinked, setRidesAlongWithLinked] = useState(false)
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
   const [notes, setNotes] = useState('')
 
@@ -122,6 +128,24 @@ export default function PostJobPage() {
 
   function removeCharge(index: number) {
     setAdditionalCharges((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function searchLinkedJob(query: string) {
+    setLinkedJobQuery(query)
+    if (query.trim().length < 2) {
+      setLinkedJobResults([])
+      return
+    }
+    setLinkedJobSearching(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('jobs')
+      .select('id, stock_number, vehicle_year, vehicle_make, vehicle_model')
+      .or(`stock_number.ilike.%${query}%,vehicle_make.ilike.%${query}%,vehicle_model.ilike.%${query}%`)
+      .order('created_at', { ascending: false })
+      .limit(8)
+    setLinkedJobResults(data ?? [])
+    setLinkedJobSearching(false)
   }
 
   async function handleDeliveryDeadlineChange(value: string) {
@@ -476,6 +500,32 @@ export default function PostJobPage() {
   // relevant inputs change, using the last-fetched distance/duration.
   useEffect(() => {
     if (distanceKm == null || durationMinutes == null || !pricingSettings) return
+
+    // Rides-along vehicles don't get their own transport bill — that cost lives
+    // on the linked job that actually carries the multi-vehicle arrangement.
+    if (ridesAlongWithLinked) {
+      const result = calculatePricing(
+        {
+          distanceKm: 0,
+          durationMinutes: 0,
+          vehicleMode,
+          numDrivers: 1,
+          outOfProvinceInspection,
+          registryVisit,
+          ferryRequired: false,
+          useGarageInsurance,
+          additionalCharges: additionalCharges.filter((c) => !c.kind),
+          oneWayFlightBack: false,
+        },
+        pricingSettings
+      )
+      setPricing(result)
+      return
+    }
+
+    const outboundVehicleCount = multiVehicleArrangement === 'two_purchases_one_trade' ? 2 : multiVehicleArrangement === 'two_trades_one_purchase' ? 1 : undefined
+    const returnVehicleCount = multiVehicleArrangement === 'two_trades_one_purchase' ? 2 : multiVehicleArrangement === 'two_purchases_one_trade' ? 1 : undefined
+
     const result = calculatePricing(
       {
         distanceKm,
@@ -488,12 +538,14 @@ export default function PostJobPage() {
         useGarageInsurance,
         additionalCharges,
         oneWayFlightBack: flyingBack,
+        outboundVehicleCount,
+        returnVehicleCount,
       },
       pricingSettings
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -587,6 +639,9 @@ export default function PostJobPage() {
       registry_visit: registryVisit,
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
+      linked_job_id: linkedJobId,
+      multi_vehicle_arrangement: multiVehicleArrangement,
+      rides_along_with_linked: ridesAlongWithLinked,
       additional_charges: additionalCharges,
       overnight_required: pricing?.overnightRequired ?? false,
       estimated_distance_km: pricing?.tripDistanceKm ?? distanceKm,
@@ -610,6 +665,12 @@ export default function PostJobPage() {
       stop_type: i === 0 ? 'pickup' : i === filledStops.length - 1 ? 'dropoff' : 'waypoint',
     }))
     await supabase.from('job_stops').insert(stopRows)
+
+    // Linking is bidirectional — the job we linked to needs to point back at
+    // this new one too, so both drivers/admin see they're paired either way.
+    if (linkedJobId) {
+      await supabase.from('jobs').update({ linked_job_id: newJob.id }).eq('id', linkedJobId)
+    }
 
     router.push('/dashboard')
     router.refresh()
@@ -807,6 +868,80 @@ export default function PostJobPage() {
               <input type="checkbox" checked={isTradeIn} onChange={(e) => setIsTradeIn(e.target.checked)} />
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
+
+            <div className="pl-1">
+              <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
+              <select
+                value={multiVehicleArrangement}
+                onChange={(e) => setMultiVehicleArrangement(e.target.value as typeof multiVehicleArrangement)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="none">Not a multi-vehicle deal</option>
+                <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
+                <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
+              </select>
+              {multiVehicleArrangement !== 'none' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Gas/ferry costs will use the right vehicle count for each leg. Post a second job for the other
+                  vehicle and link it below so both drivers know they&apos;re paired.
+                </p>
+              )}
+
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 mb-1">Link to another drive (optional)</label>
+                {linkedJobId ? (
+                  <div className="flex items-center justify-between border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50">
+                    <span>Linked to a job</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLinkedJobId(null)
+                        setLinkedJobQuery('')
+                      }}
+                      className="text-xs text-gray-400 hover:text-red-600"
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={linkedJobQuery}
+                      onChange={(e) => searchLinkedJob(e.target.value)}
+                      placeholder="Search by stock #, make, or model"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    />
+                    {linkedJobSearching && <p className="text-xs text-gray-400 mt-1">Searching…</p>}
+                    {linkedJobResults.length > 0 && (
+                      <div className="border border-gray-200 rounded-lg mt-1 divide-y divide-gray-100">
+                        {linkedJobResults.map((j) => (
+                          <button
+                            key={j.id}
+                            type="button"
+                            onClick={() => {
+                              setLinkedJobId(j.id)
+                              setLinkedJobResults([])
+                              setLinkedJobQuery('')
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                          >
+                            {[j.vehicle_year, j.vehicle_make, j.vehicle_model].filter(Boolean).join(' ')}
+                            {j.stock_number && ` · Stock #${j.stock_number}`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {linkedJobId && (
+                <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
+                  <input type="checkbox" checked={ridesAlongWithLinked} onChange={(e) => setRidesAlongWithLinked(e.target.checked)} />
+                  This vehicle rides along with the linked drive (don&apos;t double-charge transport)
+                </label>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
