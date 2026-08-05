@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     destination: toWaypoint(destination),
     intermediates: waypoints.map(toWaypoint),
     travelMode: 'DRIVE',
+    routingPreference: 'TRAFFIC_AWARE',
     units: 'METRIC',
   }
 

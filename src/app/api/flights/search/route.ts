@@ -107,6 +107,7 @@ async function drivingLegToAirport(address: string, airport: { lat: number; lng:
       origin: { address },
       destination: { location: { latLng: { latitude: airport.lat, longitude: airport.lng } } },
       travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
       units: 'METRIC',
     }),
   })
