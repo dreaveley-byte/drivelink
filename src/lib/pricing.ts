@@ -22,6 +22,8 @@ export type PricingSettings = {
   uber_base_fare_cents: number
   uber_per_km_cents: number
   uber_minimum_fare_cents: number
+  flight_airport_buffer_hours: number
+  break_duration_minutes: number
 }
 
 export type AdditionalCharge = {
@@ -47,6 +49,7 @@ export type PricingResult = {
   oneWayFlightBack: boolean
   tripDistanceKm: number
   baseDrivingHours: number
+  breakHours: number
   dealerBilledHours: number
   driverPaidHours: number
   gasCostCents: number
@@ -82,10 +85,20 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const inspectionHours = outOfProvinceInspection ? settings.out_of_province_inspection_min_hours : 0
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
 
-  // Overnight isn't just about drive time — the inspection and registry stops
-  // add real hours on the ground too, and together they can push the driver
-  // past the point where they can safely finish same-day.
-  const overnightRequired = baseDrivingHours + inspectionHours + registryHours > settings.max_driving_hours_before_overnight
+  // Every meal break also costs real time on the road (bathroom, gas, food) —
+  // not just the meal allowance dollars. Same cadence, two effects.
+  const mealBreaks = Math.min(
+    Math.floor(baseDrivingHours / settings.meal_allowance_every_hours),
+    settings.meal_allowance_max_count
+  )
+  const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
+  const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
+
+  // Overnight isn't just about drive time — the inspection/registry stops and
+  // break time add real hours on the ground too, and together they can push
+  // the driver past the point where they can safely finish same-day.
+  const overnightRequired =
+    baseDrivingHours + breakHours + inspectionHours + registryHours > settings.max_driving_hours_before_overnight
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether
@@ -96,8 +109,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const extraDealerOnlyHours = additionalCharges
     .reduce((sum, c) => sum + c.hoursAdded, 0)
 
-  const dealerBilledHours = baseDrivingHours + inspectionHours + registryHours + extraDealerOnlyHours
-  const driverPaidHours = baseDrivingHours + extraDriverPaidHours
+  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + extraDealerOnlyHours
+  const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours
 
   const hourlyDealerCents = Math.round(dealerBilledHours * settings.hourly_rate_cents * numDrivers)
   const hourlyDriverCents = Math.round(driverPaidHours * settings.hourly_rate_cents * numDrivers)
@@ -108,12 +121,6 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Second driver means a second vehicle (the chase vehicle) covering the same distance —
   // so fuel gets charged per vehicle, same as hourly pay is charged per driver.
   const gasCostCents = Math.round((tripDistanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre) * numDrivers
-
-  const mealBreaks = Math.min(
-    Math.floor(baseDrivingHours / settings.meal_allowance_every_hours),
-    settings.meal_allowance_max_count
-  )
-  const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
 
   // Wear & tear only applies when the driver uses their own vehicle to do the job —
   // that's only true for towed jobs (their own truck pulling the trailer). On a
@@ -161,6 +168,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     oneWayFlightBack,
     tripDistanceKm,
     baseDrivingHours,
+    breakHours,
     dealerBilledHours,
     driverPaidHours,
     gasCostCents,

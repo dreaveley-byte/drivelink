@@ -26,6 +26,7 @@ export default function FlightSearchButton({
       isDirect: boolean
       flightDurationMinutes: number
       hoursToAdd: number
+      airportBufferHours: number
       segments: { airline: string | null; flightNumber: string | null; from: string | null; to: string | null; departingAt: string | null; arrivingAt: string | null }[]
     } | null
   } | null>(null)
@@ -106,7 +107,7 @@ export default function FlightSearchButton({
               )}
               <p className="text-gray-400 mt-0.5">
                 Flight time {Math.floor(result.flight.flightDurationMinutes / 60)}h {result.flight.flightDurationMinutes % 60}m
-                {' '}+ 3h airport buffer = {result.flight.hoursToAdd} hrs added to the job
+                {' '}+ {result.flight.airportBufferHours}h airport buffer = {result.flight.hoursToAdd} hrs added to the job
               </p>
               <p className="text-gray-400">Ticket cost billed to dealer only — driver is still paid for the hours.</p>
               {added ? (

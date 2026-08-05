@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 const DUFFEL_BASE = 'https://api.duffel.com'
 
@@ -238,7 +239,9 @@ export async function POST(req: NextRequest) {
   }
 
   const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
-  const AIRPORT_BUFFER_MINUTES = 3 * 60
+  const supabase = await createClient()
+  const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours').eq('id', 1).single()
+  const AIRPORT_BUFFER_MINUTES = (pricingSettings?.flight_airport_buffer_hours ?? 3) * 60
 
   console.log('Duffel best offer segments (raw):', JSON.stringify(best.slices[0]?.segments))
 
@@ -269,6 +272,7 @@ export async function POST(req: NextRequest) {
       isDirect: stopCount(best) === 0,
       flightDurationMinutes,
       hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
+      airportBufferHours: AIRPORT_BUFFER_MINUTES / 60,
       segments,
     },
     groundToAirport,

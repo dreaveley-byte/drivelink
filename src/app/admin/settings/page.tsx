@@ -31,6 +31,8 @@ type Settings = {
   uber_base_fare_cents: number
   uber_per_km_cents: number
   uber_minimum_fare_cents: number
+  flight_airport_buffer_hours: number
+  break_duration_minutes: number
   max_driving_hours_before_overnight: number
 }
 
@@ -183,6 +185,13 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
+              <label className="block text-sm text-gray-700 mb-1">Break duration (minutes)</label>
+              <p className="text-xs text-gray-400 mb-1">Added to total job hours for each meal break — bathroom/gas/food stop time, not just the allowance dollars</p>
+              <input type="number" step="5" value={settings.break_duration_minutes}
+                onChange={(e) => updateNumberField('break_duration_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
               <label className="block text-sm text-gray-700 mb-1">Minimum pay per job ($)</label>
               <input type="number" step="0.01" value={dollars(settings.minimum_driver_pay_cents)}
                 onChange={(e) => updateDollarField('minimum_driver_pay_cents', e.target.value)}
@@ -297,6 +306,13 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Floor for short trips — real rides never cost less than this, regardless of distance</p>
               <input type="number" step="0.01" value={dollars(settings.uber_minimum_fare_cents)}
                 onChange={(e) => updateDollarField('uber_minimum_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Airport buffer time (hrs)</label>
+              <p className="text-xs text-gray-400 mb-1">Added on top of actual flight time for check-in, security, and deplaning</p>
+              <input type="number" step="0.5" value={settings.flight_airport_buffer_hours}
+                onChange={(e) => updateNumberField('flight_airport_buffer_hours', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
