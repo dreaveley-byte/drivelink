@@ -276,7 +276,7 @@ export default function PostJobPage() {
 
       charges = charges.filter((c) => !c.description.startsWith('Ferry:'))
       let ferryHandledLive = false
-      if (ferryRequired) {
+      {
         // On a round trip (not flying back), the driver crosses the water twice.
         const ferryCrossings = flyingBack ? 1 : 2
         try {
@@ -287,6 +287,8 @@ export default function PostJobPage() {
           })
           const ferryBody = await ferryRes.json().catch(() => ({}))
           if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
+            // A real ferry route was found automatically between these two points —
+            // no need for the checkbox in this case.
             const totalFerryMinutes = (ferryBody.sailingDurationMinutes + pricingSettings.ferry_wait_hours * 60) * ferryCrossings
             charges = [
               ...charges,
@@ -298,11 +300,15 @@ export default function PostJobPage() {
               },
             ]
             ferryHandledLive = true
-          } else {
+          } else if (ferryRequired) {
+            // Auto-detection didn't find a matching route, but the dealer manually
+            // flagged this as needing a ferry — fall back to the flat admin settings.
             setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
           }
         } catch {
-          setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
+          if (ferryRequired) {
+            setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
+          }
         }
       }
       setFerryLiveDataUsed(ferryHandledLive)
@@ -683,8 +689,11 @@ export default function PostJobPage() {
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
-              Ferry crossing required
+              Force ferry crossing (if not detected automatically)
             </label>
+            <p className="text-xs text-gray-400 -mt-1 ml-6">
+              Ferries are detected and priced automatically based on the pickup/dropoff addresses — only check this if you know a ferry is needed and it wasn't picked up.
+            </p>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
