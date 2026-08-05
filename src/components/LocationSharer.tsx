@@ -5,8 +5,56 @@ import { createClient } from '@/lib/supabase/client'
 
 const UPDATE_INTERVAL_MS = 20000
 
+function getDeviceInstructions(): string {
+  if (typeof navigator === 'undefined') return ''
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/.test(ua)
+  const isAndroid = /Android/.test(ua)
+
+  if (isIOS) {
+    return 'Open the Settings app → Safari → Location → set to "Allow", or Settings → Privacy & Security → Location Services → Safari Websites → drivflo.ca → Allow.'
+  }
+  if (isAndroid) {
+    return 'Tap the lock/info icon next to the address bar → Permissions → Location → Allow. Or: Chrome menu (⋮) → Settings → Site settings → Location → find drivflo.ca → Allow.'
+  }
+  return 'Check your browser\u2019s site settings for drivflo.ca and allow Location access.'
+}
+
 export default function LocationSharer({ jobId }: { jobId: string }) {
   const [status, setStatus] = useState<'idle' | 'sharing' | 'denied' | 'unsupported'>('idle')
+  const [retrying, setRetrying] = useState(false)
+
+  function attemptShare() {
+    if (!('geolocation' in navigator)) {
+      setStatus('unsupported')
+      return
+    }
+    const supabase = createClient()
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setStatus('sharing')
+        setRetrying(false)
+        await supabase
+          .from('jobs')
+          .update({
+            driver_lat: pos.coords.latitude,
+            driver_lng: pos.coords.longitude,
+            driver_location_updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId)
+      },
+      () => {
+        setStatus('denied')
+        setRetrying(false)
+      },
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
+    )
+  }
+
+  function handleRetry() {
+    setRetrying(true)
+    attemptShare()
+  }
 
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -64,9 +112,16 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
         <p className="font-medium">⚠️ Location sharing is off for this job.</p>
         <p className="mt-0.5">
           This is required while on an active job — dealers and customers can&apos;t see your progress, and drivers who
-          don&apos;t share location may be removed from the platform. Enable location access for this site in your phone&apos;s
-          browser settings, then reopen this page.
+          don&apos;t share location may be removed from the platform.
         </p>
+        <p className="mt-1.5 text-red-600">{getDeviceInstructions()}</p>
+        <button
+          onClick={handleRetry}
+          disabled={retrying}
+          className="mt-2 text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50"
+        >
+          {retrying ? 'Checking…' : "I've enabled it — try again"}
+        </button>
       </div>
     )
   }
