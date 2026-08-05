@@ -41,6 +41,7 @@ export default function PostJobPage() {
   const [deliveryDeadline, setDeliveryDeadline] = useState('')
   const [computingPickupTime, setComputingPickupTime] = useState(false)
   const [pickupTimeError, setPickupTimeError] = useState('')
+  const [ferryLiveDataUsed, setFerryLiveDataUsed] = useState(false)
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
@@ -273,6 +274,36 @@ export default function PostJobPage() {
         }
       }
 
+      charges = charges.filter((c) => !c.description.startsWith('Ferry:'))
+      let ferryHandledLive = false
+      if (ferryRequired) {
+        try {
+          const ferryRes = await fetch('/api/ferry/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+          })
+          const ferryBody = await ferryRes.json().catch(() => ({}))
+          if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
+            const totalFerryMinutes = ferryBody.sailingDurationMinutes + pricingSettings.ferry_wait_hours * 60
+            charges = [
+              ...charges,
+              {
+                description: `Ferry: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name} (~${ferryBody.sailingsPerDay} sailings/day, every ~${ferryBody.avgGapMinutes}min)`,
+                dealerAmountCents: pricingSettings.ferry_fare_cents,
+                hoursAdded: Math.round((totalFerryMinutes / 60) * 100) / 100,
+                paidToDriver: true,
+              },
+            ]
+            ferryHandledLive = true
+          }
+        } catch {
+          // Live schedule lookup failed — fall through to the flat admin-configured
+          // ferry fee/buffer via the ferryRequired flag passed to calculatePricing below.
+        }
+      }
+      setFerryLiveDataUsed(ferryHandledLive)
+
       // Always update the saved charges — this is what clears stale flight/ground
       // transport entries if "flying back" gets unchecked, and what the sync
       // effect below uses for every later recompute.
@@ -281,7 +312,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, additionalCharges, flyingBack, pricingSettings])
+  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -295,7 +326,7 @@ export default function PostJobPage() {
         numDrivers: secondDriver ? 2 : 1,
         outOfProvinceInspection,
         registryVisit,
-        ferryRequired,
+        ferryRequired: ferryRequired && !ferryLiveDataUsed,
         additionalCharges,
         oneWayFlightBack: flyingBack,
       },
@@ -303,7 +334,7 @@ export default function PostJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -689,7 +720,7 @@ export default function PostJobPage() {
             </p>
             {additionalCharges
               .map((charge, i) => ({ charge, i }))
-              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && charge.description !== 'Return ground transport' && charge.description !== 'Ground transport to airport')
+              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && charge.description !== 'Return ground transport' && charge.description !== 'Ground transport to airport')
               .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
@@ -770,7 +801,7 @@ export default function PostJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                    <BreakdownRow label="Ferry" cents={pricing.ferryFeeCents} />
+                    <BreakdownRow label="Ferry" cents={pricing.ferryFeeCents || additionalCharges.find((c) => c.description.startsWith('Ferry:'))?.dealerAmountCents || 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0} />
@@ -779,6 +810,7 @@ export default function PostJobPage() {
                       cents={
                         pricing.extrasDealerCents -
                         (additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0) -
+                        (additionalCharges.find((c) => c.description.startsWith('Ferry:'))?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0)
                       }
