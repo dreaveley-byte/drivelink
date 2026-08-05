@@ -262,7 +262,7 @@ export default function EditJobPage() {
         const ferryBody = await ferryRes.json().catch(() => ({}))
         if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
           ferryInfo = ferryBody
-          setFerryDebugNote(`Ferry detected: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name}`)
+          setFerryDebugNote(`Ferry detected: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name} (vehicle fare $${(pricingSettings.ferry_fare_cents / 100).toFixed(2)}, walk-on fare $${(pricingSettings.ferry_walkon_fare_cents / 100).toFixed(2)})`)
         } else {
           setFerryDebugNote(`Ferry check: ${ferryBody.error || 'no route detected'}`)
           if (ferryRequired) {
@@ -287,7 +287,12 @@ export default function EditJobPage() {
             : mode === 'oneway-vehicle'
               ? pricingSettings!.ferry_fare_cents
               : pricingSettings!.ferry_fare_cents + pricingSettings!.ferry_walkon_fare_cents
-        const label = mode === 'roundtrip-vehicle' ? ' (round trip)' : mode === 'oneway-walkon-return' ? ' (one-way + walk-on return)' : ''
+        const label =
+          mode === 'roundtrip-vehicle'
+            ? ` (round trip, 2× $${(pricingSettings!.ferry_fare_cents / 100).toFixed(2)} vehicle fare)`
+            : mode === 'oneway-walkon-return'
+              ? ` (one-way: $${(pricingSettings!.ferry_fare_cents / 100).toFixed(2)} vehicle + $${(pricingSettings!.ferry_walkon_fare_cents / 100).toFixed(2)} walk-on return)`
+              : ''
 
         if (ferryInfo) {
           const totalMinutes = (ferryInfo.sailingDurationMinutes + pricingSettings!.ferry_wait_hours * 60) * crossings
