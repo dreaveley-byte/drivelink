@@ -26,6 +26,7 @@ export type PricingSettings = {
   break_duration_minutes: number
   ferry_fare_cents: number
   ferry_wait_hours: number
+  ferry_walkon_fare_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
 }

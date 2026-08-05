@@ -233,25 +233,49 @@ export default function PostJobPage() {
       }
       setFerryLiveDataUsed(!!ferryInfo)
 
-      function ferryCharge(crossings: 1 | 2): AdditionalCharge | null {
+      // 'roundtrip-vehicle': trade-in/chase — the vehicle genuinely crosses both ways.
+      // 'oneway-vehicle': flying back — vehicle crosses once, driver flies instead of a return sailing.
+      // 'oneway-walkon-return': normal delivery, no trade-in — vehicle crosses once, driver
+      //   returns as a foot passenger (much cheaper) rather than paying for a second vehicle fare.
+      function ferryCharge(mode: 'roundtrip-vehicle' | 'oneway-vehicle' | 'oneway-walkon-return'): AdditionalCharge | null {
+        const crossings = mode === 'oneway-vehicle' ? 1 : 2
+        const feeCents =
+          mode === 'roundtrip-vehicle'
+            ? pricingSettings!.ferry_fare_cents * 2
+            : mode === 'oneway-vehicle'
+              ? pricingSettings!.ferry_fare_cents
+              : pricingSettings!.ferry_fare_cents + pricingSettings!.ferry_walkon_fare_cents
+        const label = mode === 'roundtrip-vehicle' ? ' (round trip)' : mode === 'oneway-walkon-return' ? ' (one-way + walk-on return)' : ''
+
         if (ferryInfo) {
           const totalMinutes = (ferryInfo.sailingDurationMinutes + pricingSettings!.ferry_wait_hours * 60) * crossings
           return {
-            description: `Ferry: ${ferryInfo.fromTerminal.name} → ${ferryInfo.toTerminal.name}${crossings === 2 ? ' (round trip)' : ''} (~${ferryInfo.sailingsPerDay} sailings/day, every ~${ferryInfo.avgGapMinutes}min)`,
-            dealerAmountCents: pricingSettings!.ferry_fare_cents * crossings,
+            description: `Ferry: ${ferryInfo.fromTerminal.name} → ${ferryInfo.toTerminal.name}${label} (~${ferryInfo.sailingsPerDay} sailings/day, every ~${ferryInfo.avgGapMinutes}min)`,
+            dealerAmountCents: feeCents,
             hoursAdded: Math.round((totalMinutes / 60) * 100) / 100,
             paidToDriver: true,
           }
         }
         if (ferryRequired) {
           return {
-            description: `Ferry crossing${crossings === 2 ? ' (round trip)' : ''}`,
-            dealerAmountCents: pricingSettings!.ferry_fare_cents * crossings,
+            description: `Ferry crossing${label}`,
+            dealerAmountCents: feeCents,
             hoursAdded: pricingSettings!.ferry_wait_hours * crossings,
             paidToDriver: true,
           }
         }
         return null
+      }
+
+      // Foot-passenger ferry returns still need a ride from the arrival terminal
+      // back to the dealer/home, same as the flying-back scenario does.
+      function ferryReturnGroundTransport(): AdditionalCharge {
+        return {
+          description: 'Return ground transport',
+          dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
+          hoursAdded: pricingSettings!.return_ground_transport_hours,
+          paidToDriver: true,
+        }
       }
 
       // Builds the charges for "drive one-way and fly back" — ground transport
@@ -333,7 +357,7 @@ export default function PostJobPage() {
 
       if (forcedRoundTrip) {
         effectiveFlyingBack = false
-        const fc = ferryCharge(2)
+        const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
         if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote('2nd driver + chase vehicle means a round trip — flying back was turned off.')
@@ -344,7 +368,7 @@ export default function PostJobPage() {
         const options: { label: string; flying: boolean; secondDrv: boolean; chase: boolean; charges: AdditionalCharge[]; cost: number }[] = []
 
         if (flyCharges) {
-          const fc = ferryCharge(1)
+          const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
             { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
@@ -354,7 +378,7 @@ export default function PostJobPage() {
         }
 
         {
-          const fc = ferryCharge(1)
+          const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
             { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
@@ -364,7 +388,7 @@ export default function PostJobPage() {
         }
 
         {
-          const fc = ferryCharge(2)
+          const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
             { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: false },
@@ -390,16 +414,19 @@ export default function PostJobPage() {
         if (flyingBack) {
           const flyCharges = await buildFlyCharges()
           if (flyCharges) {
-            const fc = ferryCharge(1)
+            const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           } else {
             setCalcError('Could not find a flight price — add one manually below if needed.')
-            const fc = ferryCharge(1)
+            const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, fc] : manualCharges
           }
         } else {
-          const fc = ferryCharge(2)
-          finalCharges = fc ? [...manualCharges, fc] : manualCharges
+          // No trade-in, no chase+2nd driver, not flying — the vehicle only goes one way.
+          // If a ferry's involved, the driver returns as a walk-on passenger (much cheaper
+          // than a second vehicle fare) plus a ride from the terminal back home.
+          const fc = ferryCharge('oneway-walkon-return')
+          finalCharges = fc ? [...manualCharges, fc, ferryReturnGroundTransport()] : manualCharges
         }
       }
 
