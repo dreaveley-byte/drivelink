@@ -7,6 +7,7 @@ import { calculatePricing, formatCents, type PricingSettings, type AdditionalCha
 import Logo from '@/components/Logo'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
+import DeliveryDeadlineCalculator from '@/components/DeliveryDeadlineCalculator'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -39,6 +40,7 @@ export default function PostJobPage() {
   const [recipientName, setRecipientName] = useState('')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [scheduledFor, setScheduledFor] = useState('')
+  const [deliveryDeadline, setDeliveryDeadline] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
@@ -330,6 +332,7 @@ export default function PostJobPage() {
       customer_phone: customerPhone || null,
       customer_address: customerAddress || null,
       scheduled_for: scheduledFor || null,
+      delivery_deadline: deliveryDeadline || null,
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
@@ -539,10 +542,19 @@ export default function PostJobPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-700 mb-1">Scheduled for</label>
+            <label className="block text-sm text-gray-700 mb-1">Scheduled for (pickup time)</label>
             <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
+
+          <DeliveryDeadlineCalculator
+            deliveryDeadline={deliveryDeadline}
+            onDeliveryDeadlineChange={setDeliveryDeadline}
+            originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+            destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+            pricingSettings={pricingSettings}
+            onPickupTimeCalculated={setScheduledFor}
+          />
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Is the vehicle driven or towed?</label>

@@ -13,6 +13,7 @@ type Job = {
   id: string
   status: string
   scheduled_for: string | null
+  delivery_deadline?: string | null
   estimated_duration_minutes: number | null
   pickup_address: string
   dropoff_address: string
@@ -500,6 +501,9 @@ export default function DriverJobActions({
     const end = new Date(start.getTime() + (job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120) * 60000)
     const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     const title = `${joinName(job.job_types) ?? 'Drivflo job'} — ${[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}`
+    const deadlineText = job.delivery_deadline
+      ? `\\nCustomer needs vehicle by: ${new Date(job.delivery_deadline).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+      : ''
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -509,9 +513,14 @@ export default function DriverJobActions({
       `DTSTAMP:${fmt(new Date())}`,
       `DTSTART:${fmt(start)}`,
       `DTEND:${fmt(end)}`,
-      `SUMMARY:${title}`,
+      `SUMMARY:Pick up vehicle — ${title}`,
       `LOCATION:${job.pickup_address}`,
-      `DESCRIPTION:Pickup: ${job.pickup_address}\\nDropoff: ${job.dropoff_address}`,
+      `DESCRIPTION:Pickup: ${job.pickup_address}\\nDropoff: ${job.dropoff_address}${deadlineText}`,
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Reminder — pick up the vehicle',
+      'TRIGGER:-PT30M',
+      'END:VALARM',
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n')
