@@ -445,10 +445,11 @@ export default function PostJobPage() {
           // If a ferry's involved, the driver returns as a walk-on passenger (much cheaper
           // than a second vehicle fare) plus a ride from the terminal back home.
           const fc = ferryCharge('oneway-walkon-return')
-          finalCharges = fc ? [...manualCharges, fc, ferryReturnGroundTransport()] : manualCharges
+          const groundHomeCharge = ferryReturnGroundTransport()
+          finalCharges = fc ? [...manualCharges, fc, groundHomeCharge] : manualCharges
           setDecisionNote(
             fc
-              ? 'Short trip, one-way delivery — ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare).'
+              ? `Short trip, one-way delivery — ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare). Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (${ferryInfo?.groundHome ? `calculated, ${ferryInfo.groundHome.distanceKm}km` : 'flat estimate'}).`
               : 'Short trip, one-way delivery — no ferry detected on this route.'
           )
         }
