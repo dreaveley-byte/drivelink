@@ -587,7 +587,7 @@ export default function EditJobPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-700 mb-1">Customer needs vehicle by (optional)</label>
+            <label className="block text-sm text-gray-700 mb-1">Delivery Date & Time</label>
             <input
               type="datetime-local"
               value={deliveryDeadline}
