@@ -43,6 +43,7 @@ export default function EditJobPage() {
   const [computingPickupTime, setComputingPickupTime] = useState(false)
   const [pickupTimeError, setPickupTimeError] = useState('')
   const [ferryLiveDataUsed, setFerryLiveDataUsed] = useState(false)
+  const [decisionNote, setDecisionNote] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
@@ -216,6 +217,7 @@ export default function EditJobPage() {
 
   const runCalculation = useCallback(async () => {
     setCalcError('')
+    setDecisionNote('')
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -243,38 +245,61 @@ export default function EditJobPage() {
       setDistanceKm(data.distanceKm)
       setDurationMinutes(data.durationMinutes)
 
-      let charges = additionalCharges.filter(
-        (c) =>
-          !c.description.startsWith('Flight back:') &&
-          c.description !== 'Return ground transport' &&
-          c.description !== 'Ground transport to airport'
-      )
+      const oneWayHours = data.durationMinutes / 60
+      const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
+      const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
 
-      if (flyingBack) {
-        charges = [
-          ...charges,
-          {
-            description: 'Return ground transport',
-            dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
-            hoursAdded: pricingSettings.return_ground_transport_hours,
+      // --- Ferry: look this up once regardless of round-trip/one-way, since the
+      // terminal match itself doesn't depend on that — only the crossing count does.
+      let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number } | null = null
+      try {
+        const ferryRes = await fetch('/api/ferry/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+        })
+        const ferryBody = await ferryRes.json().catch(() => ({}))
+        if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
+          ferryInfo = ferryBody
+        } else if (ferryRequired) {
+          setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+        }
+      } catch {
+        if (ferryRequired) setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
+      }
+      setFerryLiveDataUsed(!!ferryInfo)
+
+      function ferryCharge(crossings: 1 | 2): AdditionalCharge | null {
+        if (ferryInfo) {
+          const totalMinutes = (ferryInfo.sailingDurationMinutes + pricingSettings!.ferry_wait_hours * 60) * crossings
+          return {
+            description: `Ferry: ${ferryInfo.fromTerminal.name} → ${ferryInfo.toTerminal.name}${crossings === 2 ? ' (round trip)' : ''} (~${ferryInfo.sailingsPerDay} sailings/day, every ~${ferryInfo.avgGapMinutes}min)`,
+            dealerAmountCents: pricingSettings!.ferry_fare_cents * crossings,
+            hoursAdded: Math.round((totalMinutes / 60) * 100) / 100,
             paidToDriver: true,
-          },
-        ]
+          }
+        }
+        if (ferryRequired) {
+          return {
+            description: `Ferry crossing${crossings === 2 ? ' (round trip)' : ''}`,
+            dealerAmountCents: pricingSettings!.ferry_fare_cents * crossings,
+            hoursAdded: pricingSettings!.ferry_wait_hours * crossings,
+            paidToDriver: true,
+          }
+        }
+        return null
+      }
 
-        // If the total time on the ground (driving + inspection + registry) exceeds
-        // the overnight threshold, the driver can't complete it same-day — they're
-        // free to fly the day after they set out, not the scheduled start date itself.
-        const oneWayHours = data.durationMinutes / 60
-        const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
-        const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
-        const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings.max_driving_hours_before_overnight
+      // Builds the charges for "drive one-way and fly back" — ground transport
+      // both ends plus a real flight search. Returns null if no flight could be found.
+      async function buildFlyCharges(): Promise<AdditionalCharge[] | null> {
+        const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings!.max_driving_hours_before_overnight
         let flightDepartureDate: string | undefined
         if (scheduledFor) {
           const d = new Date(scheduledFor)
           if (overnightNeeded) d.setDate(d.getDate() + 1)
           flightDepartureDate = toLocalDateString(d)
         }
-
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -285,85 +310,140 @@ export default function EditJobPage() {
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
+        if (!flightRes.ok || !flightBody.flight) return null
 
-        // The drop-off location usually isn't the airport itself — the driver still
-        // needs to get themselves there. This is a real driven distance, not a guess.
+        const result: AdditionalCharge[] = [
+          {
+            description: 'Return ground transport',
+            dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
+            hoursAdded: pricingSettings!.return_ground_transport_hours,
+            paidToDriver: true,
+          },
+        ]
         if (flightBody.groundToAirport) {
           const km = flightBody.groundToAirport.distanceKm
-          charges = [
-            ...charges,
-            {
-              description: 'Ground transport to airport',
-              dealerAmountCents: Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents),
-              hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
-              paidToDriver: true,
-            },
-          ]
-        }
-
-        if (flightRes.ok && flightBody.flight) {
-          charges = [
-            ...charges,
-            {
-              description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
-              dealerAmountCents: flightBody.flight.priceCents,
-              hoursAdded: flightBody.flight.hoursToAdd,
-              paidToDriver: false,
-            },
-          ]
-        } else {
-          setCalcError(flightBody.error ? `Flight search: ${flightBody.error}` : 'Could not find a flight price — add one manually below if needed.')
-        }
-      }
-
-      charges = charges.filter((c) => !c.description.startsWith('Ferry:'))
-      let ferryHandledLive = false
-      {
-        // On a round trip (not flying back), the driver crosses the water twice.
-        const ferryCrossings = flyingBack ? 1 : 2
-        try {
-          const ferryRes = await fetch('/api/ferry/schedule', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+          result.push({
+            description: 'Ground transport to airport',
+            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
+            hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
+            paidToDriver: true,
           })
-          const ferryBody = await ferryRes.json().catch(() => ({}))
-          if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
-            // A real ferry route was found automatically between these two points —
-            // no need for the checkbox in this case.
-            const totalFerryMinutes = (ferryBody.sailingDurationMinutes + pricingSettings.ferry_wait_hours * 60) * ferryCrossings
-            charges = [
-              ...charges,
-              {
-                description: `Ferry: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name}${ferryCrossings === 2 ? ' (round trip)' : ''} (~${ferryBody.sailingsPerDay} sailings/day, every ~${ferryBody.avgGapMinutes}min)`,
-                dealerAmountCents: pricingSettings.ferry_fare_cents * ferryCrossings,
-                hoursAdded: Math.round((totalFerryMinutes / 60) * 100) / 100,
-                paidToDriver: true,
-              },
-            ]
-            ferryHandledLive = true
-          } else if (ferryRequired) {
-            // Auto-detection didn't find a matching route, but the dealer manually
-            // flagged this as needing a ferry — fall back to the flat admin settings.
-            setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+        }
+        result.push({
+          description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
+          dealerAmountCents: flightBody.flight.priceCents,
+          hoursAdded: flightBody.flight.hoursToAdd,
+          paidToDriver: false,
+        })
+        return result
+      }
+
+      function buildBusCharges(): AdditionalCharge[] {
+        const km = data.distanceKm
+        const AVG_BUS_SPEED_KMH = 65
+        return [
+          {
+            description: 'Bus back (estimate)',
+            dealerAmountCents: Math.round(pricingSettings!.bus_base_fare_cents + km * pricingSettings!.bus_per_km_cents),
+            hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH) * 100) / 100,
+            paidToDriver: false,
+          },
+        ]
+      }
+
+      const manualCharges = additionalCharges.filter(
+        (c) =>
+          !c.description.startsWith('Flight back:') &&
+          !c.description.startsWith('Ferry:') &&
+          !c.description.startsWith('Bus back') &&
+          !c.description.startsWith('Ferry crossing') &&
+          c.description !== 'Return ground transport' &&
+          c.description !== 'Ground transport to airport'
+      )
+
+      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver)
+      const longHaul = oneWayHours > 4
+
+      let finalCharges: AdditionalCharge[] = manualCharges
+
+      if (forcedRoundTrip) {
+        const fc = ferryCharge(2)
+        finalCharges = fc ? [...manualCharges, fc] : manualCharges
+        if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
+        else setDecisionNote('2nd driver + chase vehicle means a round trip — flying back was turned off.')
+      } else if (longHaul) {
+        // Compare all three ways to get the driver home, pick the cheapest.
+        const [flyCharges, busCharges] = await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
+
+        const options: { label: string; flying: boolean; secondDrv: boolean; chase: boolean; charges: AdditionalCharge[]; cost: number }[] = []
+
+        if (flyCharges) {
+          const fc = ferryCharge(1)
+          const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
+          const r = calculatePricing(
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
+            pricingSettings
+          )
+          options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
+        }
+
+        {
+          const fc = ferryCharge(1)
+          const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
+          const r = calculatePricing(
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
+            pricingSettings
+          )
+          options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
+        }
+
+        {
+          const fc = ferryCharge(2)
+          const charges = fc ? [...manualCharges, fc] : manualCharges
+          const r = calculatePricing(
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: false },
+            pricingSettings
+          )
+          options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
+        }
+
+        const winner = options.reduce((best, o) => (o.cost < best.cost ? o : best))
+        finalCharges = winner.charges
+        setFlyingBack(winner.flying)
+        setSecondDriver(winner.secondDrv)
+        setChaseVehicle(winner.chase)
+
+        setDecisionNote(
+          `Long haul (${Math.round(oneWayHours * 10) / 10}hrs one-way) — auto-selected ${winner.label} ($${(winner.cost / 100).toFixed(2)}), cheapest of: ` +
+          options.map((o) => `${o.label} $${(o.cost / 100).toFixed(2)}`).join(', ') +
+          '.'
+        )
+      } else {
+        // Short trip, nothing forcing a round trip — respect the manual checkboxes as-is.
+        if (flyingBack) {
+          const flyCharges = await buildFlyCharges()
+          if (flyCharges) {
+            const fc = ferryCharge(1)
+            finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
+          } else {
+            setCalcError('Could not find a flight price — add one manually below if needed.')
+            const fc = ferryCharge(1)
+            finalCharges = fc ? [...manualCharges, fc] : manualCharges
           }
-        } catch {
-          if (ferryRequired) {
-            setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
-          }
+        } else {
+          const fc = ferryCharge(2)
+          finalCharges = fc ? [...manualCharges, fc] : manualCharges
         }
       }
-      setFerryLiveDataUsed(ferryHandledLive)
 
-      // Always update the saved charges — this is what clears stale flight/ground
-      // transport entries if "flying back" gets unchecked, and what the sync
-      // effect below uses for every later recompute.
-      setAdditionalCharges(charges)
+      // Always update the saved charges — this is what clears stale flight/ferry/ground
+      // transport entries and what the sync effect below uses for every later recompute.
+      setAdditionalCharges(finalCharges)
     } catch {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -377,7 +457,7 @@ export default function EditJobPage() {
         numDrivers: secondDriver ? 2 : 1,
         outOfProvinceInspection,
         registryVisit,
-        ferryRequired: ferryRequired && !ferryLiveDataUsed,
+        ferryRequired: false,
         additionalCharges,
         oneWayFlightBack: flyingBack,
       },
@@ -736,7 +816,7 @@ export default function EditJobPage() {
             </p>
             {additionalCharges
               .map((charge, i) => ({ charge, i }))
-              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && charge.description !== 'Return ground transport' && charge.description !== 'Ground transport to airport')
+              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && !charge.description.startsWith('Ferry crossing') && !charge.description.startsWith('Bus back') && charge.description !== 'Return ground transport' && charge.description !== 'Ground transport to airport')
               .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
@@ -792,6 +872,7 @@ export default function EditJobPage() {
           >
             {calculating ? 'Calculating...' : 'Recalculate distance & cost'}
           </button>
+          {decisionNote && <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">{decisionNote}</p>}
           {calcError && <p className="text-sm text-red-600">{calcError}</p>}
 
           {pricing && (
@@ -817,7 +898,8 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                    <BreakdownRow label="Ferry" cents={pricing.ferryFeeCents || additionalCharges.find((c) => c.description.startsWith('Ferry:'))?.dealerAmountCents || 0} />
+                    <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.description.startsWith('Ferry:') || c.description.startsWith('Ferry crossing'))?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0} />
@@ -826,7 +908,8 @@ export default function EditJobPage() {
                       cents={
                         pricing.extrasDealerCents -
                         (additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => c.description.startsWith('Ferry:'))?.dealerAmountCents ?? 0) -
+                        (additionalCharges.find((c) => c.description.startsWith('Ferry:') || c.description.startsWith('Ferry crossing'))?.dealerAmountCents ?? 0) -
+                        (additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0)
                       }
