@@ -298,6 +298,7 @@ export default function EditJobPage() {
           const totalMinutes = (ferryInfo.sailingDurationMinutes + pricingSettings!.ferry_wait_hours * 60) * crossings
           return {
             description: `Ferry: ${ferryInfo.fromTerminal.name} → ${ferryInfo.toTerminal.name}${label} (~${ferryInfo.sailingsPerDay} sailings/day, every ~${ferryInfo.avgGapMinutes}min)`,
+            kind: 'ferry' as const,
             dealerAmountCents: feeCents,
             hoursAdded: Math.round((totalMinutes / 60) * 100) / 100,
             paidToDriver: true,
@@ -306,6 +307,7 @@ export default function EditJobPage() {
         if (ferryRequired) {
           return {
             description: `Ferry crossing${label}`,
+            kind: 'ferry' as const,
             dealerAmountCents: feeCents,
             hoursAdded: pricingSettings!.ferry_wait_hours * crossings,
             paidToDriver: true,
@@ -323,6 +325,7 @@ export default function EditJobPage() {
           const km = ferryInfo.groundHome.distanceKm
           return {
             description: `Return ground transport (${km}km from terminal)`,
+            kind: 'ground-home' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
             hoursAdded: Math.round((ferryInfo.groundHome.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
@@ -330,6 +333,7 @@ export default function EditJobPage() {
         }
         return {
           description: 'Return ground transport',
+          kind: 'ground-home' as const,
           dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
           hoursAdded: pricingSettings!.return_ground_transport_hours,
           paidToDriver: true,
@@ -361,6 +365,7 @@ export default function EditJobPage() {
         const result: AdditionalCharge[] = [
           {
             description: 'Return ground transport',
+            kind: 'ground-home' as const,
             dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
             hoursAdded: pricingSettings!.return_ground_transport_hours,
             paidToDriver: true,
@@ -370,6 +375,7 @@ export default function EditJobPage() {
           const km = flightBody.groundToAirport.distanceKm
           result.push({
             description: 'Ground transport to airport',
+            kind: 'ground-to-airport' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
             hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
@@ -377,6 +383,7 @@ export default function EditJobPage() {
         }
         result.push({
           description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
+          kind: 'flight' as const,
           dealerAmountCents: flightBody.flight.priceCents,
           hoursAdded: flightBody.flight.hoursToAdd,
           paidToDriver: false,
@@ -390,6 +397,7 @@ export default function EditJobPage() {
         return [
           {
             description: 'Bus back (estimate)',
+            kind: 'bus' as const,
             dealerAmountCents: Math.round(pricingSettings!.bus_base_fare_cents + km * pricingSettings!.bus_per_km_cents),
             hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH) * 100) / 100,
             paidToDriver: false,
@@ -397,15 +405,9 @@ export default function EditJobPage() {
         ]
       }
 
-      const manualCharges = additionalCharges.filter(
-        (c) =>
-          !c.description.startsWith('Flight back:') &&
-          !c.description.startsWith('Ferry:') &&
-          !c.description.startsWith('Bus back') &&
-          !c.description.startsWith('Ferry crossing') &&
-          !(c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')) &&
-          c.description !== 'Ground transport to airport'
-      )
+      // Only keep charges the user actually typed in themselves — anything
+      // auto-generated (tagged with a `kind`) gets rebuilt fresh every time.
+      const manualCharges = additionalCharges.filter((c) => !c.kind)
 
       const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver)
       const longHaul = oneWayHours > 4
@@ -871,7 +873,7 @@ export default function EditJobPage() {
             </p>
             {additionalCharges
               .map((charge, i) => ({ charge, i }))
-              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && !charge.description.startsWith('Ferry crossing') && !charge.description.startsWith('Bus back') && !charge.description.startsWith('Return ground transport') && !charge.description.startsWith('Ground transport home') && charge.description !== 'Ground transport to airport')
+              .filter(({ charge }) => !charge.kind)
               .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
@@ -954,21 +956,14 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                    <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.description.startsWith('Ferry:') || c.description.startsWith('Ferry crossing'))?.dealerAmountCents ?? 0} />
-                    <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0} />
-                    <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
-                    <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
-                    <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => (c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')))?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.kind === 'flight')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.kind === 'ground-to-airport')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.kind === 'ground-home')?.dealerAmountCents ?? 0} />
                     <BreakdownRow
                       label="Other additional charges"
-                      cents={
-                        pricing.extrasDealerCents -
-                        (additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => c.description.startsWith('Ferry:') || c.description.startsWith('Ferry crossing'))?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => (c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')))?.dealerAmountCents ?? 0)
-                      }
+                      cents={additionalCharges.filter((c) => !c.kind).reduce((sum, c) => sum + c.dealerAmountCents, 0)}
                     />
                   </div>
 
@@ -1036,9 +1031,7 @@ export default function EditJobPage() {
                   outOfProvinceInspection={outOfProvinceInspection}
                   registryVisit={registryVisit}
                   ferryRequired={ferryRequired}
-                  manualCharges={additionalCharges.filter(
-                    (c) => !c.description.startsWith('Flight back:') && !(c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')) && c.description !== 'Ground transport to airport'
-                  )}
+                  manualCharges={additionalCharges.filter((c) => !c.kind)}
                   onSelectDate={(d) => {
                     setScheduledFor(d)
                     setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')

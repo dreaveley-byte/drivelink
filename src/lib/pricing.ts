@@ -36,6 +36,10 @@ export type AdditionalCharge = {
   dealerAmountCents: number
   hoursAdded: number
   paidToDriver: boolean
+  // Stable tag for auto-generated charges, so cleanup/lookup code can identify
+  // them reliably instead of matching on description text (which changes over
+  // time and silently breaks that matching). Manual/user-added charges omit this.
+  kind?: 'flight' | 'ferry' | 'bus' | 'ground-to-airport' | 'ground-home'
 }
 
 export type PricingInput = {
