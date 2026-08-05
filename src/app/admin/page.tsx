@@ -230,6 +230,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     {job.estimated_driver_pay_cents != null && `Pay: ${formatCents(job.estimated_driver_pay_cents)}`}
                   </p>
                 )}
+                {['picked_up', 'in_progress'].includes(job.status) && (() => {
+                  const updatedAt = job.driver_location_updated_at ? new Date(job.driver_location_updated_at) : null
+                  const minutesAgo = updatedAt ? (Date.now() - updatedAt.getTime()) / 60000 : null
+                  if (minutesAgo == null) {
+                    return <p className="text-xs text-red-600 mt-0.5">⚠️ Not sharing location</p>
+                  }
+                  if (minutesAgo > 2) {
+                    return <p className="text-xs text-amber-600 mt-0.5">⚠️ Location stale ({Math.round(minutesAgo)}m ago)</p>
+                  }
+                  return <p className="text-xs text-green-600 mt-0.5">● Live location</p>
+                })()}
                 {isFinished && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
                 {isTrackable && <p className="text-xs text-blue-600 mt-1">Track drive →</p>}
               </>

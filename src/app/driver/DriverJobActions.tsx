@@ -525,13 +525,13 @@ export default function DriverJobActions({
       'END:VCALENDAR',
     ].join('\r\n')
 
-    const blob = new Blob([ics], { type: 'text/calendar' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `drivflo-job-${job.id.slice(0, 8)}.ics`
-    a.click()
-    URL.revokeObjectURL(url)
+    // iOS Safari (which most drivers are likely on) doesn't reliably handle
+    // blob URLs with a forced download attribute for .ics files — it often just
+    // ignores it or saves to Files instead of prompting to add to Calendar.
+    // Navigating directly to a data: URI is the reliable cross-platform way to
+    // get the "Add to Calendar" handoff to actually trigger.
+    const dataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
+    window.open(dataUrl, '_blank')
   }
 
   return (
