@@ -37,8 +37,6 @@ export default function PostJobPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
 
-  const [recipientName, setRecipientName] = useState('')
-  const [recipientPhone, setRecipientPhone] = useState('')
   const [scheduledFor, setScheduledFor] = useState('')
   const [deliveryDeadline, setDeliveryDeadline] = useState('')
   const [computingPickupTime, setComputingPickupTime] = useState(false)
@@ -369,8 +367,8 @@ export default function PostJobPage() {
       created_by: user.id,
       pickup_address: filledStops[0],
       dropoff_address: filledStops[filledStops.length - 1],
-      recipient_name: recipientName || null,
-      recipient_phone: recipientPhone || null,
+      recipient_name: customerFullName || null,
+      recipient_phone: customerPhone || null,
       vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
       vehicle_make: vehicleMake || null,
       vehicle_model: vehicleModel || null,
@@ -561,7 +559,7 @@ export default function PostJobPage() {
           </div>
 
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-gray-900">Customer</p>
+            <p className="text-sm font-medium text-gray-900">Customer / Recipient</p>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Full name</label>
               <input value={customerFullName} onChange={(e) => setCustomerFullName(e.target.value)}
@@ -578,19 +576,6 @@ export default function PostJobPage() {
                 <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Recipient name</label>
-              <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Recipient phone</label>
-              <input value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
 
