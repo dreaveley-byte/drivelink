@@ -35,6 +35,8 @@ type Settings = {
   break_duration_minutes: number
   ferry_fare_cents: number
   ferry_wait_hours: number
+  bus_base_fare_cents: number
+  bus_per_km_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -302,6 +304,19 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Time to arrive before sailing + crossing time not already reflected in drive time</p>
               <input type="number" step="0.5" value={settings.ferry_wait_hours}
                 onChange={(e) => updateNumberField('ferry_wait_hours', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Bus base fare ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Estimate only — no live bus pricing source exists. Used to compare against flying/driving back on long hauls.</p>
+              <input type="number" step="0.01" value={dollars(settings.bus_base_fare_cents)}
+                onChange={(e) => updateDollarField('bus_base_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Bus rate per km ($)</label>
+              <input type="number" step="0.01" value={dollars(settings.bus_per_km_cents)}
+                onChange={(e) => updateDollarField('bus_per_km_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
