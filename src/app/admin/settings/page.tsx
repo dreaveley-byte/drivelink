@@ -30,6 +30,7 @@ type Settings = {
   return_ground_transport_fee_cents: number
   uber_base_fare_cents: number
   uber_per_km_cents: number
+  uber_minimum_fare_cents: number
   max_driving_hours_before_overnight: number
 }
 
@@ -289,6 +290,13 @@ export default function PricingSettingsPage() {
               <label className="block text-sm text-gray-700 mb-1">Uber/taxi rate per km ($)</label>
               <input type="number" step="0.01" value={dollars(settings.uber_per_km_cents)}
                 onChange={(e) => updateDollarField('uber_per_km_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Uber/taxi minimum fare ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Floor for short trips — real rides never cost less than this, regardless of distance</p>
+              <input type="number" step="0.01" value={dollars(settings.uber_minimum_fare_cents)}
+                onChange={(e) => updateDollarField('uber_minimum_fare_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>

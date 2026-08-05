@@ -197,7 +197,7 @@ export default function PostJobPage() {
             ...charges,
             {
               description: 'Ground transport to airport',
-              dealerAmountCents: Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents),
+              dealerAmountCents: Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents),
               hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
               paidToDriver: true,
             },

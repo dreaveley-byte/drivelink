@@ -28,6 +28,8 @@ export default function ReturnOptionsComparison({
   const [flightPriceCents, setFlightPriceCents] = useState<number | null>(null)
   const [flightHours, setFlightHours] = useState(0)
   const [flightSummary, setFlightSummary] = useState('')
+  const [groundToAirportCents, setGroundToAirportCents] = useState(0)
+  const [groundToAirportHours, setGroundToAirportHours] = useState(0)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
 
@@ -73,6 +75,16 @@ export default function ReturnOptionsComparison({
     setFlightSummary(
       `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`} · ${body.flight.currency}`
     )
+    if (body.groundToAirport) {
+      const km = body.groundToAirport.distanceKm
+      setGroundToAirportCents(
+        Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents)
+      )
+      setGroundToAirportHours(Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100)
+    } else {
+      setGroundToAirportCents(0)
+      setGroundToAirportHours(0)
+    }
   }
 
   const baseInput = { distanceKm, durationMinutes, vehicleMode, outOfProvinceInspection, registryVisit }
@@ -91,6 +103,12 @@ export default function ReturnOptionsComparison({
             oneWayFlightBack: true,
             additionalCharges: [
               { description: 'Flight back', dealerAmountCents: flightPriceCents, hoursAdded: flightHours, paidToDriver: false },
+              {
+                description: 'Ground transport to airport',
+                dealerAmountCents: groundToAirportCents,
+                hoursAdded: groundToAirportHours,
+                paidToDriver: true,
+              },
               {
                 description: 'Return ground transport',
                 dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,

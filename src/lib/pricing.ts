@@ -21,6 +21,7 @@ export type PricingSettings = {
   return_ground_transport_fee_cents: number
   uber_base_fare_cents: number
   uber_per_km_cents: number
+  uber_minimum_fare_cents: number
 }
 
 export type AdditionalCharge = {
