@@ -24,6 +24,8 @@ export type PricingSettings = {
   uber_minimum_fare_cents: number
   flight_airport_buffer_hours: number
   break_duration_minutes: number
+  ferry_fare_cents: number
+  ferry_wait_hours: number
 }
 
 export type AdditionalCharge = {
@@ -40,6 +42,7 @@ export type PricingInput = {
   numDrivers: 1 | 2
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  ferryRequired: boolean
   additionalCharges: AdditionalCharge[]
   oneWayFlightBack: boolean // driver flies back instead of driving back — bill/pay one-way only
 }
@@ -60,6 +63,7 @@ export type PricingResult = {
   overnightFeeCents: number
   inspectionFeeCents: number
   registryFeeCents: number
+  ferryFeeCents: number
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
@@ -72,7 +76,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, additionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, oneWayFlightBack,
   } = input
 
   // Normally every delivery is a round trip — the driver (and trailer, if towing)
@@ -84,6 +88,10 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Extra fixed-minimum hours (billed to dealer, not paid to driver — not "real hours worked")
   const inspectionHours = outOfProvinceInspection ? settings.out_of_province_inspection_min_hours : 0
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
+  // Ferry wait buffer — BC Ferries recommends arriving well before sailing time,
+  // and Google's drive time doesn't reliably account for that wait or the fare.
+  const ferryHours = ferryRequired ? settings.ferry_wait_hours : 0
+  const ferryFeeCents = ferryRequired ? settings.ferry_fare_cents : 0
 
   // Every meal break also costs real time on the road (bathroom, gas, food) —
   // not just the meal allowance dollars. Same cadence, two effects.
@@ -94,11 +102,11 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
   const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
 
-  // Overnight isn't just about drive time — the inspection/registry stops and
-  // break time add real hours on the ground too, and together they can push
-  // the driver past the point where they can safely finish same-day.
+  // Overnight isn't just about drive time — the inspection/registry stops, ferry
+  // wait, and break time add real hours on the ground too, and together they can
+  // push the driver past the point where they can safely finish same-day.
   const overnightRequired =
-    baseDrivingHours + breakHours + inspectionHours + registryHours > settings.max_driving_hours_before_overnight
+    baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours > settings.max_driving_hours_before_overnight
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether
@@ -109,7 +117,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const extraDealerOnlyHours = additionalCharges
     .reduce((sum, c) => sum + c.hoursAdded, 0)
 
-  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + extraDealerOnlyHours
+  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours + extraDealerOnlyHours
   const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours
 
   const hourlyDealerCents = Math.round(dealerBilledHours * settings.hourly_rate_cents * numDrivers)
@@ -159,7 +167,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
-    registryFeeCents + extrasDealerCents + driverPayFloorBumpCents
+    registryFeeCents + ferryFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
 
@@ -179,6 +187,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     overnightFeeCents,
     inspectionFeeCents,
     registryFeeCents,
+    ferryFeeCents,
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,

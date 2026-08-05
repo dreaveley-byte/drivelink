@@ -50,6 +50,7 @@ export default function EditJobPage() {
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
+  const [ferryRequired, setFerryRequired] = useState(false)
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
   const [notes, setNotes] = useState('')
 
@@ -131,6 +132,7 @@ export default function EditJobPage() {
       setVehicleMode(job.vehicle_mode ?? 'driven')
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
+      setFerryRequired(job.ferry_required ?? false)
       setAdditionalCharges(job.additional_charges ?? [])
       setNotes(job.notes ?? '')
 
@@ -335,6 +337,7 @@ export default function EditJobPage() {
         numDrivers: secondDriver ? 2 : 1,
         outOfProvinceInspection,
         registryVisit,
+        ferryRequired,
         additionalCharges,
         oneWayFlightBack: flyingBack,
       },
@@ -342,7 +345,7 @@ export default function EditJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -386,6 +389,7 @@ export default function EditJobPage() {
       vehicle_mode: vehicleMode,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
+      ferry_required: ferryRequired,
       additional_charges: additionalCharges,
       overnight_required: pricing?.overnightRequired ?? false,
       estimated_distance_km: pricing?.tripDistanceKm ?? null,
@@ -652,6 +656,10 @@ export default function EditJobPage() {
               Registry visit required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
+              Ferry crossing required
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
             </label>
@@ -766,6 +774,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                    <BreakdownRow label="Ferry" cents={pricing.ferryFeeCents} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.description === 'Return ground transport')?.dealerAmountCents ?? 0} />
@@ -843,6 +852,7 @@ export default function EditJobPage() {
                   destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
                   outOfProvinceInspection={outOfProvinceInspection}
                   registryVisit={registryVisit}
+                  ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter(
                     (c) => !c.description.startsWith('Flight back:') && c.description !== 'Return ground transport' && c.description !== 'Ground transport to airport'
                   )}
@@ -862,6 +872,7 @@ export default function EditJobPage() {
               vehicleMode={vehicleMode}
               outOfProvinceInspection={outOfProvinceInspection}
               registryVisit={registryVisit}
+                  ferryRequired={ferryRequired}
               pricingSettings={pricingSettings}
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
               destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}

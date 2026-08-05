@@ -24,6 +24,7 @@ export default function NearbyDatesFlightCheck({
   destinationAddress,
   outOfProvinceInspection,
   registryVisit,
+  ferryRequired,
   manualCharges,
   onSelectDate,
 }: {
@@ -37,6 +38,7 @@ export default function NearbyDatesFlightCheck({
   destinationAddress: string
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  ferryRequired: boolean
   manualCharges: AdditionalCharge[]
   onSelectDate: (newScheduledFor: string) => void
 }) {
@@ -112,6 +114,7 @@ export default function NearbyDatesFlightCheck({
             numDrivers,
             outOfProvinceInspection,
             registryVisit,
+            ferryRequired,
             additionalCharges: charges,
             oneWayFlightBack: true,
           },
