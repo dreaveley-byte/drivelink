@@ -46,19 +46,17 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
-async function nearestTerminal(address: string): Promise<{ code: string; name: string; distanceKm: number } | null> {
-  const coords = await geocodeAddress(address)
-  if (!coords) return null
-  let closest = TERMINALS[0]
-  let closestDist = Infinity
-  for (const terminal of TERMINALS) {
-    const dist = haversineKm(coords.lat, coords.lng, terminal.lat, terminal.lng)
-    if (dist < closestDist) {
-      closestDist = dist
-      closest = terminal
-    }
-  }
-  return { code: closest.code, name: closest.name, distanceKm: Math.round(closestDist) }
+// Ranks every terminal by distance from a point, closest first — rather than
+// just picking the single nearest one. The nearest terminal to an address
+// isn't always the one that actually has a route to the other side (e.g.
+// Horseshoe Bay is closer to some mainland points than Tsawwassen, but only
+// Tsawwassen actually connects to Swartz Bay).
+function rankedTerminals(coords: { lat: number; lng: number }): { code: string; name: string; distanceKm: number }[] {
+  return TERMINALS.map((t) => ({
+    code: t.code,
+    name: t.name,
+    distanceKm: Math.round(haversineKm(coords.lat, coords.lng, t.lat, t.lng)),
+  })).sort((a, b) => a.distanceKm - b.distanceKm)
 }
 
 // bcferriesapi.ca durations come in mixed formats: "01:35", "1h 35m", "55m", "40m", "10m"
@@ -84,38 +82,34 @@ function parseTimeToMinutesSinceMidnight(time: string): number | null {
   return hours * 60 + minutes
 }
 
+type Route = {
+  fromTerminalCode: string
+  toTerminalCode: string
+  sailingDuration: string
+  sailings: { time: string; arrivalTime: string; vesselStatus: string }[]
+}
+
 export async function POST(req: NextRequest) {
   const { originAddress, destinationAddress } = await req.json()
   if (!originAddress || !destinationAddress) {
     return NextResponse.json({ error: 'Missing origin or destination address.' }, { status: 400 })
   }
 
-  const [fromTerminal, toTerminal] = await Promise.all([
-    nearestTerminal(originAddress),
-    nearestTerminal(destinationAddress),
-  ])
+  const [originCoords, destCoords] = await Promise.all([geocodeAddress(originAddress), geocodeAddress(destinationAddress)])
 
-  if (!fromTerminal || !toTerminal) {
-    const failed = !fromTerminal && !toTerminal ? 'both addresses' : !fromTerminal ? `origin ("${originAddress}")` : `destination ("${destinationAddress}")`
+  if (!originCoords || !destCoords) {
+    const failed = !originCoords && !destCoords ? 'both addresses' : !originCoords ? `origin ("${originAddress}")` : `destination ("${destinationAddress}")`
     return NextResponse.json({ error: `Could not geocode ${failed}.` }, { status: 404 })
   }
 
-  // If the nearest terminal is genuinely far from either address, this route
-  // likely doesn't actually cross by ferry near these points — bail out rather
-  // than return a misleading "route."
-  if (fromTerminal.distanceKm > 60 || toTerminal.distanceKm > 60) {
-    return NextResponse.json({
-      error: `Nearest terminals too far away (${fromTerminal.name} ${fromTerminal.distanceKm}km, ${toTerminal.name} ${toTerminal.distanceKm}km) — likely not a ferry route.`,
-      fromTerminal,
-      toTerminal,
-    }, { status: 404 })
-  }
+  const originCandidates = rankedTerminals(originCoords).filter((t) => t.distanceKm <= 60).slice(0, 4)
+  const destCandidates = rankedTerminals(destCoords).filter((t) => t.distanceKm <= 60).slice(0, 4)
 
-  if (fromTerminal.code === toTerminal.code) {
+  if (originCandidates.length === 0 || destCandidates.length === 0) {
+    const nearestOrigin = rankedTerminals(originCoords)[0]
+    const nearestDest = rankedTerminals(destCoords)[0]
     return NextResponse.json({
-      error: `Both addresses matched the same nearest terminal (${fromTerminal.name}) — not a ferry route.`,
-      fromTerminal,
-      toTerminal,
+      error: `No ferry terminal within 60km of ${originCandidates.length === 0 ? `origin (nearest is ${nearestOrigin.name}, ${nearestOrigin.distanceKm}km)` : `destination (nearest is ${nearestDest.name}, ${nearestDest.distanceKm}km)`}.`,
     }, { status: 404 })
   }
 
@@ -123,35 +117,46 @@ export async function POST(req: NextRequest) {
   try {
     scheduleRes = await fetch('https://www.bcferriesapi.ca/v2/noncapacity/')
   } catch (e) {
-    return NextResponse.json({ error: `Ferry schedule service unreachable: ${e instanceof Error ? e.message : 'unknown error'}`, fromTerminal, toTerminal }, { status: 502 })
+    return NextResponse.json({ error: `Ferry schedule service unreachable: ${e instanceof Error ? e.message : 'unknown error'}` }, { status: 502 })
   }
   if (!scheduleRes.ok) {
-    return NextResponse.json({ error: `Ferry schedule service returned HTTP ${scheduleRes.status}.`, fromTerminal, toTerminal }, { status: 502 })
+    return NextResponse.json({ error: `Ferry schedule service returned HTTP ${scheduleRes.status}.` }, { status: 502 })
   }
 
   const scheduleData = await scheduleRes.json()
-  type Route = {
-    fromTerminalCode: string
-    toTerminalCode: string
-    sailingDuration: string
-    sailings: { time: string; arrivalTime: string; vesselStatus: string }[]
-  }
   const routes: Route[] = scheduleData.routes ?? []
 
-  // Try the direct match first; if that specific direction isn't listed, the
-  // reverse direction's duration/frequency is a reasonable stand-in (crossings
-  // are symmetric in practice) rather than giving up entirely.
-  const route =
-    routes.find((r) => r.fromTerminalCode === fromTerminal.code && r.toTerminalCode === toTerminal.code) ??
-    routes.find((r) => r.fromTerminalCode === toTerminal.code && r.toTerminalCode === fromTerminal.code)
+  // Check every combination of candidate terminals (closest pairs first) and use
+  // the first one that's an actual connected route in the schedule.
+  let bestMatch: { origin: (typeof originCandidates)[number]; dest: (typeof destCandidates)[number]; route: Route } | null = null
+  let bestTotalDistance = Infinity
 
-  if (!route || route.sailings.some((s) => s.vesselStatus?.includes('No sailings'))) {
+  for (const o of originCandidates) {
+    for (const d of destCandidates) {
+      if (o.code === d.code) continue
+      const route =
+        routes.find((r) => r.fromTerminalCode === o.code && r.toTerminalCode === d.code) ??
+        routes.find((r) => r.fromTerminalCode === d.code && r.toTerminalCode === o.code)
+      if (!route || route.sailings.some((s) => s.vesselStatus?.includes('No sailings'))) continue
+      const totalDistance = o.distanceKm + d.distanceKm
+      if (totalDistance < bestTotalDistance) {
+        bestTotalDistance = totalDistance
+        bestMatch = { origin: o, dest: d, route }
+      }
+    }
+  }
+
+  if (!bestMatch) {
     return NextResponse.json({
-      error: `Matched terminals ${fromTerminal.name} (${fromTerminal.code}) → ${toTerminal.name} (${toTerminal.code}), but no route code "${fromTerminal.code}${toTerminal.code}" or "${toTerminal.code}${fromTerminal.code}" found in the ${routes.length}-route schedule.`,
-      fromTerminal,
-      toTerminal,
+      error: `Checked ${originCandidates.map((t) => t.code).join('/')} → ${destCandidates.map((t) => t.code).join('/')} — no connected route found in the ${routes.length}-route schedule.`,
+      originCandidates,
+      destCandidates,
     }, { status: 404 })
   }
+
+  const fromTerminal = { code: bestMatch.origin.code, name: bestMatch.origin.name, distanceKm: bestMatch.origin.distanceKm }
+  const toTerminal = { code: bestMatch.dest.code, name: bestMatch.dest.name, distanceKm: bestMatch.dest.distanceKm }
+  const route = bestMatch.route
 
   const sailingDurationMinutes = parseDurationMinutes(route.sailingDuration)
   const sailingTimes = route.sailings
