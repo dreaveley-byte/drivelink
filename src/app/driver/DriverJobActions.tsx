@@ -525,13 +525,15 @@ export default function DriverJobActions({
       'END:VCALENDAR',
     ].join('\r\n')
 
-    // iOS Safari (which most drivers are likely on) doesn't reliably handle
-    // blob URLs with a forced download attribute for .ics files — it often just
-    // ignores it or saves to Files instead of prompting to add to Calendar.
-    // Navigating directly to a data: URI is the reliable cross-platform way to
-    // get the "Add to Calendar" handoff to actually trigger.
-    const dataUrl = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
-    window.open(dataUrl, '_blank')
+    // Safari blocks top-level navigation to data: URLs as an anti-phishing
+    // measure, and window.open() calls are prone to mobile popup blockers.
+    // A blob: URL with a direct same-tab navigation is the most reliable
+    // combination across iOS Safari and Android Chrome for handing an .ics
+    // file off to the device's calendar app.
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
   }
 
   return (
