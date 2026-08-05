@@ -90,8 +90,10 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
   // Ferry wait buffer — BC Ferries recommends arriving well before sailing time,
   // and Google's drive time doesn't reliably account for that wait or the fare.
-  const ferryHours = ferryRequired ? settings.ferry_wait_hours : 0
-  const ferryFeeCents = ferryRequired ? settings.ferry_fare_cents : 0
+  // On a round trip (not flying back), the driver crosses the water twice.
+  const ferryCrossings = oneWayFlightBack ? 1 : 2
+  const ferryHours = ferryRequired ? settings.ferry_wait_hours * ferryCrossings : 0
+  const ferryFeeCents = ferryRequired ? settings.ferry_fare_cents * ferryCrossings : 0
 
   // Every meal break also costs real time on the road (bathroom, gas, food) —
   // not just the meal allowance dollars. Same cadence, two effects.

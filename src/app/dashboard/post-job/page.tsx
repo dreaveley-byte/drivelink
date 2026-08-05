@@ -277,6 +277,8 @@ export default function PostJobPage() {
       charges = charges.filter((c) => !c.description.startsWith('Ferry:'))
       let ferryHandledLive = false
       if (ferryRequired) {
+        // On a round trip (not flying back), the driver crosses the water twice.
+        const ferryCrossings = flyingBack ? 1 : 2
         try {
           const ferryRes = await fetch('/api/ferry/schedule', {
             method: 'POST',
@@ -285,21 +287,22 @@ export default function PostJobPage() {
           })
           const ferryBody = await ferryRes.json().catch(() => ({}))
           if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
-            const totalFerryMinutes = ferryBody.sailingDurationMinutes + pricingSettings.ferry_wait_hours * 60
+            const totalFerryMinutes = (ferryBody.sailingDurationMinutes + pricingSettings.ferry_wait_hours * 60) * ferryCrossings
             charges = [
               ...charges,
               {
-                description: `Ferry: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name} (~${ferryBody.sailingsPerDay} sailings/day, every ~${ferryBody.avgGapMinutes}min)`,
-                dealerAmountCents: pricingSettings.ferry_fare_cents,
+                description: `Ferry: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name}${ferryCrossings === 2 ? ' (round trip)' : ''} (~${ferryBody.sailingsPerDay} sailings/day, every ~${ferryBody.avgGapMinutes}min)`,
+                dealerAmountCents: pricingSettings.ferry_fare_cents * ferryCrossings,
                 hoursAdded: Math.round((totalFerryMinutes / 60) * 100) / 100,
                 paidToDriver: true,
               },
             ]
             ferryHandledLive = true
+          } else {
+            setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
           }
         } catch {
-          // Live schedule lookup failed — fall through to the flat admin-configured
-          // ferry fee/buffer via the ferryRequired flag passed to calculatePricing below.
+          setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
         }
       }
       setFerryLiveDataUsed(ferryHandledLive)
