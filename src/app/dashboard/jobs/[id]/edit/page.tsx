@@ -498,10 +498,22 @@ export default function EditJobPage() {
         setSecondDriver(winner.secondDrv)
         setChaseVehicle(winner.chase)
 
+        // Duffel doesn't carry every airline's fares (notably ultra-low-cost
+        // carriers like Flair, which mostly sell direct-only) — flag it clearly
+        // when the flight option isn't direct, since that often means a cheaper
+        // real fare exists that this search just couldn't see.
+        const flightOption = options.find((o) => o.label === 'Flight')
+        const flightCharge = flightOption?.charges.find((c) => c.kind === 'flight')
+        const flightStopsNote = flightCharge?.description.includes('direct')
+          ? ''
+          : flightCharge
+            ? ` ⚠️ The flight found wasn't direct (${flightCharge.description.match(/\(([^)]+)\)/)?.[1] ?? 'connecting'}) — Duffel may be missing a cheaper direct fare from a carrier it doesn't have access to (e.g. Flair). Worth double-checking Google Flights before trusting this comparison.`
+            : ''
+
         setDecisionNote(
           `Long haul (${Math.round(oneWayHours * 10) / 10}hrs one-way) — auto-selected ${winner.label} ($${(winner.cost / 100).toFixed(2)}), cheapest of: ` +
           options.map((o) => `${o.label} $${(o.cost / 100).toFixed(2)}`).join(', ') +
-          '.'
+          '.' + flightStopsNote
         )
       } else {
         // Short trip, nothing forcing a round trip — respect the manual checkboxes as-is.
