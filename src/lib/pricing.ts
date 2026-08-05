@@ -79,8 +79,17 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
   } = input
+
+  // Safety net: a single corrupted charge (bad data, a stale entry, anything
+  // that ends up NaN/non-finite) should never be able to wipe out the entire
+  // quote by poisoning every sum downstream. Sanitize once, up front.
+  const additionalCharges = rawAdditionalCharges.map((c) => ({
+    ...c,
+    dealerAmountCents: Number.isFinite(c.dealerAmountCents) ? c.dealerAmountCents : 0,
+    hoursAdded: Number.isFinite(c.hoursAdded) ? c.hoursAdded : 0,
+  }))
 
   // Normally every delivery is a round trip — the driver (and trailer, if towing)
   // has to drive back. If the driver is flying back instead, only bill/pay for
