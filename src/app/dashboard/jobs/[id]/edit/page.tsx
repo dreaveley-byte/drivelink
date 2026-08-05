@@ -54,6 +54,7 @@ export default function EditJobPage() {
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
+  const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
   const [notes, setNotes] = useState('')
 
@@ -136,6 +137,7 @@ export default function EditJobPage() {
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
       setFerryRequired(job.ferry_required ?? false)
+      setUseGarageInsurance(job.use_garage_insurance ?? false)
       setAdditionalCharges(job.additional_charges ?? [])
       setNotes(job.notes ?? '')
 
@@ -209,6 +211,13 @@ export default function EditJobPage() {
 
       const pickupDate = new Date(value)
       pickupDate.setTime(pickupDate.getTime() - totalHoursNeeded * 60 * 60 * 1000)
+
+      if (pickupDate.getTime() < Date.now()) {
+        const shortfallHours = Math.round(((Date.now() - pickupDate.getTime()) / (60 * 60 * 1000)) * 10) / 10
+        setPickupTimeError(
+          `⚠️ This delivery time isn't achievable — the driver would have needed to leave ${shortfallHours} hrs ago (by ${pickupDate.toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}). Pick a later delivery time or an earlier pickup.`
+        )
+      }
       setScheduledFor(toLocalDatetimeInputValue(pickupDate))
     } catch {
       setPickupTimeError('Something went wrong calculating the pickup time.')
@@ -429,7 +438,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -439,7 +448,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -449,7 +458,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -516,6 +525,7 @@ export default function EditJobPage() {
         outOfProvinceInspection,
         registryVisit,
         ferryRequired: false,
+        useGarageInsurance,
         additionalCharges,
         oneWayFlightBack: flyingBack,
       },
@@ -523,7 +533,7 @@ export default function EditJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -568,6 +578,7 @@ export default function EditJobPage() {
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
       ferry_required: ferryRequired,
+      use_garage_insurance: useGarageInsurance,
       additional_charges: additionalCharges,
       overnight_required: pricing?.overnightRequired ?? false,
       estimated_distance_km: pricing?.tripDistanceKm ?? null,
@@ -844,6 +855,10 @@ export default function EditJobPage() {
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
             </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={useGarageInsurance} onChange={(e) => setUseGarageInsurance(e.target.checked)} />
+              Run under our garage policy insurance
+            </label>
             <div className="pt-2 border-t border-gray-100">
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" checked={flyingBack} onChange={(e) => setFlyingBack(e.target.checked)} />
@@ -957,6 +972,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                    <BreakdownRow label="Garage policy insurance" cents={pricing.garageInsuranceFeeCents} />
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.kind === 'flight')?.dealerAmountCents ?? 0} />

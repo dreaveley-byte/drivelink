@@ -27,6 +27,7 @@ export type PricingSettings = {
   ferry_fare_cents: number
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
+  garage_insurance_fee_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
 }
@@ -50,6 +51,7 @@ export type PricingInput = {
   outOfProvinceInspection: boolean
   registryVisit: boolean
   ferryRequired: boolean
+  useGarageInsurance: boolean
   additionalCharges: AdditionalCharge[]
   oneWayFlightBack: boolean // driver flies back instead of driving back — bill/pay one-way only
 }
@@ -71,6 +73,7 @@ export type PricingResult = {
   inspectionFeeCents: number
   registryFeeCents: number
   ferryFeeCents: number
+  garageInsuranceFeeCents: number
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
@@ -83,7 +86,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -182,10 +185,12 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // too, before markup is applied on top.
   const driverPayFloorBumpCents = estimatedDriverPayCents - computedDriverPayCents
 
+  const garageInsuranceFeeCents = useGarageInsurance ? settings.garage_insurance_fee_cents : 0
+
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
-    registryFeeCents + ferryFeeCents + extrasDealerCents + driverPayFloorBumpCents
+    registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
 
@@ -206,6 +211,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     inspectionFeeCents,
     registryFeeCents,
     ferryFeeCents,
+    garageInsuranceFeeCents,
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,

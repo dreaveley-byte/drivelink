@@ -90,7 +90,7 @@ export default function ReturnOptionsComparison({
     }
   }
 
-  const baseInput = { distanceKm, durationMinutes, vehicleMode, outOfProvinceInspection, registryVisit, ferryRequired }
+  const baseInput = { distanceKm, durationMinutes, vehicleMode, outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance: false }
 
   const secondDriverResult = calculatePricing(
     { ...baseInput, numDrivers: 2, oneWayFlightBack: false, additionalCharges: [] },

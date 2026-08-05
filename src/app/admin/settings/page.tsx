@@ -36,6 +36,7 @@ type Settings = {
   ferry_fare_cents: number
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
+  garage_insurance_fee_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
   max_driving_hours_before_overnight: number
@@ -325,6 +326,13 @@ export default function PricingSettingsPage() {
               <label className="block text-sm text-gray-700 mb-1">Bus rate per km ($)</label>
               <input type="number" step="0.01" value={dollars(settings.bus_per_km_cents)}
                 onChange={(e) => updateDollarField('bus_per_km_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Garage insurance fee ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Charged when the dealer opts to run the delivery under our garage policy instead of their own</p>
+              <input type="number" step="0.01" value={dollars(settings.garage_insurance_fee_cents)}
+                onChange={(e) => updateDollarField('garage_insurance_fee_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
