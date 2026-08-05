@@ -35,6 +35,35 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   return R * 2 * Math.asin(Math.sqrt(a))
 }
 
+async function drivingLeg(address: string, point: { lat: number; lng: number }): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  if (!apiKey) return null
+  const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+    },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: point.lat, longitude: point.lng } } },
+      destination: { address },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
+      units: 'METRIC',
+    }),
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  const route = data.routes?.[0]
+  if (!route) return null
+  const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10)
+  return {
+    distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
+    durationMinutes: Math.round(durationSeconds / 60),
+  }
+}
+
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY
   if (!key) return null
@@ -51,11 +80,13 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
 // isn't always the one that actually has a route to the other side (e.g.
 // Horseshoe Bay is closer to some mainland points than Tsawwassen, but only
 // Tsawwassen actually connects to Swartz Bay).
-function rankedTerminals(coords: { lat: number; lng: number }): { code: string; name: string; distanceKm: number }[] {
+function rankedTerminals(coords: { lat: number; lng: number }): { code: string; name: string; distanceKm: number; lat: number; lng: number }[] {
   return TERMINALS.map((t) => ({
     code: t.code,
     name: t.name,
     distanceKm: Math.round(haversineKm(coords.lat, coords.lng, t.lat, t.lng)),
+    lat: t.lat,
+    lng: t.lng,
   })).sort((a, b) => a.distanceKm - b.distanceKm)
 }
 
@@ -171,6 +202,11 @@ export async function POST(req: NextRequest) {
     avgGapMinutes = Math.round(gaps.reduce((sum, g) => sum + g, 0) / gaps.length)
   }
 
+  // When the driver returns as a walk-on passenger, they land back at the
+  // origin-side terminal and still need a ride from there to the dealership —
+  // a real driven distance, not a flat guess, since we know exactly where both ends are.
+  const groundHome = await drivingLeg(originAddress, { lat: bestMatch.origin.lat, lng: bestMatch.origin.lng })
+
   return NextResponse.json({
     fromTerminal,
     toTerminal,
@@ -178,5 +214,6 @@ export async function POST(req: NextRequest) {
     avgGapMinutes,
     sailingsPerDay: sailingTimes.length,
     sailingTimes: route.sailings.map((s) => s.time),
+    groundHome,
   })
 }

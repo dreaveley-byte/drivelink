@@ -252,7 +252,7 @@ export default function EditJobPage() {
 
       // --- Ferry: look this up once regardless of round-trip/one-way, since the
       // terminal match itself doesn't depend on that — only the crossing count does.
-      let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number } | null = null
+      let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number; groundHome: { distanceKm: number; durationMinutes: number } | null } | null = null
       try {
         const ferryRes = await fetch('/api/ferry/schedule', {
           method: 'POST',
@@ -310,8 +310,19 @@ export default function EditJobPage() {
       }
 
       // Foot-passenger ferry returns still need a ride from the arrival terminal
-      // back to the dealer/home, same as the flying-back scenario does.
+      // back to the dealer/home. Uses the real driven distance from the ferry API
+      // when available (same Uber base+per-km formula as the airport leg), falling
+      // back to the flat admin estimate otherwise.
       function ferryReturnGroundTransport(): AdditionalCharge {
+        if (ferryInfo?.groundHome) {
+          const km = ferryInfo.groundHome.distanceKm
+          return {
+            description: `Ground transport home (${km}km from terminal)`,
+            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
+            hoursAdded: Math.round((ferryInfo.groundHome.durationMinutes / 60) * 100) / 100,
+            paidToDriver: true,
+          }
+        }
         return {
           description: 'Return ground transport',
           dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
