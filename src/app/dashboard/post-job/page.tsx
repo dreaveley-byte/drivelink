@@ -371,7 +371,7 @@ export default function PostJobPage() {
         const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
         if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
-        else setDecisionNote('2nd driver + chase vehicle means a round trip — flying back was turned off.')
+        else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
       } else if (longHaul) {
         // Compare all three ways to get the driver home, pick the cheapest.
         const [flyCharges, busCharges] = await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
@@ -427,6 +427,7 @@ export default function PostJobPage() {
           if (flyCharges) {
             const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
+            setDecisionNote('Short trip, flying back (manually selected).')
           } else {
             setCalcError('Could not find a flight price — add one manually below if needed.')
             const fc = ferryCharge('oneway-vehicle')
@@ -438,6 +439,11 @@ export default function PostJobPage() {
           // than a second vehicle fare) plus a ride from the terminal back home.
           const fc = ferryCharge('oneway-walkon-return')
           finalCharges = fc ? [...manualCharges, fc, ferryReturnGroundTransport()] : manualCharges
+          setDecisionNote(
+            fc
+              ? 'Short trip, one-way delivery — ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare).'
+              : 'Short trip, one-way delivery — no ferry detected on this route.'
+          )
         }
       }
 
