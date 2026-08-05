@@ -93,9 +93,12 @@ async function duffelFetch(path: string, token: string, init?: RequestInit) {
   })
 }
 
-async function drivingLegToAirport(address: string, airport: { lat: number; lng: number }): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+async function drivingLegToAirport(address: string, airport: { lat: number; lng: number }, departureTime?: string): Promise<{ distanceKm: number; durationMinutes: number } | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
+
+  const departureDate = departureTime ? new Date(departureTime) : null
+  const useScheduledTime = departureDate && !isNaN(departureDate.getTime()) && departureDate.getTime() > Date.now()
 
   const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
     method: 'POST',
@@ -110,6 +113,7 @@ async function drivingLegToAirport(address: string, airport: { lat: number; lng:
       travelMode: 'DRIVE',
       routingPreference: 'TRAFFIC_AWARE',
       units: 'METRIC',
+      ...(useScheduledTime && { departureTime: departureDate.toISOString() }),
     }),
   })
   if (!res.ok) return null
@@ -172,12 +176,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Return airport: ${flightTo.error}` }, { status: 404 })
   }
 
-  // The driver drops the vehicle off at destinationAddress, then still needs to
-  // get themselves to flightFrom (the departure airport) — often a real drive,
-  // not just "at the airport already."
-  const groundToAirport = await drivingLegToAirport(destinationAddress, flightFrom)
-
   const date = departureDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+  // The drop-off location usually isn't the airport itself — the driver still
+  // needs to get themselves there. This is a real driven distance, not a guess.
+  const groundToAirport = await drivingLegToAirport(destinationAddress, flightFrom, date)
 
   const offerRequestRes = await duffelFetch('/air/offer_requests?return_offers=true', token, {
     method: 'POST',

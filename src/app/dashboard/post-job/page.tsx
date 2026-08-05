@@ -134,7 +134,7 @@ export default function PostJobPage() {
       const res = await fetch('/api/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: filledStops }),
+        body: JSON.stringify({ addresses: filledStops, departureTime: scheduledFor || undefined }),
       })
       const data = await res.json()
       if (!res.ok) {

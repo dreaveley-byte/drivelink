@@ -11,7 +11,7 @@ function toWaypoint(point: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const { addresses } = await req.json()
+  const { addresses, departureTime } = await req.json()
 
   if (!Array.isArray(addresses) || addresses.length < 2) {
     return NextResponse.json({ error: 'Need at least 2 addresses' }, { status: 400 })
@@ -26,6 +26,12 @@ export async function POST(req: NextRequest) {
   const destination = addresses[addresses.length - 1]
   const waypoints = addresses.slice(1, -1)
 
+  // Predictive traffic needs a real future timestamp — if the scheduled time has
+  // already passed (or wasn't provided), fall back to "now" rather than sending
+  // Google a departure time in the past, which it will reject.
+  const departureDate = departureTime ? new Date(departureTime) : null
+  const useScheduledTime = departureDate && !isNaN(departureDate.getTime()) && departureDate.getTime() > Date.now()
+
   const body = {
     origin: toWaypoint(origin),
     destination: toWaypoint(destination),
@@ -33,6 +39,7 @@ export async function POST(req: NextRequest) {
     travelMode: 'DRIVE',
     routingPreference: 'TRAFFIC_AWARE',
     units: 'METRIC',
+    ...(useScheduledTime && { departureTime: departureDate.toISOString() }),
   }
 
   try {
