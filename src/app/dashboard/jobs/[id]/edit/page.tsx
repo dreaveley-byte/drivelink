@@ -7,7 +7,7 @@ import { calculatePricing, formatCents, type PricingSettings, type AdditionalCha
 import Logo from '@/components/Logo'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
-import DeliveryDeadlineCalculator from '@/components/DeliveryDeadlineCalculator'
+import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString } from '@/lib/localDatetime'
 
 type JobType = { id: string; name: string }
 
@@ -40,6 +40,8 @@ export default function EditJobPage() {
   const [recipientPhone, setRecipientPhone] = useState('')
   const [scheduledFor, setScheduledFor] = useState('')
   const [deliveryDeadline, setDeliveryDeadline] = useState('')
+  const [computingPickupTime, setComputingPickupTime] = useState(false)
+  const [pickupTimeError, setPickupTimeError] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
@@ -160,6 +162,55 @@ export default function EditJobPage() {
     setAdditionalCharges((prev) => prev.filter((_, i) => i !== index))
   }
 
+  async function handleDeliveryDeadlineChange(value: string) {
+    setDeliveryDeadline(value)
+    setPickupTimeError('')
+
+    if (!value) return
+    const filledStops = stops.map((s) => s.trim()).filter(Boolean)
+    if (filledStops.length < 2) {
+      setPickupTimeError('Enter a pickup and dropoff address first.')
+      return
+    }
+    if (!pricingSettings) {
+      setPickupTimeError('Pricing settings not loaded yet.')
+      return
+    }
+
+    setComputingPickupTime(true)
+    try {
+      const res = await fetch('/api/distance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          addresses: [filledStops[0], filledStops[filledStops.length - 1]],
+          departureTime: localInputToUtcIso(value),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setPickupTimeError(data.error || 'Could not calculate drive time.')
+        setComputingPickupTime(false)
+        return
+      }
+
+      const driveHours = data.durationMinutes / 60
+      const mealBreaks = Math.min(
+        Math.floor(driveHours / pricingSettings.meal_allowance_every_hours),
+        pricingSettings.meal_allowance_max_count
+      )
+      const breakHours = (mealBreaks * pricingSettings.break_duration_minutes) / 60
+      const totalHoursNeeded = driveHours + breakHours
+
+      const pickupDate = new Date(value)
+      pickupDate.setTime(pickupDate.getTime() - totalHoursNeeded * 60 * 60 * 1000)
+      setScheduledFor(toLocalDatetimeInputValue(pickupDate))
+    } catch {
+      setPickupTimeError('Something went wrong calculating the pickup time.')
+    }
+    setComputingPickupTime(false)
+  }
+
   const runCalculation = useCallback(async () => {
     setCalcError('')
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
@@ -177,7 +228,7 @@ export default function EditJobPage() {
       const res = await fetch('/api/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: filledStops, departureTime: scheduledFor || undefined }),
+        body: JSON.stringify({ addresses: filledStops, departureTime: localInputToUtcIso(scheduledFor) }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -218,7 +269,7 @@ export default function EditJobPage() {
         if (scheduledFor) {
           const d = new Date(scheduledFor)
           if (overnightNeeded) d.setDate(d.getDate() + 1)
-          flightDepartureDate = d.toISOString().slice(0, 10)
+          flightDepartureDate = toLocalDateString(d)
         }
 
         const flightRes = await fetch('/api/flights/search', {
@@ -535,14 +586,22 @@ export default function EditJobPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
 
-          <DeliveryDeadlineCalculator
-            deliveryDeadline={deliveryDeadline}
-            onDeliveryDeadlineChange={setDeliveryDeadline}
-            originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
-            destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
-            pricingSettings={pricingSettings}
-            onPickupTimeCalculated={setScheduledFor}
-          />
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Customer needs vehicle by (optional)</label>
+            <input
+              type="datetime-local"
+              value={deliveryDeadline}
+              onChange={(e) => handleDeliveryDeadlineChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+            {computingPickupTime && <p className="text-xs text-gray-400 mt-1">Calculating required pickup time…</p>}
+            {pickupTimeError && <p className="text-xs text-red-600 mt-1">{pickupTimeError}</p>}
+            {deliveryDeadline && !computingPickupTime && !pickupTimeError && scheduledFor && (
+              <p className="text-xs text-gray-500 mt-1">
+                Driver needs to leave by {new Date(scheduledFor).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })} to make it on time.
+              </p>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Is the vehicle driven or towed?</label>

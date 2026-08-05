@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
+import { toLocalDateString, toLocalDatetimeInputValue } from '@/lib/localDatetime'
 
 type DayResult = {
   offset: number
@@ -49,7 +50,7 @@ export default function NearbyDatesFlightCheck({
     const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings.max_driving_hours_before_overnight
     const d = new Date(startDate)
     if (overnightNeeded) d.setDate(d.getDate() + 1)
-    return d.toISOString().slice(0, 10)
+    return toLocalDateString(d)
   }
 
   async function checkDates() {
@@ -177,7 +178,7 @@ export default function NearbyDatesFlightCheck({
                       onClick={() => {
                         const newDate = new Date(scheduledFor)
                         newDate.setDate(newDate.getDate() + r.offset)
-                        onSelectDate(newDate.toISOString().slice(0, 16))
+                        onSelectDate(toLocalDatetimeInputValue(newDate))
                       }}
                       className="text-xs bg-[#378ADD] text-white px-2 py-1 rounded-lg hover:bg-[#2d6ead]"
                     >

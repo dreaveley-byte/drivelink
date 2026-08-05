@@ -540,10 +540,15 @@ export default function DriverJobActions({
         <div>
           {job.scheduled_for && (
             <p className="text-xs font-semibold text-blue-700">
-              {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              Leave by {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </p>
           )}
           <p className="text-xs text-blue-600">To: {extractCity(job.dropoff_address)}</p>
+          {job.delivery_deadline && (
+            <p className="text-xs text-amber-600 mt-0.5">
+              Deliver by {new Date(job.delivery_deadline).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </p>
+          )}
         </div>
         {isActive && job.scheduled_for && (
           <button

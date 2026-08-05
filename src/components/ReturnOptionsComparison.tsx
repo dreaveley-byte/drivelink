@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { calculatePricing, formatCents, type PricingSettings } from '@/lib/pricing'
+import { toLocalDateString } from '@/lib/localDatetime'
 
 export default function ReturnOptionsComparison({
   distanceKm,
@@ -48,7 +49,7 @@ export default function ReturnOptionsComparison({
     if (scheduledFor) {
       const d = new Date(scheduledFor)
       if (overnightNeeded) d.setDate(d.getDate() + 1)
-      flightDepartureDate = d.toISOString().slice(0, 10)
+      flightDepartureDate = toLocalDateString(d)
     }
 
     const res = await fetch('/api/flights/search', {
