@@ -398,7 +398,7 @@ export default function EditJobPage() {
           !c.description.startsWith('Ferry:') &&
           !c.description.startsWith('Bus back') &&
           !c.description.startsWith('Ferry crossing') &&
-          !c.description.startsWith('Return ground transport') &&
+          !(c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')) &&
           c.description !== 'Ground transport to airport'
       )
 
@@ -860,7 +860,7 @@ export default function EditJobPage() {
             </p>
             {additionalCharges
               .map((charge, i) => ({ charge, i }))
-              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && !charge.description.startsWith('Ferry crossing') && !charge.description.startsWith('Bus back') && !charge.description.startsWith('Return ground transport') && charge.description !== 'Ground transport to airport')
+              .filter(({ charge }) => !charge.description.startsWith('Flight back:') && !charge.description.startsWith('Ferry:') && !charge.description.startsWith('Ferry crossing') && !charge.description.startsWith('Bus back') && !charge.description.startsWith('Return ground transport') && !charge.description.startsWith('Ground transport home') && charge.description !== 'Ground transport to airport')
               .map(({ charge, i }) => (
               <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                 <div className="flex gap-2">
@@ -947,7 +947,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.description.startsWith('Flight back:'))?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0} />
-                    <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.description.startsWith('Return ground transport'))?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => (c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')))?.dealerAmountCents ?? 0} />
                     <BreakdownRow
                       label="Other additional charges"
                       cents={
@@ -956,7 +956,7 @@ export default function EditJobPage() {
                         (additionalCharges.find((c) => c.description.startsWith('Ferry:') || c.description.startsWith('Ferry crossing'))?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description.startsWith('Bus back'))?.dealerAmountCents ?? 0) -
                         (additionalCharges.find((c) => c.description === 'Ground transport to airport')?.dealerAmountCents ?? 0) -
-                        (additionalCharges.find((c) => c.description.startsWith('Return ground transport'))?.dealerAmountCents ?? 0)
+                        (additionalCharges.find((c) => (c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')))?.dealerAmountCents ?? 0)
                       }
                     />
                   </div>
@@ -1026,7 +1026,7 @@ export default function EditJobPage() {
                   registryVisit={registryVisit}
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter(
-                    (c) => !c.description.startsWith('Flight back:') && !c.description.startsWith('Return ground transport') && c.description !== 'Ground transport to airport'
+                    (c) => !c.description.startsWith('Flight back:') && !(c.description.startsWith('Return ground transport') || c.description.startsWith('Ground transport home')) && c.description !== 'Ground transport to airport'
                   )}
                   onSelectDate={(d) => {
                     setScheduledFor(d)
