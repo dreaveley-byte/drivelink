@@ -799,7 +799,7 @@ export default function EditJobPage() {
         pricingSettings
       )
 
-      const { data: companionJob } = await supabase.from('jobs').insert({
+      const { data: companionJob, error: companionError } = await supabase.from('jobs').insert({
         organization_id: organizationId,
         job_type_id: jobTypeId,
         created_by: user?.id,
@@ -848,8 +848,14 @@ export default function EditJobPage() {
         notes: notes ? `${notes}\n\n(Chase/2nd driver for the linked primary job)` : '(Chase/2nd driver for the linked primary job)',
       }).select('id').single()
 
+      if (companionError) {
+        setError(`Job saved, but creating the 2nd driver's job failed: ${companionError.message}. Contact support if this keeps happening.`)
+        setLoading(false)
+        return
+      }
+
       if (companionJob) {
-        await supabase.from('job_stops').insert(
+        const { error: companionStopsError } = await supabase.from('job_stops').insert(
           filledStops.map((address, i) => ({
             job_id: companionJob.id,
             stop_order: i,
@@ -857,6 +863,11 @@ export default function EditJobPage() {
             stop_type: i === 0 ? 'pickup' : i === filledStops.length - 1 ? 'dropoff' : 'waypoint',
           }))
         )
+        if (companionStopsError) {
+          setError(`Job saved, but saving the 2nd driver's job's addresses failed: ${companionStopsError.message}.`)
+          setLoading(false)
+          return
+        }
         await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', jobId)
       }
     }
