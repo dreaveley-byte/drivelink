@@ -958,6 +958,18 @@ export default function PostJobPage() {
           </div>
 
           <div>
+            <label className="block text-sm text-gray-700 mb-1">Insurance</label>
+            <select
+              value={useGarageInsurance ? 'drivflo' : 'dealer'}
+              onChange={(e) => setUseGarageInsurance(e.target.value === 'drivflo')}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="dealer">Dealer&apos;s own garage policy</option>
+              <option value="drivflo">Buy insurance through Drivflo</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm text-gray-700 mb-1">Is the vehicle driven or towed?</label>
             <select
               value={vehicleMode}
@@ -1006,20 +1018,16 @@ export default function PostJobPage() {
               Registry visit required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
+              Delivery is to a First Nations reserve
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
               Force ferry crossing (if not detected automatically)
             </label>
             <p className="text-xs text-gray-400 -mt-1 ml-6">
               Ferries are detected and priced automatically based on the pickup/dropoff addresses — only check this if you know a ferry is needed and it wasn't picked up.
             </p>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
-              Delivery is to a First Nations reserve
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={useGarageInsurance} onChange={(e) => setUseGarageInsurance(e.target.checked)} />
-              Run under our garage policy insurance
-            </label>
             <div className="pt-2 border-t border-gray-100">
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
