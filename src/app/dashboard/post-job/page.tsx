@@ -713,10 +713,10 @@ export default function PostJobPage() {
 
     // Second driver required — create a fully independent companion job post
     // (its own full pay, not a split of the primary's) so a different driver
-    // can see and claim it separately, linked back to this one. Skipped if this
-    // job is already linked to a multi-vehicle sibling, since both features
-    // share the same link field and shouldn't overwrite each other.
-    if (secondDriver && !linkedJobId && pricingSettings && distanceKm != null && durationMinutes != null) {
+    // can see and claim it separately, linked back to this one. Uses its own
+    // field (companion_job_id), separate from multi-vehicle linking, so the
+    // two features never conflict even when used together.
+    if (secondDriver && pricingSettings && distanceKm != null && durationMinutes != null) {
       const soloPricing = calculatePricing(
         {
           distanceKm,
@@ -768,7 +768,7 @@ export default function PostJobPage() {
         ferry_required: ferryRequired,
         use_garage_insurance: false,
         is_second_driver_job: true,
-        linked_job_id: newJob.id,
+        companion_job_id: newJob.id,
         overnight_required: soloPricing.overnightRequired,
         estimated_distance_km: soloPricing.tripDistanceKm,
         estimated_duration_minutes: durationMinutes,
@@ -788,7 +788,7 @@ export default function PostJobPage() {
           }))
         )
         // Point the primary job back at its companion too.
-        await supabase.from('jobs').update({ linked_job_id: companionJob.id }).eq('id', newJob.id)
+        await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', newJob.id)
       }
     }
 
