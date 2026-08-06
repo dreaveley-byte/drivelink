@@ -139,7 +139,9 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // not a full multi-night calendar).
   const mealDays = overnightRequired ? 2 : 1
   const rawMealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
-  const mealCostCents = Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
+  const mealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
+    ? Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
+    : rawMealCostCents
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether
@@ -203,7 +205,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // too, before markup is applied on top.
   const driverPayFloorBumpCents = estimatedDriverPayCents - computedDriverPayCents
 
-  const garageInsuranceFeeCents = useGarageInsurance ? settings.garage_insurance_fee_cents : 0
+  const garageInsuranceFeeCents = useGarageInsurance && Number.isFinite(settings.garage_insurance_fee_cents) ? settings.garage_insurance_fee_cents : 0
 
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
