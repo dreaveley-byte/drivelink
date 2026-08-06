@@ -48,6 +48,19 @@ export default function EditJobPage() {
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
+  const [tradeInYear, setTradeInYear] = useState('')
+  const [tradeInMake, setTradeInMake] = useState('')
+  const [tradeInModel, setTradeInModel] = useState('')
+  const [tradeInVin, setTradeInVin] = useState('')
+  const [secondVehicleYear, setSecondVehicleYear] = useState('')
+  const [secondVehicleMake, setSecondVehicleMake] = useState('')
+  const [secondVehicleModel, setSecondVehicleModel] = useState('')
+  const [secondVehicleStockNumber, setSecondVehicleStockNumber] = useState('')
+  const [secondVehicleVin, setSecondVehicleVin] = useState('')
+  const [secondTradeInYear, setSecondTradeInYear] = useState('')
+  const [secondTradeInMake, setSecondTradeInMake] = useState('')
+  const [secondTradeInModel, setSecondTradeInModel] = useState('')
+  const [secondTradeInVin, setSecondTradeInVin] = useState('')
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
@@ -142,6 +155,10 @@ export default function EditJobPage() {
       setSecondDriver(job.second_driver_required ?? false)
       setChaseVehicle(job.chase_vehicle_required ?? false)
       setIsTradeIn(job.is_trade_in_pickup ?? false)
+      setTradeInYear(job.trade_in_year ? String(job.trade_in_year) : '')
+      setTradeInMake(job.trade_in_make ?? '')
+      setTradeInModel(job.trade_in_model ?? '')
+      setTradeInVin(job.trade_in_vin ?? '')
       setIsFirstNationsDelivery(job.is_first_nations_delivery ?? false)
       setFlyingBack(job.one_way_flight_back ?? false)
       setVehicleMode(job.vehicle_mode ?? 'driven')
@@ -731,6 +748,10 @@ export default function EditJobPage() {
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
       estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
+      trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
+      trade_in_make: isTradeIn ? tradeInMake || null : null,
+      trade_in_model: isTradeIn ? tradeInModel || null : null,
+      trade_in_vin: isTradeIn ? tradeInVin || null : null,
       notes: notes || null,
     }).eq('id', jobId)
 
@@ -786,12 +807,12 @@ export default function EditJobPage() {
         dropoff_address: filledStops[filledStops.length - 1],
         recipient_name: recipientName || null,
         recipient_phone: recipientPhone || null,
-        vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
-        vehicle_make: vehicleMake || null,
-        vehicle_model: vehicleModel || null,
-        stock_number: stockNumber || null,
-        vin: vin || null,
-        mileage: mileage ? parseInt(mileage) : null,
+        vehicle_year: secondVehicleYear ? parseInt(secondVehicleYear) : null,
+        vehicle_make: secondVehicleMake || null,
+        vehicle_model: secondVehicleModel || null,
+        stock_number: secondVehicleStockNumber || null,
+        vin: secondVehicleVin || null,
+        mileage: null,
         key_count: keyCount ? parseInt(keyCount) : null,
         has_wheel_lock: hasWheelLock,
         has_charging_cables: hasChargingCables,
@@ -814,6 +835,10 @@ export default function EditJobPage() {
         use_garage_insurance: false,
         is_second_driver_job: true,
         companion_job_id: jobId,
+        trade_in_year: secondTradeInYear ? parseInt(secondTradeInYear) : null,
+        trade_in_make: secondTradeInMake || null,
+        trade_in_model: secondTradeInModel || null,
+        trade_in_vin: secondTradeInVin || null,
         overnight_required: soloPricing.overnightRequired,
         estimated_distance_km: soloPricing.tripDistanceKm,
         estimated_duration_minutes: durationMinutes,
@@ -1014,6 +1039,53 @@ export default function EditJobPage() {
             </div>
           </div>
 
+          {multiVehicleArrangement !== 'none' && (
+            <div className="space-y-4 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-900">Other Vehicle(s) In This Deal</p>
+
+              {multiVehicleArrangement !== 'two_trades_one_purchase' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Second vehicle to deliver</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={secondVehicleYear} onChange={(e) => setSecondVehicleYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={secondVehicleMake} onChange={(e) => setSecondVehicleMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={secondVehicleModel} onChange={(e) => setSecondVehicleModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                  <input value={secondVehicleStockNumber} onChange={(e) => setSecondVehicleStockNumber(e.target.value)} placeholder="Stock #" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+              )}
+
+              {isTradeIn && (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="block text-xs text-gray-500">
+                    {multiVehicleArrangement === 'two_purchases_one_trade'
+                      ? 'Trade-in vehicle (both drivers ride back in this one together)'
+                      : 'First trade-in vehicle (this driver takes it back)'}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={tradeInYear} onChange={(e) => setTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                  <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+              )}
+
+              {(multiVehicleArrangement === 'two_trades_one_purchase' || multiVehicleArrangement === 'two_vehicles_two_trades') && (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="block text-xs text-gray-500">Second trade-in vehicle (2nd driver takes this one back)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={secondTradeInYear} onChange={(e) => setSecondTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={secondTradeInMake} onChange={(e) => setSecondTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={secondTradeInModel} onChange={(e) => setSecondTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                  <input value={secondTradeInVin} onChange={(e) => setSecondTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-900">Customer</p>
             <div>
@@ -1122,6 +1194,17 @@ export default function EditJobPage() {
               <input type="checkbox" checked={isTradeIn} onChange={(e) => setIsTradeIn(e.target.checked)} />
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
+            {isTradeIn && multiVehicleArrangement === 'none' && (
+              <div className="pl-1 space-y-2">
+                <label className="block text-xs text-gray-500">Trade-in vehicle</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={tradeInYear} onChange={(e) => setTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+                <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
