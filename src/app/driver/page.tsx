@@ -59,11 +59,11 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     .not('status', 'in', '("completed","cancelled")')
     .order('scheduled_for', { ascending, nullsFirst: false })
 
-  const { data: openJobs } = await supabase
-    .from('jobs')
+  const { data: openJobsRaw } = await supabase
+    .rpc('get_available_jobs_for_driver', { p_driver_id: user.id })
     .select(jobSelect)
-    .eq('status', 'awaiting_driver')
     .order('scheduled_for', { ascending, nullsFirst: false })
+  const openJobs = Array.isArray(openJobsRaw) ? openJobsRaw : openJobsRaw ? [openJobsRaw] : []
 
   // A job's rough time window: scheduled start through an estimated round-trip duration
   // (falls back to 2 hours if we don't have a duration estimate yet).
@@ -170,10 +170,10 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
         <div>
           <h2 className="text-sm font-medium text-gray-500 mb-2">Available jobs</h2>
           <div className="space-y-3">
-            {openJobs?.length === 0 && (
+            {openJobs.length === 0 && (
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
             )}
-            {openJobs?.map((job) => (
+            {openJobs.map((job) => (
               <DriverJobActions key={job.id} job={job} isActive={false} disabled={overlapsAnyMyJob(job)} />
             ))}
           </div>

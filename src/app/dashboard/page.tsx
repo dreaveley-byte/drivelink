@@ -157,6 +157,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Link href="/dashboard/team" className="text-sm text-gray-600 hover:text-gray-900">
             Team
           </Link>
+          {isOrgAdmin && (
+            <Link href="/dashboard/preferred-drivers" className="text-sm text-gray-600 hover:text-gray-900">
+              Preferred Drivers
+            </Link>
+          )}
         </div>
       </div>
 

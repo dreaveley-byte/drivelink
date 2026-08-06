@@ -711,6 +711,87 @@ export default function PostJobPage() {
       await supabase.from('jobs').update({ linked_job_id: newJob.id }).eq('id', linkedJobId)
     }
 
+    // Second driver required — create a fully independent companion job post
+    // (its own full pay, not a split of the primary's) so a different driver
+    // can see and claim it separately, linked back to this one. Skipped if this
+    // job is already linked to a multi-vehicle sibling, since both features
+    // share the same link field and shouldn't overwrite each other.
+    if (secondDriver && !linkedJobId && pricingSettings && distanceKm != null && durationMinutes != null) {
+      const soloPricing = calculatePricing(
+        {
+          distanceKm,
+          durationMinutes,
+          vehicleMode,
+          numDrivers: 1,
+          outOfProvinceInspection,
+          registryVisit,
+          ferryRequired: false,
+          useGarageInsurance: false,
+          additionalCharges: additionalCharges.filter((c) => !c.kind),
+          oneWayFlightBack: flyingBack,
+        },
+        pricingSettings
+      )
+
+      const { data: companionJob } = await supabase.from('jobs').insert({
+        organization_id: orgIdToUse,
+        job_type_id: jobTypeId,
+        created_by: user.id,
+        pickup_address: filledStops[0],
+        dropoff_address: filledStops[filledStops.length - 1],
+        recipient_name: customerFullName || null,
+        recipient_phone: customerPhone || null,
+        vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+        vehicle_make: vehicleMake || null,
+        vehicle_model: vehicleModel || null,
+        stock_number: stockNumber || null,
+        vin: vin || null,
+        mileage: mileage ? parseInt(mileage) : null,
+        key_count: keyCount ? parseInt(keyCount) : null,
+        has_wheel_lock: hasWheelLock,
+        has_charging_cables: hasChargingCables,
+        other_included_items: otherIncludedItems || null,
+        customer_full_name: customerFullName || null,
+        customer_phone: customerPhone || null,
+        customer_address: customerAddress || null,
+        scheduled_for: scheduledFor || null,
+        delivery_deadline: deliveryDeadline || null,
+        second_driver_required: false,
+        chase_vehicle_required: false,
+        is_trade_in_pickup: isTradeIn,
+        is_first_nations_delivery: isFirstNationsDelivery,
+        one_way_flight_back: flyingBack,
+        vehicle_mode: vehicleMode,
+        used_own_vehicle: true,
+        out_of_province_inspection: outOfProvinceInspection,
+        registry_visit: registryVisit,
+        ferry_required: ferryRequired,
+        use_garage_insurance: false,
+        is_second_driver_job: true,
+        linked_job_id: newJob.id,
+        overnight_required: soloPricing.overnightRequired,
+        estimated_distance_km: soloPricing.tripDistanceKm,
+        estimated_duration_minutes: durationMinutes,
+        estimated_dealer_cost_cents: null,
+        estimated_driver_pay_cents: soloPricing.estimatedDriverPayCents,
+        estimated_driver_reimbursement_cents: soloPricing.reimbursementCents,
+        notes: notes ? `${notes}\n\n(Chase/2nd driver for the linked primary job)` : '(Chase/2nd driver for the linked primary job)',
+      }).select('id').single()
+
+      if (companionJob) {
+        await supabase.from('job_stops').insert(
+          filledStops.map((address, i) => ({
+            job_id: companionJob.id,
+            stop_order: i,
+            address,
+            stop_type: i === 0 ? 'pickup' : i === filledStops.length - 1 ? 'dropoff' : 'waypoint',
+          }))
+        )
+        // Point the primary job back at its companion too.
+        await supabase.from('jobs').update({ linked_job_id: companionJob.id }).eq('id', newJob.id)
+      }
+    }
+
     router.push('/dashboard')
     router.refresh()
   }

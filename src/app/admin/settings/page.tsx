@@ -37,6 +37,7 @@ type Settings = {
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
   garage_insurance_fee_cents: number
+  preferred_driver_window_minutes: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
   max_driving_hours_before_overnight: number
@@ -333,6 +334,13 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Charged when the dealer opts to run the delivery under our garage policy instead of their own</p>
               <input type="number" step="0.01" value={dollars(settings.garage_insurance_fee_cents)}
                 onChange={(e) => updateDollarField('garage_insurance_fee_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Preferred driver window (minutes)</label>
+              <p className="text-xs text-gray-400 mb-1">A fresh job is only visible to a dealer's preferred drivers for this long, then opens up to everyone</p>
+              <input type="number" step="1" value={settings.preferred_driver_window_minutes}
+                onChange={(e) => updateNumberField('preferred_driver_window_minutes', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
