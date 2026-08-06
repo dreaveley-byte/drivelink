@@ -661,6 +661,29 @@ export default function EditJobPage() {
     setLoading(true)
     const supabase = createClient()
 
+    // When there's a 2nd driver, each driver's own job shows their own full
+    // pay (not the combined 2-driver total) — the dealer's bill still reflects
+    // the full 2-driver cost, but what a driver sees for THEIR job should be a
+    // solo figure, matching how the auto-created companion job pays.
+    const primaryDriverPricing =
+      secondDriver && pricingSettings && distanceKm != null && durationMinutes != null
+        ? calculatePricing(
+            {
+              distanceKm,
+              durationMinutes,
+              vehicleMode,
+              numDrivers: 1,
+              outOfProvinceInspection,
+              registryVisit,
+              ferryRequired: false,
+              useGarageInsurance: false,
+              additionalCharges: additionalCharges.filter((c) => !c.kind),
+              oneWayFlightBack: flyingBack,
+            },
+            pricingSettings
+          )
+        : pricing
+
     const { error: jobError } = await supabase.from('jobs').update({
       job_type_id: jobTypeId,
       pickup_address: filledStops[0],
@@ -700,8 +723,8 @@ export default function EditJobPage() {
       estimated_distance_km: pricing?.tripDistanceKm ?? null,
       estimated_duration_minutes: durationMinutes,
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
-      estimated_driver_pay_cents: pricing?.estimatedDriverPayCents ?? null,
-      estimated_driver_reimbursement_cents: pricing?.reimbursementCents ?? null,
+      estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
+      estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
       notes: notes || null,
     }).eq('id', jobId)
 
@@ -1275,9 +1298,10 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <p className="text-[11px] text-gray-400">
                       Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
+                      {secondDriver && ' This breakdown is the combined total for both drivers — each driver\u2019s own job post shows their individual full pay separately, not half of this.'}
                     </p>
                     <div className="flex items-center justify-between pt-1 text-xs font-medium text-gray-700">
-                      <span>Total driver pay</span>
+                      <span>{secondDriver ? 'Total driver pay (both drivers combined)' : 'Total driver pay'}</span>
                       <span>{formatCents(pricing.estimatedDriverPayCents)}</span>
                     </div>
                     {pricing.reimbursementCents > 0 && (
