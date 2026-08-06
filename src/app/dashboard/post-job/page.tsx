@@ -57,7 +57,7 @@ export default function PostJobPage() {
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [flightPriceOverride, setFlightPriceOverride] = useState('')
   const [flightHoursOverride, setFlightHoursOverride] = useState('')
-  const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade'>('none')
+  const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade' | 'two_vehicles_two_trades'>('none')
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
   const [linkedJobQuery, setLinkedJobQuery] = useState('')
   const [linkedJobResults, setLinkedJobResults] = useState<{ id: string; stock_number: string | null; vehicle_year: number | null; vehicle_make: string | null; vehicle_model: string | null }[]>([])
@@ -562,8 +562,18 @@ export default function PostJobPage() {
       return
     }
 
-    const outboundVehicleCount = multiVehicleArrangement === 'two_purchases_one_trade' ? 2 : multiVehicleArrangement === 'two_trades_one_purchase' ? 1 : undefined
-    const returnVehicleCount = multiVehicleArrangement === 'two_trades_one_purchase' ? 2 : multiVehicleArrangement === 'two_purchases_one_trade' ? 1 : undefined
+    const outboundVehicleCount =
+      multiVehicleArrangement === 'two_purchases_one_trade' || multiVehicleArrangement === 'two_vehicles_two_trades'
+        ? 2
+        : multiVehicleArrangement === 'two_trades_one_purchase'
+          ? 1
+          : undefined
+    const returnVehicleCount =
+      multiVehicleArrangement === 'two_trades_one_purchase' || multiVehicleArrangement === 'two_vehicles_two_trades'
+        ? 2
+        : multiVehicleArrangement === 'two_purchases_one_trade'
+          ? 1
+          : undefined
 
     const result = calculatePricing(
       {
@@ -836,7 +846,14 @@ export default function PostJobPage() {
             <label className="block text-sm text-gray-700 mb-1">Job type</label>
             <select
               value={jobTypeId}
-              onChange={(e) => setJobTypeId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value
+                setJobTypeId(newId)
+                const newType = jobTypes.find((jt) => jt.id === newId)
+                if (newType?.name !== 'Vehicle Delivery' && multiVehicleArrangement !== 'none') {
+                  setMultiVehicleArrangement('none')
+                }
+              }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             >
               {jobTypes.map((jt) => (
@@ -845,35 +862,38 @@ export default function PostJobPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
-            <select
-              value={multiVehicleArrangement}
-              onChange={(e) => {
-                const value = e.target.value as typeof multiVehicleArrangement
-                setMultiVehicleArrangement(value)
-                if (value !== 'none') {
-                  // A multi-vehicle deal always needs two people — auto-select the
-                  // second driver, which is what actually creates their companion
-                  // job post. No manual linking needed.
-                  setSecondDriver(true)
-                  setChaseVehicle(true)
-                }
-              }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="none">Not a multi-vehicle deal</option>
-              <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
-              <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
-            </select>
-            {multiVehicleArrangement !== 'none' && (
-              <p className="text-xs text-gray-400 mt-1">
-                Gas/ferry costs will use the right vehicle count for each leg, and a second driver has been
-                selected below — a fully independent job post for them will be created automatically when you
-                submit, so a second driver can claim it separately.
-              </p>
-            )}
-          </div>
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Delivery' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
+              <select
+                value={multiVehicleArrangement}
+                onChange={(e) => {
+                  const value = e.target.value as typeof multiVehicleArrangement
+                  setMultiVehicleArrangement(value)
+                  if (value !== 'none') {
+                    // A multi-vehicle deal always needs two people — auto-select the
+                    // second driver, which is what actually creates their companion
+                    // job post. No manual linking needed.
+                    setSecondDriver(true)
+                    setChaseVehicle(true)
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="none">Not a multi-vehicle deal</option>
+                <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
+                <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
+                <option value="two_vehicles_two_trades">2 purchases, 2 trade-ins — 2 vehicles up, 2 back</option>
+              </select>
+              {multiVehicleArrangement !== 'none' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Gas/ferry costs will use the right vehicle count for each leg, and a second driver has been
+                  selected below — a fully independent job post for them will be created automatically when you
+                  submit, so a second driver can claim it separately.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             {stops.map((stop, i) => (

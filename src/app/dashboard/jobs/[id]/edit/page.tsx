@@ -57,12 +57,14 @@ export default function EditJobPage() {
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [flightPriceOverride, setFlightPriceOverride] = useState('')
   const [flightHoursOverride, setFlightHoursOverride] = useState('')
-  const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade'>('none')
+  const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade' | 'two_vehicles_two_trades'>('none')
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
   const [linkedJobQuery, setLinkedJobQuery] = useState('')
   const [linkedJobResults, setLinkedJobResults] = useState<{ id: string; stock_number: string | null; vehicle_year: number | null; vehicle_make: string | null; vehicle_model: string | null }[]>([])
   const [linkedJobSearching, setLinkedJobSearching] = useState(false)
   const [ridesAlongWithLinked, setRidesAlongWithLinked] = useState(false)
+  const [companionJobId, setCompanionJobId] = useState<string | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([])
   const [notes, setNotes] = useState('')
 
@@ -149,6 +151,8 @@ export default function EditJobPage() {
       setMultiVehicleArrangement(job.multi_vehicle_arrangement ?? 'none')
       setLinkedJobId(job.linked_job_id ?? null)
       setRidesAlongWithLinked(job.rides_along_with_linked ?? false)
+      setCompanionJobId(job.companion_job_id ?? null)
+      setOrganizationId(job.organization_id ?? null)
       setAdditionalCharges(job.additional_charges ?? [])
       setNotes(job.notes ?? '')
 
@@ -606,8 +610,18 @@ export default function EditJobPage() {
       return
     }
 
-    const outboundVehicleCount = multiVehicleArrangement === 'two_purchases_one_trade' ? 2 : multiVehicleArrangement === 'two_trades_one_purchase' ? 1 : undefined
-    const returnVehicleCount = multiVehicleArrangement === 'two_trades_one_purchase' ? 2 : multiVehicleArrangement === 'two_purchases_one_trade' ? 1 : undefined
+    const outboundVehicleCount =
+      multiVehicleArrangement === 'two_purchases_one_trade' || multiVehicleArrangement === 'two_vehicles_two_trades'
+        ? 2
+        : multiVehicleArrangement === 'two_trades_one_purchase'
+          ? 1
+          : undefined
+    const returnVehicleCount =
+      multiVehicleArrangement === 'two_trades_one_purchase' || multiVehicleArrangement === 'two_vehicles_two_trades'
+        ? 2
+        : multiVehicleArrangement === 'two_purchases_one_trade'
+          ? 1
+          : undefined
 
     const result = calculatePricing(
       {
@@ -708,6 +722,86 @@ export default function EditJobPage() {
       await supabase.from('jobs').update({ linked_job_id: jobId }).eq('id', linkedJobId)
     }
 
+    // Second driver required and no companion job yet — create a fully
+    // independent companion job post (its own full pay, not a split) so a
+    // different driver can claim it separately. Guarded by companionJobId so
+    // saving the same edit twice doesn't create duplicates.
+    if (secondDriver && !companionJobId && organizationId && pricingSettings && distanceKm != null && durationMinutes != null) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const soloPricing = calculatePricing(
+        {
+          distanceKm,
+          durationMinutes,
+          vehicleMode,
+          numDrivers: 1,
+          outOfProvinceInspection,
+          registryVisit,
+          ferryRequired: false,
+          useGarageInsurance: false,
+          additionalCharges: additionalCharges.filter((c) => !c.kind),
+          oneWayFlightBack: flyingBack,
+        },
+        pricingSettings
+      )
+
+      const { data: companionJob } = await supabase.from('jobs').insert({
+        organization_id: organizationId,
+        job_type_id: jobTypeId,
+        created_by: user?.id,
+        pickup_address: filledStops[0],
+        dropoff_address: filledStops[filledStops.length - 1],
+        recipient_name: recipientName || null,
+        recipient_phone: recipientPhone || null,
+        vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+        vehicle_make: vehicleMake || null,
+        vehicle_model: vehicleModel || null,
+        stock_number: stockNumber || null,
+        vin: vin || null,
+        mileage: mileage ? parseInt(mileage) : null,
+        key_count: keyCount ? parseInt(keyCount) : null,
+        has_wheel_lock: hasWheelLock,
+        has_charging_cables: hasChargingCables,
+        other_included_items: otherIncludedItems || null,
+        customer_full_name: customerFullName || null,
+        customer_phone: customerPhone || null,
+        customer_address: customerAddress || null,
+        scheduled_for: scheduledFor || null,
+        delivery_deadline: deliveryDeadline || null,
+        second_driver_required: false,
+        chase_vehicle_required: false,
+        is_trade_in_pickup: isTradeIn,
+        is_first_nations_delivery: isFirstNationsDelivery,
+        one_way_flight_back: flyingBack,
+        vehicle_mode: vehicleMode,
+        used_own_vehicle: true,
+        out_of_province_inspection: outOfProvinceInspection,
+        registry_visit: registryVisit,
+        ferry_required: ferryRequired,
+        use_garage_insurance: false,
+        is_second_driver_job: true,
+        companion_job_id: jobId,
+        overnight_required: soloPricing.overnightRequired,
+        estimated_distance_km: soloPricing.tripDistanceKm,
+        estimated_duration_minutes: durationMinutes,
+        estimated_dealer_cost_cents: null,
+        estimated_driver_pay_cents: soloPricing.estimatedDriverPayCents,
+        estimated_driver_reimbursement_cents: soloPricing.reimbursementCents,
+        notes: notes ? `${notes}\n\n(Chase/2nd driver for the linked primary job)` : '(Chase/2nd driver for the linked primary job)',
+      }).select('id').single()
+
+      if (companionJob) {
+        await supabase.from('job_stops').insert(
+          filledStops.map((address, i) => ({
+            job_id: companionJob.id,
+            stop_order: i,
+            address,
+            stop_type: i === 0 ? 'pickup' : i === filledStops.length - 1 ? 'dropoff' : 'waypoint',
+          }))
+        )
+        await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', jobId)
+      }
+    }
+
     router.push('/dashboard')
     router.refresh()
   }
@@ -745,7 +839,14 @@ export default function EditJobPage() {
             <label className="block text-sm text-gray-700 mb-1">Job type</label>
             <select
               value={jobTypeId}
-              onChange={(e) => setJobTypeId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value
+                setJobTypeId(newId)
+                const newType = jobTypes.find((jt) => jt.id === newId)
+                if (newType?.name !== 'Vehicle Delivery' && multiVehicleArrangement !== 'none') {
+                  setMultiVehicleArrangement('none')
+                }
+              }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             >
               {jobTypes.map((jt) => (
@@ -754,81 +855,40 @@ export default function EditJobPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
-            <select
-              value={multiVehicleArrangement}
-              onChange={(e) => setMultiVehicleArrangement(e.target.value as typeof multiVehicleArrangement)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="none">Not a multi-vehicle deal</option>
-              <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
-              <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
-            </select>
-            {multiVehicleArrangement !== 'none' && (
-              <>
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Delivery' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
+              <select
+                value={multiVehicleArrangement}
+                onChange={(e) => {
+                  const value = e.target.value as typeof multiVehicleArrangement
+                  setMultiVehicleArrangement(value)
+                  if (value !== 'none') {
+                    // A multi-vehicle deal always needs two people — auto-select the
+                    // second driver, which is what actually creates their companion
+                    // job post. No manual linking needed.
+                    setSecondDriver(true)
+                    setChaseVehicle(true)
+                  }
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="none">Not a multi-vehicle deal</option>
+                <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
+                <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
+                <option value="two_vehicles_two_trades">2 purchases, 2 trade-ins — 2 vehicles up, 2 back</option>
+              </select>
+              {multiVehicleArrangement !== 'none' && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Gas/ferry costs will use the right vehicle count for each leg. Post a second job for the other
-                  vehicle and link it below so both drivers know they&apos;re paired.
+                  Gas/ferry costs will use the right vehicle count for each leg, and a second driver has been
+                  selected below.{' '}
+                  {companionJobId
+                    ? 'This job already has a companion job for the second driver.'
+                    : 'A fully independent job post for them will be created automatically when you save, so a second driver can claim it separately.'}
                 </p>
-
-                <div className="mt-2">
-                  <label className="block text-xs text-gray-500 mb-1">Link to the second driver&apos;s drive</label>
-                  {linkedJobId ? (
-                    <div className="flex items-center justify-between border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50">
-                      <span>Linked to a job</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLinkedJobId(null)
-                          setLinkedJobQuery('')
-                        }}
-                        className="text-xs text-gray-400 hover:text-red-600"
-                      >
-                        Unlink
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        value={linkedJobQuery}
-                        onChange={(e) => searchLinkedJob(e.target.value)}
-                        placeholder="Search by stock #, make, or model"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                      {linkedJobSearching && <p className="text-xs text-gray-400 mt-1">Searching…</p>}
-                      {linkedJobResults.length > 0 && (
-                        <div className="border border-gray-200 rounded-lg mt-1 divide-y divide-gray-100">
-                          {linkedJobResults.map((j) => (
-                            <button
-                              key={j.id}
-                              type="button"
-                              onClick={() => {
-                                setLinkedJobId(j.id)
-                                setLinkedJobResults([])
-                                setLinkedJobQuery('')
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
-                            >
-                              {[j.vehicle_year, j.vehicle_make, j.vehicle_model].filter(Boolean).join(' ')}
-                              {j.stock_number && ` · Stock #${j.stock_number}`}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-
-            {linkedJobId && (
-              <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
-                <input type="checkbox" checked={ridesAlongWithLinked} onChange={(e) => setRidesAlongWithLinked(e.target.checked)} />
-                This vehicle rides along with the linked drive (don&apos;t double-charge transport)
-              </label>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             {stops.map((stop, i) => (
