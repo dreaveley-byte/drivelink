@@ -426,7 +426,11 @@ export default function PostJobPage() {
       // auto-generated (tagged with a `kind`) gets rebuilt fresh every time.
       const manualCharges = additionalCharges.filter((c) => !c.kind)
 
-      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver)
+      // A multi-vehicle deal is always a "drive it back" situation (never flying) —
+      // that shouldn't depend on chase vehicle being checked, since chase vehicle
+      // is a different concept (one driver following another in the same vehicle
+      // pairing) that never actually applies to a multi-vehicle deal.
+      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver) || multiVehicleArrangement !== 'none'
       const longHaul = oneWayHours > 4
 
       let finalCharges: AdditionalCharge[] = manualCharges
@@ -873,9 +877,11 @@ export default function PostJobPage() {
                   if (value !== 'none') {
                     // A multi-vehicle deal always needs two people — auto-select the
                     // second driver, which is what actually creates their companion
-                    // job post. No manual linking needed.
+                    // job post. No manual linking needed. Chase vehicle is a
+                    // different concept (one driver following another in the same
+                    // vehicle pairing) and never applies here — each driver has
+                    // their own separate vehicle and job post.
                     setSecondDriver(true)
-                    setChaseVehicle(true)
                   }
                 }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
