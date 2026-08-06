@@ -745,6 +745,82 @@ export default function EditJobPage() {
             </select>
           </div>
 
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
+            <select
+              value={multiVehicleArrangement}
+              onChange={(e) => setMultiVehicleArrangement(e.target.value as typeof multiVehicleArrangement)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="none">Not a multi-vehicle deal</option>
+              <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
+              <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
+            </select>
+            {multiVehicleArrangement !== 'none' && (
+              <>
+                <p className="text-xs text-gray-400 mt-1">
+                  Gas/ferry costs will use the right vehicle count for each leg. Post a second job for the other
+                  vehicle and link it below so both drivers know they&apos;re paired.
+                </p>
+
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-500 mb-1">Link to the second driver&apos;s drive</label>
+                  {linkedJobId ? (
+                    <div className="flex items-center justify-between border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50">
+                      <span>Linked to a job</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLinkedJobId(null)
+                          setLinkedJobQuery('')
+                        }}
+                        className="text-xs text-gray-400 hover:text-red-600"
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        value={linkedJobQuery}
+                        onChange={(e) => searchLinkedJob(e.target.value)}
+                        placeholder="Search by stock #, make, or model"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                      {linkedJobSearching && <p className="text-xs text-gray-400 mt-1">Searching…</p>}
+                      {linkedJobResults.length > 0 && (
+                        <div className="border border-gray-200 rounded-lg mt-1 divide-y divide-gray-100">
+                          {linkedJobResults.map((j) => (
+                            <button
+                              key={j.id}
+                              type="button"
+                              onClick={() => {
+                                setLinkedJobId(j.id)
+                                setLinkedJobResults([])
+                                setLinkedJobQuery('')
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                            >
+                              {[j.vehicle_year, j.vehicle_make, j.vehicle_model].filter(Boolean).join(' ')}
+                              {j.stock_number && ` · Stock #${j.stock_number}`}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {linkedJobId && (
+              <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
+                <input type="checkbox" checked={ridesAlongWithLinked} onChange={(e) => setRidesAlongWithLinked(e.target.checked)} />
+                This vehicle rides along with the linked drive (don&apos;t double-charge transport)
+              </label>
+            )}
+          </div>
+
           <div className="space-y-2">
             {stops.map((stop, i) => (
               <div key={i}>
@@ -907,82 +983,6 @@ export default function EditJobPage() {
               <input type="checkbox" checked={isTradeIn} onChange={(e) => setIsTradeIn(e.target.checked)} />
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
-
-            <div className="pl-1">
-              <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
-              <select
-                value={multiVehicleArrangement}
-                onChange={(e) => setMultiVehicleArrangement(e.target.value as typeof multiVehicleArrangement)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="none">Not a multi-vehicle deal</option>
-                <option value="two_trades_one_purchase">2 trade-ins, 1 purchase — 1 vehicle up, 2 back</option>
-                <option value="two_purchases_one_trade">2 purchases, 1 trade-in — 2 vehicles up, 1 back</option>
-              </select>
-              {multiVehicleArrangement !== 'none' && (
-                <>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Gas/ferry costs will use the right vehicle count for each leg. Post a second job for the other
-                    vehicle and link it below so both drivers know they&apos;re paired.
-                  </p>
-
-                  <div className="mt-2">
-                    <label className="block text-xs text-gray-500 mb-1">Link to the second driver&apos;s drive</label>
-                    {linkedJobId ? (
-                      <div className="flex items-center justify-between border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50">
-                        <span>Linked to a job</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLinkedJobId(null)
-                            setLinkedJobQuery('')
-                          }}
-                          className="text-xs text-gray-400 hover:text-red-600"
-                        >
-                          Unlink
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <input
-                          value={linkedJobQuery}
-                          onChange={(e) => searchLinkedJob(e.target.value)}
-                          placeholder="Search by stock #, make, or model"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                        />
-                        {linkedJobSearching && <p className="text-xs text-gray-400 mt-1">Searching…</p>}
-                        {linkedJobResults.length > 0 && (
-                          <div className="border border-gray-200 rounded-lg mt-1 divide-y divide-gray-100">
-                            {linkedJobResults.map((j) => (
-                              <button
-                                key={j.id}
-                                type="button"
-                                onClick={() => {
-                                  setLinkedJobId(j.id)
-                                  setLinkedJobResults([])
-                                  setLinkedJobQuery('')
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
-                              >
-                                {[j.vehicle_year, j.vehicle_make, j.vehicle_model].filter(Boolean).join(' ')}
-                                {j.stock_number && ` · Stock #${j.stock_number}`}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {linkedJobId && (
-                <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
-                  <input type="checkbox" checked={ridesAlongWithLinked} onChange={(e) => setRidesAlongWithLinked(e.target.checked)} />
-                  This vehicle rides along with the linked drive (don&apos;t double-charge transport)
-                </label>
-              )}
-            </div>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
