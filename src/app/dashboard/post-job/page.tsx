@@ -47,6 +47,15 @@ export default function PostJobPage() {
   const [secondDriver, setSecondDriver] = useState(false)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
+  const [tradeInYear, setTradeInYear] = useState('')
+  const [tradeInMake, setTradeInMake] = useState('')
+  const [tradeInModel, setTradeInModel] = useState('')
+  const [tradeInVin, setTradeInVin] = useState('')
+  const [secondVehicleYear, setSecondVehicleYear] = useState('')
+  const [secondVehicleMake, setSecondVehicleMake] = useState('')
+  const [secondVehicleModel, setSecondVehicleModel] = useState('')
+  const [secondVehicleStockNumber, setSecondVehicleStockNumber] = useState('')
+  const [secondVehicleVin, setSecondVehicleVin] = useState('')
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
@@ -725,6 +734,10 @@ export default function PostJobPage() {
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
       estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
+      trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
+      trade_in_make: isTradeIn ? tradeInMake || null : null,
+      trade_in_model: isTradeIn ? tradeInModel || null : null,
+      trade_in_vin: isTradeIn ? tradeInVin || null : null,
       notes: notes || null,
     }).select('id').single()
 
@@ -778,12 +791,12 @@ export default function PostJobPage() {
         dropoff_address: filledStops[filledStops.length - 1],
         recipient_name: customerFullName || null,
         recipient_phone: customerPhone || null,
-        vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
-        vehicle_make: vehicleMake || null,
-        vehicle_model: vehicleModel || null,
-        stock_number: stockNumber || null,
-        vin: vin || null,
-        mileage: mileage ? parseInt(mileage) : null,
+        vehicle_year: secondVehicleYear ? parseInt(secondVehicleYear) : null,
+        vehicle_make: secondVehicleMake || null,
+        vehicle_model: secondVehicleModel || null,
+        stock_number: secondVehicleStockNumber || null,
+        vin: secondVehicleVin || null,
+        mileage: null,
         key_count: keyCount ? parseInt(keyCount) : null,
         has_wheel_lock: hasWheelLock,
         has_charging_cables: hasChargingCables,
@@ -915,11 +928,27 @@ export default function PostJobPage() {
                 <option value="two_vehicles_two_trades">2 purchases, 2 trade-ins — 2 vehicles up, 2 back</option>
               </select>
               {multiVehicleArrangement !== 'none' && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Gas/ferry costs will use the right vehicle count for each leg, and a second driver has been
-                  selected below — a fully independent job post for them will be created automatically when you
-                  submit, so a second driver can claim it separately.
-                </p>
+                <>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Gas/ferry costs will use the right vehicle count for each leg, and a second driver has been
+                    selected below — a fully independent job post for them will be created automatically when you
+                    submit, so a second driver can claim it separately.
+                  </p>
+                  <div className="pl-1 mt-2 space-y-2">
+                    <label className="block text-xs text-gray-500">
+                      {multiVehicleArrangement === 'two_trades_one_purchase' ? 'Second trade-in vehicle' : 'Second vehicle to deliver'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={secondVehicleYear} onChange={(e) => setSecondVehicleYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={secondVehicleMake} onChange={(e) => setSecondVehicleMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={secondVehicleModel} onChange={(e) => setSecondVehicleModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    </div>
+                    {multiVehicleArrangement !== 'two_trades_one_purchase' && (
+                      <input value={secondVehicleStockNumber} onChange={(e) => setSecondVehicleStockNumber(e.target.value)} placeholder="Stock # (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    )}
+                    <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -1079,6 +1108,17 @@ export default function PostJobPage() {
               <input type="checkbox" checked={isTradeIn} onChange={(e) => setIsTradeIn(e.target.checked)} />
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
+            {isTradeIn && (
+              <div className="pl-1 space-y-2">
+                <label className="block text-xs text-gray-500">Trade-in vehicle</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={tradeInYear} onChange={(e) => setTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+                <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
