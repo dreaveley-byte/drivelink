@@ -28,6 +28,7 @@ export type PricingSettings = {
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
   garage_insurance_fee_cents: number
+  max_daily_meal_budget_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
 }
@@ -125,7 +126,6 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     Math.floor(baseDrivingHours / settings.meal_allowance_every_hours),
     settings.meal_allowance_max_count
   )
-  const mealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
   const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
 
   // Overnight isn't just about drive time — the inspection/registry stops, ferry
@@ -133,6 +133,13 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // push the driver past the point where they can safely finish same-day.
   const overnightRequired =
     baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours > settings.max_driving_hours_before_overnight
+
+  // Capped per person per day — an overnight trip is treated as 2 days for this
+  // purpose (the app's overnight model is a single same-day/next-day threshold,
+  // not a full multi-night calendar).
+  const mealDays = overnightRequired ? 2 : 1
+  const rawMealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
+  const mealCostCents = Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether

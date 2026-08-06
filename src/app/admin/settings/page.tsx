@@ -37,6 +37,7 @@ type Settings = {
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
   garage_insurance_fee_cents: number
+  max_daily_meal_budget_cents: number
   preferred_driver_window_minutes: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
@@ -189,6 +190,13 @@ export default function PricingSettingsPage() {
               <label className="block text-sm text-gray-700 mb-1">Max meal breaks counted</label>
               <input type="number" value={settings.meal_allowance_max_count}
                 onChange={(e) => updateNumberField('meal_allowance_max_count', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Max daily food budget per person ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Caps total meal cost per driver per day, regardless of how many breaks add up — an overnight trip counts as 2 days</p>
+              <input type="number" step="0.01" value={dollars(settings.max_daily_meal_budget_cents)}
+                onChange={(e) => updateDollarField('max_daily_meal_budget_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
