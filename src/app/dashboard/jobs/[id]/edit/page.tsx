@@ -55,6 +55,8 @@ export default function EditJobPage() {
   const [registryVisit, setRegistryVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
+  const [flightPriceOverride, setFlightPriceOverride] = useState('')
+  const [flightHoursOverride, setFlightHoursOverride] = useState('')
   const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade'>('none')
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
   const [linkedJobQuery, setLinkedJobQuery] = useState('')
@@ -380,6 +382,8 @@ export default function EditJobPage() {
       // Builds the charges for "drive one-way and fly back" — ground transport
       // both ends plus a real flight search. Returns null if no flight could be found.
       async function buildFlyCharges(): Promise<AdditionalCharge[] | null> {
+        const hasOverride = flightPriceOverride.trim() !== '' && flightHoursOverride.trim() !== ''
+
         const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings!.max_driving_hours_before_overnight
         let flightDepartureDate: string | undefined
         if (scheduledFor) {
@@ -397,7 +401,11 @@ export default function EditJobPage() {
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
-        if (!flightRes.ok || !flightBody.flight) return null
+
+        // Ground transport legs stay auto-calculated either way — the override
+        // is specifically for when Duffel's flight price/time itself is wrong
+        // (e.g. it's missing a cheaper direct fare from a carrier it doesn't carry).
+        if (!hasOverride && (!flightRes.ok || !flightBody.flight)) return null
 
         const result: AdditionalCharge[] = [
           {
@@ -418,13 +426,23 @@ export default function EditJobPage() {
             paidToDriver: true,
           })
         }
-        result.push({
-          description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
-          kind: 'flight' as const,
-          dealerAmountCents: flightBody.flight.priceCents,
-          hoursAdded: flightBody.flight.hoursToAdd,
-          paidToDriver: false,
-        })
+        if (hasOverride) {
+          result.push({
+            description: `Flight back (manual override)${flightBody.origin && flightBody.destination ? `: ${flightBody.origin.code} → ${flightBody.destination.code}` : ''}`,
+            kind: 'flight' as const,
+            dealerAmountCents: Math.round(parseFloat(flightPriceOverride) * 100),
+            hoursAdded: parseFloat(flightHoursOverride),
+            paidToDriver: false,
+          })
+        } else {
+          result.push({
+            description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
+            kind: 'flight' as const,
+            dealerAmountCents: flightBody.flight.priceCents,
+            hoursAdded: flightBody.flight.hoursToAdd,
+            paidToDriver: false,
+          })
+        }
         return result
       }
 
@@ -550,7 +568,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -1024,6 +1042,36 @@ export default function EditJobPage() {
                   Flight price and hours will be looked up and added automatically when you click "Calculate distance & cost" below.
                 </p>
               )}
+              <div className="ml-6 mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Override flight price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={flightPriceOverride}
+                    onChange={(e) => setFlightPriceOverride(e.target.value)}
+                    placeholder="e.g. 249.00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Override flight hours</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={flightHoursOverride}
+                    onChange={(e) => setFlightHoursOverride(e.target.value)}
+                    placeholder="e.g. 4.7"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <p className="ml-6 mt-1 text-xs text-gray-400">
+                Fill both in to use your own flight price/time instead of the auto-search (e.g. when Duffel can&apos;t
+                see a cheaper direct fare from a carrier it doesn&apos;t carry, like Flair). Leave blank to search automatically.
+                Ground transport legs stay auto-calculated either way. Applies whenever the driver flies back, including
+                the auto-selected long-haul comparison.
+              </p>
             </div>
           </div>
 
