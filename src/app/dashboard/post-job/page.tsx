@@ -56,6 +56,10 @@ export default function PostJobPage() {
   const [secondVehicleModel, setSecondVehicleModel] = useState('')
   const [secondVehicleStockNumber, setSecondVehicleStockNumber] = useState('')
   const [secondVehicleVin, setSecondVehicleVin] = useState('')
+  const [secondTradeInYear, setSecondTradeInYear] = useState('')
+  const [secondTradeInMake, setSecondTradeInMake] = useState('')
+  const [secondTradeInModel, setSecondTradeInModel] = useState('')
+  const [secondTradeInVin, setSecondTradeInVin] = useState('')
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
@@ -819,6 +823,10 @@ export default function PostJobPage() {
         use_garage_insurance: false,
         is_second_driver_job: true,
         companion_job_id: newJob.id,
+        trade_in_year: secondTradeInYear ? parseInt(secondTradeInYear) : null,
+        trade_in_make: secondTradeInMake || null,
+        trade_in_model: secondTradeInModel || null,
+        trade_in_vin: secondTradeInVin || null,
         overnight_required: soloPricing.overnightRequired,
         estimated_distance_km: soloPricing.tripDistanceKm,
         estimated_duration_minutes: durationMinutes,
@@ -916,8 +924,10 @@ export default function PostJobPage() {
                     // job post. No manual linking needed. Chase vehicle is a
                     // different concept (one driver following another in the same
                     // vehicle pairing) and never applies here — each driver has
-                    // their own separate vehicle and job post.
+                    // their own separate vehicle and job post. Every arrangement
+                    // involves at least one trade-in, so surface those fields too.
                     setSecondDriver(true)
+                    setIsTradeIn(true)
                   }
                 }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -948,6 +958,17 @@ export default function PostJobPage() {
                     )}
                     <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   </div>
+                  {multiVehicleArrangement === 'two_vehicles_two_trades' && (
+                    <div className="pl-1 mt-2 space-y-2">
+                      <label className="block text-xs text-gray-500">Second trade-in vehicle (2nd driver takes this one back)</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input value={secondTradeInYear} onChange={(e) => setSecondTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        <input value={secondTradeInMake} onChange={(e) => setSecondTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        <input value={secondTradeInModel} onChange={(e) => setSecondTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      </div>
+                      <input value={secondTradeInVin} onChange={(e) => setSecondTradeInVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1110,7 +1131,15 @@ export default function PostJobPage() {
             </label>
             {isTradeIn && (
               <div className="pl-1 space-y-2">
-                <label className="block text-xs text-gray-500">Trade-in vehicle</label>
+                <label className="block text-xs text-gray-500">
+                  {multiVehicleArrangement === 'two_trades_one_purchase'
+                    ? 'First trade-in vehicle (this driver takes it back)'
+                    : multiVehicleArrangement === 'two_purchases_one_trade'
+                      ? 'Trade-in vehicle (both drivers ride back in this one together)'
+                      : multiVehicleArrangement === 'two_vehicles_two_trades'
+                        ? 'First trade-in vehicle (this driver takes it back)'
+                        : 'Trade-in vehicle'}
+                </label>
                 <div className="grid grid-cols-3 gap-2">
                   <input value={tradeInYear} onChange={(e) => setTradeInYear(e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
