@@ -7,7 +7,7 @@ import { calculatePricing, formatCents, type PricingSettings, type AdditionalCha
 import Logo from '@/components/Logo'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
-import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString } from '@/lib/localDatetime'
+import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
 
 type JobType = { id: string; name: string }
 type Organization = { id: string; name: string }
@@ -39,6 +39,8 @@ export default function PostJobPage() {
 
   const [scheduledFor, setScheduledFor] = useState('')
   const [deliveryDeadline, setDeliveryDeadline] = useState('')
+  const [originTimeZone, setOriginTimeZone] = useState<string | null>(null)
+  const [destinationTimeZone, setDestinationTimeZone] = useState<string | null>(null)
   const [computingPickupTime, setComputingPickupTime] = useState(false)
   const [pickupTimeError, setPickupTimeError] = useState('')
   const [ferryLiveDataUsed, setFerryLiveDataUsed] = useState(false)
@@ -181,6 +183,10 @@ export default function PostJobPage() {
 
     setComputingPickupTime(true)
     try {
+      // Departure time for the traffic-aware route needs a real UTC instant —
+      // use the browser's naive interpretation just to get traffic in the right
+      // ballpark; the actual deadline is recalculated correctly below once we
+      // know the destination's real timezone.
       const res = await fetch('/api/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,6 +202,9 @@ export default function PostJobPage() {
         return
       }
 
+      setOriginTimeZone(data.originTimeZone ?? null)
+      setDestinationTimeZone(data.destinationTimeZone ?? null)
+
       const driveHours = data.durationMinutes / 60
       const mealBreaks = Math.min(
         Math.floor(driveHours / pricingSettings.meal_allowance_every_hours),
@@ -204,18 +213,40 @@ export default function PostJobPage() {
       const breakHours = (mealBreaks * pricingSettings.break_duration_minutes) / 60
       const totalHoursNeeded = driveHours + breakHours
 
-      // Safe to do this arithmetic directly — both value and "now" are being
-      // interpreted in the same (local) context here on the client.
-      const pickupDate = new Date(value)
-      pickupDate.setTime(pickupDate.getTime() - totalHoursNeeded * 60 * 60 * 1000)
+      // The delivery time the dealer typed means wall-clock time AT THE
+      // DESTINATION — a 5pm Edmonton delivery is 5pm Edmonton time, not 5pm
+      // wherever the dealer's browser happens to be. Fall back to naive
+      // browser-local interpretation only if we couldn't resolve a timezone.
+      const deadlineUtcIso = data.destinationTimeZone
+        ? zonedLocalInputToUtcIso(value, data.destinationTimeZone)
+        : localInputToUtcIso(value)
+      if (!deadlineUtcIso) {
+        setPickupTimeError('Could not interpret that delivery time.')
+        setComputingPickupTime(false)
+        return
+      }
 
-      if (pickupDate.getTime() < Date.now()) {
-        const shortfallHours = Math.round(((Date.now() - pickupDate.getTime()) / (60 * 60 * 1000)) * 10) / 10
+      const pickupInstant = new Date(deadlineUtcIso)
+      pickupInstant.setTime(pickupInstant.getTime() - totalHoursNeeded * 60 * 60 * 1000)
+
+      if (pickupInstant.getTime() < Date.now()) {
+        const shortfallHours = Math.round(((Date.now() - pickupInstant.getTime()) / (60 * 60 * 1000)) * 10) / 10
+        const displayTz = data.originTimeZone ?? undefined
+        const pickupDisplay = displayTz
+          ? pickupInstant.toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short', timeZone: displayTz })
+          : pickupInstant.toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })
         setPickupTimeError(
-          `⚠️ This delivery time isn't achievable — the driver would have needed to leave ${shortfallHours} hrs ago (by ${pickupDate.toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}). Pick a later delivery time or an earlier pickup.`
+          `⚠️ This delivery time isn't achievable — the driver would have needed to leave ${shortfallHours} hrs ago (by ${pickupDisplay}${displayTz ? ` ${zonedAbbreviation(pickupInstant.toISOString(), displayTz)}` : ''}). Pick a later delivery time or an earlier pickup.`
         )
       }
-      setScheduledFor(toLocalDatetimeInputValue(pickupDate))
+
+      // Store the pickup as a datetime-local value in the ORIGIN's own timezone
+      // (that's the true local pickup time), not the browser's.
+      setScheduledFor(
+        data.originTimeZone
+          ? utcIsoToZonedInputValue(pickupInstant.toISOString(), data.originTimeZone)
+          : toLocalDatetimeInputValue(pickupInstant)
+      )
     } catch {
       setPickupTimeError('Something went wrong calculating the pickup time.')
     }
@@ -240,7 +271,10 @@ export default function PostJobPage() {
       const res = await fetch('/api/distance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: filledStops, departureTime: localInputToUtcIso(scheduledFor) }),
+        body: JSON.stringify({
+          addresses: filledStops,
+          departureTime: originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -248,6 +282,9 @@ export default function PostJobPage() {
         setCalculating(false)
         return
       }
+
+      if (data.originTimeZone) setOriginTimeZone(data.originTimeZone)
+      if (data.destinationTimeZone) setDestinationTimeZone(data.destinationTimeZone)
 
       setDistanceKm(data.distanceKm)
       setDurationMinutes(data.durationMinutes)
@@ -551,7 +588,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -719,8 +756,8 @@ export default function PostJobPage() {
       customer_full_name: customerFullName || null,
       customer_phone: customerPhone || null,
       customer_address: customerAddress || null,
-      scheduled_for: scheduledFor || null,
-      delivery_deadline: deliveryDeadline || null,
+      scheduled_for: scheduledFor ? (originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor)) ?? null : null,
+      delivery_deadline: deliveryDeadline ? (destinationTimeZone ? zonedLocalInputToUtcIso(deliveryDeadline, destinationTimeZone) : localInputToUtcIso(deliveryDeadline)) ?? null : null,
       second_driver_required: secondDriver,
       chase_vehicle_required: chaseVehicle,
       is_trade_in_pickup: isTradeIn,
@@ -814,8 +851,8 @@ export default function PostJobPage() {
         customer_full_name: customerFullName || null,
         customer_phone: customerPhone || null,
         customer_address: customerAddress || null,
-        scheduled_for: scheduledFor || null,
-        delivery_deadline: deliveryDeadline || null,
+        scheduled_for: scheduledFor ? (originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor)) ?? null : null,
+        delivery_deadline: deliveryDeadline ? (destinationTimeZone ? zonedLocalInputToUtcIso(deliveryDeadline, destinationTimeZone) : localInputToUtcIso(deliveryDeadline)) ?? null : null,
         second_driver_required: false,
         chase_vehicle_required: false,
         is_trade_in_pickup: isTradeIn,
@@ -1131,11 +1168,19 @@ export default function PostJobPage() {
             />
             {computingPickupTime && <p className="text-xs text-gray-400 mt-1">Calculating required pickup time…</p>}
             {pickupTimeError && <p className="text-xs text-red-600 mt-1">{pickupTimeError}</p>}
-            {deliveryDeadline && !computingPickupTime && !pickupTimeError && scheduledFor && (
-              <p className="text-xs text-gray-500 mt-1">
-                Driver needs to leave by {new Date(scheduledFor).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })} to make it on time.
-              </p>
-            )}
+            {deliveryDeadline && !computingPickupTime && !pickupTimeError && scheduledFor && (() => {
+              const utcIso = originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor)
+              if (!utcIso) return null
+              const display = originTimeZone
+                ? new Date(utcIso).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short', timeZone: originTimeZone })
+                : new Date(utcIso).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })
+              const tzAbbr = originTimeZone ? zonedAbbreviation(utcIso, originTimeZone) : ''
+              return (
+                <p className="text-xs text-gray-500 mt-1">
+                  Driver needs to leave by {display}{tzAbbr && ` ${tzAbbr}`} to make it on time.
+                </p>
+              )
+            })()}
           </div>
 
           <div>
@@ -1220,9 +1265,9 @@ export default function PostJobPage() {
               <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => setOutOfProvinceInspection(e.target.checked)} />
               Out-of-province inspection required
             </label>
-            {outOfProvinceInspection && scheduledFor && [5, 6].includes(new Date(scheduledFor).getDay()) && (
+            {outOfProvinceInspection && scheduledFor && [5, 6].includes(new Date(`${scheduledFor}:00Z`).getUTCDay()) && (
               <p className="text-xs text-amber-600 -mt-1 ml-6">
-                ⚠️ This is scheduled for a {new Date(scheduledFor).getDay() === 5 ? 'Friday' : 'Saturday'} — most registries and
+                ⚠️ This is scheduled for a {new Date(`${scheduledFor}:00Z`).getUTCDay() === 5 ? 'Friday' : 'Saturday'} — most registries and
                 inspection shops are closed Sundays, so the inspection may not complete until Monday. An extra hotel night and
                 flat fees may apply if so.
               </p>

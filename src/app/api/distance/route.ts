@@ -10,6 +10,23 @@ function toWaypoint(point: string) {
   return { address: point }
 }
 
+// Resolves the IANA timezone (e.g. "America/Edmonton") for a lat/lng, so pickup
+// and delivery times can be interpreted/shown in the RIGHT local timezone rather
+// than always assuming the browser's own timezone (which breaks for interprovincial
+// deliveries — a driver in Vancouver delivering to Edmonton needs Edmonton's time).
+async function resolveTimeZone(lat: number, lng: number, apiKey: string): Promise<string | null> {
+  try {
+    const timestamp = Math.floor(Date.now() / 1000)
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${timestamp}&key=${apiKey}`
+    )
+    const data = await res.json()
+    return data.status === 'OK' ? data.timeZoneId : null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   const { addresses, departureTime } = await req.json()
 
@@ -48,7 +65,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.legs.startLocation,routes.legs.endLocation',
       },
       body: JSON.stringify(body),
     })
@@ -61,9 +78,20 @@ export async function POST(req: NextRequest) {
     const route = data.routes[0]
     const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10)
 
+    const legs = route.legs ?? []
+    const startPoint = legs[0]?.startLocation?.latLng
+    const endPoint = legs[legs.length - 1]?.endLocation?.latLng
+
+    const [originTimeZone, destinationTimeZone] = await Promise.all([
+      startPoint ? resolveTimeZone(startPoint.latitude, startPoint.longitude, apiKey) : Promise.resolve(null),
+      endPoint ? resolveTimeZone(endPoint.latitude, endPoint.longitude, apiKey) : Promise.resolve(null),
+    ])
+
     return NextResponse.json({
       distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
       durationMinutes: Math.round(durationSeconds / 60),
+      originTimeZone,
+      destinationTimeZone,
     })
   } catch {
     return NextResponse.json({ error: 'Failed to reach mapping service' }, { status: 500 })
