@@ -28,6 +28,9 @@ export type PricingSettings = {
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
   garage_insurance_fee_cents: number
+  drivflo_insurance_rate_per_day_cents: number
+  drivflo_insurance_multiday_discount_percent: number
+  drivflo_insurance_tow_deductible_fee_cents: number
   max_daily_meal_budget_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
@@ -53,6 +56,7 @@ export type PricingInput = {
   registryVisit: boolean
   ferryRequired: boolean
   useGarageInsurance: boolean
+  includeTowDeductibleCoverage: boolean
   additionalCharges: AdditionalCharge[]
   oneWayFlightBack: boolean // driver flies back instead of driving back — bill/pay one-way only
   // For linked multi-vehicle deals (e.g. 2 trade-ins + 1 purchase): how many
@@ -80,6 +84,7 @@ export type PricingResult = {
   registryFeeCents: number
   ferryFeeCents: number
   garageInsuranceFeeCents: number
+  insuranceDays: number
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
@@ -92,7 +97,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -205,7 +210,23 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // too, before markup is applied on top.
   const driverPayFloorBumpCents = estimatedDriverPayCents - computedDriverPayCents
 
-  const garageInsuranceFeeCents = useGarageInsurance && Number.isFinite(settings.garage_insurance_fee_cents) ? settings.garage_insurance_fee_cents : 0
+  // Drivflo's own insurance is priced per vehicle per day — day 1 at full rate,
+  // every day after that discounted (the vehicle's tied up longer, but the
+  // marginal risk/cost of continuing coverage is lower than starting fresh).
+  // Days are estimated from total billed hours since the app doesn't track a
+  // precise multi-night calendar.
+  const insuranceDays = Math.max(1, Math.ceil(dealerBilledHours / 24))
+  const discountedDailyRateCents = Number.isFinite(settings.drivflo_insurance_rate_per_day_cents) && Number.isFinite(settings.drivflo_insurance_multiday_discount_percent)
+    ? Math.round(settings.drivflo_insurance_rate_per_day_cents * (1 - settings.drivflo_insurance_multiday_discount_percent / 100))
+    : 0
+  const baseInsuranceCents = Number.isFinite(settings.drivflo_insurance_rate_per_day_cents)
+    ? settings.drivflo_insurance_rate_per_day_cents + Math.max(0, insuranceDays - 1) * discountedDailyRateCents
+    : 0
+  const towDeductibleCents =
+    includeTowDeductibleCoverage && Number.isFinite(settings.drivflo_insurance_tow_deductible_fee_cents)
+      ? settings.drivflo_insurance_tow_deductible_fee_cents
+      : 0
+  const garageInsuranceFeeCents = useGarageInsurance ? baseInsuranceCents + towDeductibleCents : 0
 
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
@@ -232,6 +253,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     registryFeeCents,
     ferryFeeCents,
     garageInsuranceFeeCents,
+    insuranceDays,
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,

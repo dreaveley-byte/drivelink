@@ -37,6 +37,9 @@ type Settings = {
   ferry_wait_hours: number
   ferry_walkon_fare_cents: number
   garage_insurance_fee_cents: number
+  drivflo_insurance_rate_per_day_cents: number
+  drivflo_insurance_multiday_discount_percent: number
+  drivflo_insurance_tow_deductible_fee_cents: number
   max_daily_meal_budget_cents: number
   preferred_driver_window_minutes: number
   bus_base_fare_cents: number
@@ -338,10 +341,24 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Garage insurance fee ($)</label>
-              <p className="text-xs text-gray-400 mb-1">Charged when the dealer opts to run the delivery under our garage policy instead of their own</p>
-              <input type="number" step="0.01" value={dollars(settings.garage_insurance_fee_cents)}
-                onChange={(e) => updateDollarField('garage_insurance_fee_cents', e.target.value)}
+              <label className="block text-sm text-gray-700 mb-1">Drivflo insurance rate ($/vehicle/day)</label>
+              <p className="text-xs text-gray-400 mb-1">Day 1 rate when the dealer opts to insure through Drivflo instead of their own garage policy</p>
+              <input type="number" step="0.01" value={dollars(settings.drivflo_insurance_rate_per_day_cents)}
+                onChange={(e) => updateDollarField('drivflo_insurance_rate_per_day_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Drivflo insurance multi-day discount (%)</label>
+              <p className="text-xs text-gray-400 mb-1">Applied to the daily rate for every day after day 1</p>
+              <input type="number" step="1" value={settings.drivflo_insurance_multiday_discount_percent}
+                onChange={(e) => updateNumberField('drivflo_insurance_multiday_discount_percent', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Tow + deductible coverage add-on ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Optional flat fee on top of Drivflo insurance — covers tow assistance and pays the deductible if there's a claim</p>
+              <input type="number" step="0.01" value={dollars(settings.drivflo_insurance_tow_deductible_fee_cents)}
+                onChange={(e) => updateDollarField('drivflo_insurance_tow_deductible_fee_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>

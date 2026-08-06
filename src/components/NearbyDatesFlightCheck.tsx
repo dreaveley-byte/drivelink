@@ -116,6 +116,7 @@ export default function NearbyDatesFlightCheck({
             registryVisit,
             ferryRequired,
             useGarageInsurance: false,
+            includeTowDeductibleCoverage: false,
             additionalCharges: charges,
             oneWayFlightBack: true,
           },

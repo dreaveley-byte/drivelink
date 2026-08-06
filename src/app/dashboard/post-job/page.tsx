@@ -68,6 +68,7 @@ export default function PostJobPage() {
   const [registryVisit, setRegistryVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
+  const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
   const [flightPriceOverride, setFlightPriceOverride] = useState('')
   const [flightHoursOverride, setFlightHoursOverride] = useState('')
   const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade' | 'two_vehicles_two_trades'>('none')
@@ -465,7 +466,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -475,7 +476,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -485,7 +486,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -570,6 +571,7 @@ export default function PostJobPage() {
           registryVisit,
           ferryRequired: false,
           useGarageInsurance,
+          includeTowDeductibleCoverage,
           additionalCharges: additionalCharges.filter((c) => !c.kind),
           oneWayFlightBack: false,
         },
@@ -602,6 +604,7 @@ export default function PostJobPage() {
         registryVisit,
         ferryRequired: false,
         useGarageInsurance,
+        includeTowDeductibleCoverage,
         additionalCharges,
         oneWayFlightBack: flyingBack,
         outboundVehicleCount,
@@ -611,7 +614,7 @@ export default function PostJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -687,6 +690,7 @@ export default function PostJobPage() {
               registryVisit,
               ferryRequired: false,
               useGarageInsurance: false,
+          includeTowDeductibleCoverage: false,
               additionalCharges: additionalCharges.filter((c) => !c.kind),
               oneWayFlightBack: flyingBack,
             },
@@ -728,6 +732,7 @@ export default function PostJobPage() {
       registry_visit: registryVisit,
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
+      include_tow_deductible_coverage: includeTowDeductibleCoverage,
       linked_job_id: linkedJobId,
       multi_vehicle_arrangement: multiVehicleArrangement,
       rides_along_with_linked: ridesAlongWithLinked,
@@ -781,6 +786,7 @@ export default function PostJobPage() {
           registryVisit,
           ferryRequired: false,
           useGarageInsurance: false,
+          includeTowDeductibleCoverage: false,
           additionalCharges: additionalCharges.filter((c) => !c.kind),
           oneWayFlightBack: flyingBack,
         },
@@ -1131,6 +1137,28 @@ export default function PostJobPage() {
               <option value="dealer">Dealer&apos;s own garage policy</option>
               <option value="drivflo">Buy insurance through Drivflo</option>
             </select>
+            {useGarageInsurance && pricingSettings && (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-gray-500">
+                  {pricing ? (
+                    <>
+                      {formatCents(pricingSettings.drivflo_insurance_rate_per_day_cents)}/day
+                      {pricing.insuranceDays > 1 && (
+                        <> (day 1 full rate, {pricing.insuranceDays - 1} more day{pricing.insuranceDays - 1 === 1 ? '' : 's'} at {100 - pricingSettings.drivflo_insurance_multiday_discount_percent}%)</>
+                      )}
+                      {' — '}
+                      {formatCents(pricing.garageInsuranceFeeCents - (includeTowDeductibleCoverage ? pricingSettings.drivflo_insurance_tow_deductible_fee_cents : 0))} for {pricing.insuranceDays} day{pricing.insuranceDays === 1 ? '' : 's'}
+                    </>
+                  ) : (
+                    'Calculate distance & cost to see the price.'
+                  )}
+                </p>
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input type="checkbox" checked={includeTowDeductibleCoverage} onChange={(e) => setIncludeTowDeductibleCoverage(e.target.checked)} />
+                  Add tow assistance + deductible coverage (+{formatCents(pricingSettings.drivflo_insurance_tow_deductible_fee_cents)})
+                </label>
+              </div>
+            )}
           </div>
 
           <div>
@@ -1350,7 +1378,7 @@ export default function PostJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
-                    <BreakdownRow label="Garage policy insurance" cents={pricing.garageInsuranceFeeCents} />
+                    <BreakdownRow label="Drivflo insurance" cents={pricing.garageInsuranceFeeCents} />
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.kind === 'flight')?.dealerAmountCents ?? 0} />
