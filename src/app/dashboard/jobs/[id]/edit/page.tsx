@@ -974,7 +974,7 @@ export default function EditJobPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Stock number</label>
-                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)}
+                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} required
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
@@ -985,7 +985,7 @@ export default function EditJobPage() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">VIN</label>
-              <input value={vin} onChange={(e) => setVin(e.target.value)}
+              <input value={vin} onChange={(e) => setVin(e.target.value)} required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
 

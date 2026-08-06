@@ -1002,7 +1002,7 @@ export default function PostJobPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Stock number</label>
-                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)}
+                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} required
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
@@ -1013,7 +1013,7 @@ export default function PostJobPage() {
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">VIN</label>
-              <input value={vin} onChange={(e) => setVin(e.target.value)}
+              <input value={vin} onChange={(e) => setVin(e.target.value)} required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
 
@@ -1054,8 +1054,8 @@ export default function PostJobPage() {
                     <input value={secondVehicleMake} onChange={(e) => setSecondVehicleMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                     <input value={secondVehicleModel} onChange={(e) => setSecondVehicleModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   </div>
-                  <input value={secondVehicleStockNumber} onChange={(e) => setSecondVehicleStockNumber(e.target.value)} placeholder="Stock # (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
-                  <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={secondVehicleStockNumber} onChange={(e) => setSecondVehicleStockNumber(e.target.value)} placeholder="Stock #" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
               )}
 
@@ -1071,7 +1071,7 @@ export default function PostJobPage() {
                     <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                     <input value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   </div>
-                  <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
               )}
 
@@ -1083,7 +1083,7 @@ export default function PostJobPage() {
                     <input value={secondTradeInMake} onChange={(e) => setSecondTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                     <input value={secondTradeInModel} onChange={(e) => setSecondTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   </div>
-                  <input value={secondTradeInVin} onChange={(e) => setSecondTradeInVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={secondTradeInVin} onChange={(e) => setSecondTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
               )}
             </div>
@@ -1186,7 +1186,7 @@ export default function PostJobPage() {
                   <input value={tradeInMake} onChange={(e) => setTradeInMake(e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   <input value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                 </div>
-                <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN (optional)" className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
               </div>
             )}
             <label className="flex items-center gap-2 text-sm text-gray-700">
