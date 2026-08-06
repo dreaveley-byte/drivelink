@@ -245,25 +245,34 @@ export default function PostJobPage() {
       // --- Ferry: look this up once regardless of round-trip/one-way, since the
       // terminal match itself doesn't depend on that — only the crossing count does.
       let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number; groundHome: { distanceKm: number; durationMinutes: number } | null } | null = null
-      try {
-        const ferryRes = await fetch('/api/ferry/schedule', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
-        })
-        const ferryBody = await ferryRes.json().catch(() => ({}))
-        if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
-          ferryInfo = ferryBody
-          setFerryDebugNote(`Ferry detected: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name} (vehicle fare $${(pricingSettings.ferry_fare_cents / 100).toFixed(2)}, walk-on fare $${(pricingSettings.ferry_walkon_fare_cents / 100).toFixed(2)})`)
-        } else {
-          setFerryDebugNote(`Ferry check: ${ferryBody.error || 'no route detected'}`)
-          if (ferryRequired) {
-            setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+      // A real BC Ferries route never applies to a short local drive — the terminal
+      // matching can otherwise false-positive on nearby-but-different terminals for
+      // trips like a quick dealer-to-dealer trade. Skip the check entirely below
+      // this distance unless the dealer explicitly knows better and forced it on.
+      const MIN_ONE_WAY_KM_FOR_FERRY_CHECK = 25
+      if (data.distanceKm >= MIN_ONE_WAY_KM_FOR_FERRY_CHECK || ferryRequired) {
+        try {
+          const ferryRes = await fetch('/api/ferry/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1] }),
+          })
+          const ferryBody = await ferryRes.json().catch(() => ({}))
+          if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {
+            ferryInfo = ferryBody
+            setFerryDebugNote(`Ferry detected: ${ferryBody.fromTerminal.name} → ${ferryBody.toTerminal.name} (vehicle fare $${(pricingSettings.ferry_fare_cents / 100).toFixed(2)}, walk-on fare $${(pricingSettings.ferry_walkon_fare_cents / 100).toFixed(2)})`)
+          } else {
+            setFerryDebugNote(`Ferry check: ${ferryBody.error || 'no route detected'}`)
+            if (ferryRequired) {
+              setCalcError(ferryBody.error ? `Ferry lookup: ${ferryBody.error} — using default fare/wait time instead.` : 'Could not look up live ferry schedule — using default fare/wait time instead.')
+            }
           }
+        } catch (e) {
+          setFerryDebugNote(`Ferry check failed: ${e instanceof Error ? e.message : 'unknown error'}`)
+          if (ferryRequired) setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
         }
-      } catch (e) {
-        setFerryDebugNote(`Ferry check failed: ${e instanceof Error ? e.message : 'unknown error'}`)
-        if (ferryRequired) setCalcError('Could not reach the ferry schedule service — using default fare/wait time instead.')
+      } else {
+        setFerryDebugNote(`Ferry check skipped — ${data.distanceKm}km one-way is too short for a real ferry route.`)
       }
       setFerryLiveDataUsed(!!ferryInfo)
 
