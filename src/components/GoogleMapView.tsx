@@ -59,6 +59,10 @@ export default function GoogleMapView({
   const [locationUpdatedAt, setLocationUpdatedAt] = useState(initialLocationUpdatedAt)
   const [eta, setEta] = useState<string>('')
   const isTerminal = jobStatus === 'completed' || jobStatus === 'cancelled'
+  // Live GPS tracking only makes sense once the driver has actually started the
+  // delivery drive — before that (assigned/picked up) there's no meaningful
+  // position to show yet, so the map stays a static preview of the planned route.
+  const isTracking = jobStatus === 'in_progress'
 
   const updateEta = useCallback(async (lat: number, lng: number) => {
     try {
@@ -91,6 +95,28 @@ export default function GoogleMapView({
         })
         mapRef.current = map
 
+        // Draw the actual planned driving route as a line between pickup and
+        // dropoff — this is what lets the customer see the driver visibly
+        // progressing along a real road path, not just two disconnected pins.
+        const directionsService = new google.maps.DirectionsService()
+        const directionsRenderer = new google.maps.DirectionsRenderer({
+          map,
+          suppressMarkers: true,
+          polylineOptions: { strokeColor: '#2563eb', strokeOpacity: 0.6, strokeWeight: 4 },
+        })
+        directionsService.route(
+          {
+            origin: pickupAddress,
+            destination: dropoffAddress,
+            travelMode: google.maps.TravelMode.DRIVING,
+          },
+          (result: any, status: string) => {
+            if (status === 'OK' && result) {
+              directionsRenderer.setDirections(result)
+            }
+          }
+        )
+
         const geocoder = new google.maps.Geocoder()
         const bounds = new google.maps.LatLngBounds()
 
@@ -112,7 +138,7 @@ export default function GoogleMapView({
           }
         })
 
-        if (initialDriverLat != null && initialDriverLng != null) {
+        if (isTracking && initialDriverLat != null && initialDriverLng != null) {
           const pos = { lat: initialDriverLat, lng: initialDriverLng }
           driverMarkerRef.current = new google.maps.Marker({
             position: pos,
@@ -142,9 +168,9 @@ export default function GoogleMapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Poll for driver location updates every 15s while the job is still active
+  // Poll for driver location updates every 15s while the driver is actively en route
   useEffect(() => {
-    if (isTerminal) return
+    if (!isTracking) return
 
     const supabase = createClient()
     const interval = setInterval(async () => {
@@ -194,7 +220,7 @@ export default function GoogleMapView({
     }, 15000)
 
     return () => clearInterval(interval)
-  }, [jobId, isTerminal, updateEta, publicToken])
+  }, [jobId, isTracking, isTerminal, updateEta, publicToken])
 
   const minutesAgo = locationUpdatedAt
     ? Math.round((Date.now() - new Date(locationUpdatedAt).getTime()) / 60000)
@@ -209,9 +235,13 @@ export default function GoogleMapView({
       )}
       <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
         <span>
-          {eta && !isTerminal ? eta : isTerminal ? 'Trip finished' : 'Waiting for driver location...'}
+          {isTerminal
+            ? 'Trip finished'
+            : !isTracking
+              ? 'Live tracking starts once your driver is on the way'
+              : eta || 'Waiting for driver location...'}
         </span>
-        {minutesAgo != null && !isTerminal && (
+        {minutesAgo != null && isTracking && !isTerminal && (
           <span>Updated {minutesAgo === 0 ? 'just now' : `${minutesAgo} min ago`}</span>
         )}
       </div>
