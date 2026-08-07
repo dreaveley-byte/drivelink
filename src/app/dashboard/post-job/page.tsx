@@ -524,7 +524,10 @@ export default function PostJobPage() {
         setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
-        if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
+        if (dealerPickupCount > 0) {
+          const driverCount = Math.max(dealerDropoffCount, dealerPickupCount, 1)
+          setDecisionNote(`Dealer trade: ${dealerDropoffCount} to drop off, ${dealerPickupCount} to pick up — ${driverCount} driver${driverCount === 1 ? '' : 's'} needed, billed accordingly. Treated as a round trip since vehicles are being driven back.`)
+        } else if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
       } else if (longHaul) {
         // Compare all three ways to get the driver home, pick the cheapest.
@@ -1113,6 +1116,12 @@ export default function PostJobPage() {
                 const newType = jobTypes.find((jt) => jt.id === newId)
                 if (newType?.name !== 'Vehicle Delivery' && multiVehicleArrangement !== 'none') {
                   setMultiVehicleArrangement('none')
+                }
+                if (newType?.name !== 'Dealer to Dealer' && (dealerDropoffCount > 0 || dealerPickupCount > 0)) {
+                  setDealerDropoffCount(0)
+                  setDealerPickupCount(0)
+                  setDealerDropoffVehicles([])
+                  setDealerPickupVehicles([])
                 }
               }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
