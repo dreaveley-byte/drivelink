@@ -14,6 +14,22 @@ function toWaypoint(point: string) {
 // and delivery times can be interpreted/shown in the RIGHT local timezone rather
 // than always assuming the browser's own timezone (which breaks for interprovincial
 // deliveries — a driver in Vancouver delivering to Edmonton needs Edmonton's time).
+// Rough North American timezone bands by longitude, with known DST exceptions
+// handled (Saskatchewan doesn't observe DST, hence the separate Regina zone).
+// Not exact at every provincial boundary, but close enough (~50km) to never be
+// as wrong as falling back to the server's raw UTC offset would be.
+function approximateNorthAmericanTimeZone(lat: number, lng: number): string {
+  if (lat > 46.5 && lat < 61 && lng > -59.5 && lng < -52.5) return 'America/St_Johns'
+  if (lng >= -68 && lng < -52.5) return 'America/Halifax'
+  if (lng >= -90 && lng < -68) return 'America/Toronto'
+  if (lng >= -102 && lng < -90) {
+    if (lat > 48.5 && lat < 60 && lng > -110 && lng < -101.3) return 'America/Regina'
+    return 'America/Winnipeg'
+  }
+  if (lng >= -120 && lng < -102) return 'America/Edmonton'
+  return 'America/Vancouver'
+}
+
 async function resolveTimeZone(lat: number, lng: number, apiKey: string): Promise<string | null> {
   try {
     const timestamp = Math.floor(Date.now() / 1000)
@@ -22,13 +38,13 @@ async function resolveTimeZone(lat: number, lng: number, apiKey: string): Promis
     )
     const data = await res.json()
     if (data.status !== 'OK') {
-      console.error(`Timezone API failed for ${lat},${lng}: status=${data.status}, message=${data.errorMessage || 'none'}`)
-      return null
+      console.error(`Timezone API failed for ${lat},${lng}: status=${data.status}, message=${data.errorMessage || 'none'} — using longitude-based fallback instead.`)
+      return approximateNorthAmericanTimeZone(lat, lng)
     }
     return data.timeZoneId
   } catch (e) {
-    console.error(`Timezone API request failed for ${lat},${lng}:`, e)
-    return null
+    console.error(`Timezone API request failed for ${lat},${lng}:`, e, '— using longitude-based fallback instead.')
+    return approximateNorthAmericanTimeZone(lat, lng)
   }
 }
 
