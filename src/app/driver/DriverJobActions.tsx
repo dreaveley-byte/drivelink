@@ -115,7 +115,7 @@ const nextStatusLabel: Record<string, string> = {
   assigned: 'Mark picked up',
   picked_up: 'Mark in progress',
   in_progress: 'Mark delivered',
-  delivered: 'Mark completed (must be back at pickup location)',
+  delivered: 'Mark completed',
 }
 
 const statusLabels: Record<string, string> = {
@@ -412,16 +412,6 @@ export default function DriverJobActions({
     })
   }
 
-  function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const R = 6371
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLng = ((lng2 - lng1) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-    return R * 2 * Math.asin(Math.sqrt(a))
-  }
-
   async function advanceStatus() {
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
@@ -442,34 +432,19 @@ export default function DriverJobActions({
     }
 
     // "Delivered" means the vehicle reached the customer — it doesn't mean the
-    // driver's day is done. The job only counts as fully complete once they're
-    // actually back where they started, and their real pay hours run until then,
-    // not just until drop-off.
+    // driver's day is done necessarily, so we still capture when/where they
+    // actually wrap up for real hours tracking. This is informational only —
+    // it does NOT block marking the job complete regardless of location.
     if (newStatus === 'completed') {
       const pos = await getCurrentPositionSafe()
-      if (!pos) {
-        setLoading(false)
-        alert('Could not confirm your location. Enable location services and try again — you need to be back at the pickup location to mark this job complete.')
-        return
-      }
-
-      if (job.pickup_gps_lat != null && job.pickup_gps_lng != null) {
-        const { data: settings } = await supabase.from('pricing_settings').select('return_location_radius_km').eq('id', 1).single()
-        const radiusKm = settings?.return_location_radius_km ?? 5
-        const distanceKm = haversineKm(job.pickup_gps_lat, job.pickup_gps_lng, pos.coords.latitude, pos.coords.longitude)
-        if (distanceKm > radiusKm) {
-          setLoading(false)
-          alert(`You're still ${distanceKm.toFixed(1)}km from where you picked up this vehicle. This job can't be marked complete until you're back at the pickup location (within ${radiusKm}km).`)
-          return
+      if (pos) {
+        jobUpdate.return_gps_lat = pos.coords.latitude
+        jobUpdate.return_gps_lng = pos.coords.longitude
+        jobUpdate.return_gps_at = new Date().toISOString()
+        if (job.pickup_gps_at) {
+          const actualHours = (Date.now() - new Date(job.pickup_gps_at).getTime()) / (60 * 60 * 1000)
+          jobUpdate.actual_driver_hours = Math.round(actualHours * 100) / 100
         }
-      }
-
-      jobUpdate.return_gps_lat = pos.coords.latitude
-      jobUpdate.return_gps_lng = pos.coords.longitude
-      jobUpdate.return_gps_at = new Date().toISOString()
-      if (job.pickup_gps_at) {
-        const actualHours = (Date.now() - new Date(job.pickup_gps_at).getTime()) / (60 * 60 * 1000)
-        jobUpdate.actual_driver_hours = Math.round(actualHours * 100) / 100
       }
     }
 
