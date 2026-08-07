@@ -776,6 +776,11 @@ export default function PostJobPage() {
           )
         : pricing
 
+    const isDealerToDealerMultiVehicle = dealerDropoffCount > 0 || dealerPickupCount > 0
+    const primaryDropoffVehicle = dealerDropoffVehicles[0]
+    const primaryPickupVehicle = dealerPickupVehicles[0]
+    const primaryVehicle = primaryDropoffVehicle || primaryPickupVehicle
+
     const { data: newJob, error: jobError } = await supabase.from('jobs').insert({
       organization_id: orgIdToUse,
       job_type_id: jobTypeId,
@@ -784,11 +789,11 @@ export default function PostJobPage() {
       dropoff_address: filledStops[filledStops.length - 1],
       recipient_name: customerFullName || null,
       recipient_phone: customerPhone || null,
-      vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
-      vehicle_make: vehicleMake || null,
-      vehicle_model: vehicleModel || null,
-      stock_number: stockNumber || null,
-      vin: vin || null,
+      vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
+      vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
+      vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
+      stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
+      vin: isDealerToDealerMultiVehicle ? (primaryVehicle?.vin || null) : (vin || null),
       mileage: mileage ? parseInt(mileage) : null,
       key_count: keyCount ? parseInt(keyCount) : null,
       has_wheel_lock: hasWheelLock,
@@ -821,10 +826,18 @@ export default function PostJobPage() {
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
       estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
-      trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
-      trade_in_make: isTradeIn ? tradeInMake || null : null,
-      trade_in_model: isTradeIn ? tradeInModel || null : null,
-      trade_in_vin: isTradeIn ? tradeInVin || null : null,
+      trade_in_year: isDealerToDealerMultiVehicle
+        ? (primaryDropoffVehicle && primaryPickupVehicle?.year ? parseInt(primaryPickupVehicle.year) : null)
+        : (isTradeIn && tradeInYear ? parseInt(tradeInYear) : null),
+      trade_in_make: isDealerToDealerMultiVehicle
+        ? (primaryDropoffVehicle && primaryPickupVehicle ? primaryPickupVehicle.make || null : null)
+        : (isTradeIn ? tradeInMake || null : null),
+      trade_in_model: isDealerToDealerMultiVehicle
+        ? (primaryDropoffVehicle && primaryPickupVehicle ? primaryPickupVehicle.model || null : null)
+        : (isTradeIn ? tradeInModel || null : null),
+      trade_in_vin: isDealerToDealerMultiVehicle
+        ? (primaryDropoffVehicle && primaryPickupVehicle ? primaryPickupVehicle.vin || null : null)
+        : (isTradeIn ? tradeInVin || null : null),
       notes: notes || null,
     }).select('id').single()
 
@@ -852,8 +865,9 @@ export default function PostJobPage() {
     // (its own full pay, not a split of the primary's) so a different driver
     // can see and claim it separately, linked back to this one. Uses its own
     // field (companion_job_id), separate from multi-vehicle linking, so the
-    // two features never conflict even when used together.
-    if (secondDriver && pricingSettings && distanceKm != null && durationMinutes != null) {
+    // two features never conflict even when used together. Dealer-to-dealer
+    // uses the generalized loop below instead, since it can need more than 2 drivers.
+    if (secondDriver && !isDealerToDealerMultiVehicle && pricingSettings && distanceKm != null && durationMinutes != null) {
       const soloPricing = calculatePricing(
         {
           distanceKm,
@@ -942,6 +956,110 @@ export default function PostJobPage() {
         }
         // Point the primary job back at its companion too.
         await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', newJob.id)
+      }
+    }
+
+    // Dealer-to-dealer with more than one driver needed — create one companion
+    // job per additional driver (not just one), each with its own vehicle
+    // assignment, chained together via companion_job_id (primary -> #2 -> #3 -> ...)
+    // so every driver has their own independently claimable job post.
+    if (isDealerToDealerMultiVehicle && pricingSettings && distanceKm != null && durationMinutes != null) {
+      const driverCount = Math.max(dealerDropoffCount, dealerPickupCount, 1)
+      let previousJobId = newJob.id
+
+      for (let i = 1; i < driverCount; i++) {
+        const dropoffVehicle = dealerDropoffVehicles[i]
+        const pickupVehicle = dealerPickupVehicles[i]
+        const vehicle = dropoffVehicle || pickupVehicle
+
+        const soloPricing = calculatePricing(
+          {
+            distanceKm,
+            durationMinutes,
+            vehicleMode,
+            numDrivers: 1,
+            outOfProvinceInspection,
+            registryVisit,
+            ferryRequired: false,
+            useGarageInsurance: false,
+            includeTowDeductibleCoverage: false,
+            additionalCharges: additionalCharges.filter((c) => !c.kind),
+            oneWayFlightBack: effectiveOneWayReturn,
+          },
+          pricingSettings
+        )
+
+        const { data: companionJob, error: companionError } = await supabase.from('jobs').insert({
+          organization_id: orgIdToUse,
+          job_type_id: jobTypeId,
+          created_by: user.id,
+          pickup_address: filledStops[0],
+          dropoff_address: filledStops[filledStops.length - 1],
+          recipient_name: customerFullName || null,
+          recipient_phone: customerPhone || null,
+          vehicle_year: vehicle?.year ? parseInt(vehicle.year) : null,
+          vehicle_make: vehicle?.make || null,
+          vehicle_model: vehicle?.model || null,
+          stock_number: dropoffVehicle?.stockNumber || null,
+          vin: vehicle?.vin || null,
+          mileage: null,
+          key_count: keyCount ? parseInt(keyCount) : null,
+          has_wheel_lock: hasWheelLock,
+          has_charging_cables: hasChargingCables,
+          other_included_items: otherIncludedItems || null,
+          customer_full_name: customerFullName || null,
+          customer_phone: customerPhone || null,
+          customer_address: customerAddress || null,
+          scheduled_for: scheduledFor ? (originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor)) ?? null : null,
+          delivery_deadline: deliveryDeadline ? (destinationTimeZone ? zonedLocalInputToUtcIso(deliveryDeadline, destinationTimeZone) : localInputToUtcIso(deliveryDeadline)) ?? null : null,
+          second_driver_required: false,
+          chase_vehicle_required: false,
+          is_trade_in_pickup: !!pickupVehicle,
+          is_first_nations_delivery: isFirstNationsDelivery,
+          one_way_flight_back: false,
+          vehicle_mode: vehicleMode,
+          used_own_vehicle: true,
+          out_of_province_inspection: outOfProvinceInspection,
+          registry_visit: registryVisit,
+          ferry_required: ferryRequired,
+          use_garage_insurance: false,
+          is_second_driver_job: true,
+          trade_in_year: dropoffVehicle && pickupVehicle?.year ? parseInt(pickupVehicle.year) : null,
+          trade_in_make: dropoffVehicle && pickupVehicle ? pickupVehicle.make || null : null,
+          trade_in_model: dropoffVehicle && pickupVehicle ? pickupVehicle.model || null : null,
+          trade_in_vin: dropoffVehicle && pickupVehicle ? pickupVehicle.vin || null : null,
+          overnight_required: soloPricing.overnightRequired,
+          estimated_distance_km: soloPricing.tripDistanceKm,
+          estimated_duration_minutes: durationMinutes,
+          estimated_dealer_cost_cents: null,
+          estimated_driver_pay_cents: soloPricing.estimatedDriverPayCents,
+          estimated_driver_reimbursement_cents: soloPricing.reimbursementCents,
+          notes: notes ? `${notes}\n\nDriver ${i + 1} of ${driverCount} on this dealer trade.` : `Driver ${i + 1} of ${driverCount} on this dealer trade.`,
+        }).select('id').single()
+
+        if (companionError) {
+          setError(`Primary job posted, but creating driver ${i + 1}'s job failed: ${companionError.message}. You may need to post the remaining drivers' jobs manually or contact support.`)
+          setLoading(false)
+          return
+        }
+
+        if (companionJob) {
+          const { error: companionStopsError } = await supabase.from('job_stops').insert(
+            filledStops.map((address, idx) => ({
+              job_id: companionJob.id,
+              stop_order: idx,
+              address,
+              stop_type: idx === 0 ? 'pickup' : idx === filledStops.length - 1 ? 'dropoff' : 'waypoint',
+            }))
+          )
+          if (companionStopsError) {
+            setError(`Primary job posted, but saving driver ${i + 1}'s job's addresses failed: ${companionStopsError.message}.`)
+            setLoading(false)
+            return
+          }
+          await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', previousJobId)
+          previousJobId = companionJob.id
+        }
       }
     }
 
