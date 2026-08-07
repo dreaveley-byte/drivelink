@@ -102,6 +102,10 @@ export default function PostJobPage() {
   // gate this, which silently billed a full round trip's worth of gas/hours even
   // when the driver only drove one-way and took an Uber back.
   const [effectiveOneWayReturn, setEffectiveOneWayReturn] = useState(false)
+  // On by default - always compares Uber-back vs 2nd driver + chase (plus flight/bus
+  // on long hauls) and picks the cheapest, regardless of trip length. Turning it off
+  // lets a manual checkbox choice (e.g. a staff member riding along) stick across recalculations.
+  const [autoSelectReturnMethod, setAutoSelectReturnMethod] = useState(true)
   const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade' | 'two_vehicles_two_trades'>('none')
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
   const [linkedJobQuery, setLinkedJobQuery] = useState('')
@@ -529,9 +533,15 @@ export default function PostJobPage() {
           setDecisionNote(`Dealer trade: ${dealerDropoffCount} to drop off, ${dealerPickupCount} to pick up — ${driverCount} driver${driverCount === 1 ? '' : 's'} needed, billed accordingly. Treated as a round trip since vehicles are being driven back.`)
         } else if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
-      } else if (longHaul) {
-        // Compare all three ways to get the driver home, pick the cheapest.
-        const [flyCharges, busCharges] = await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
+      } else if (autoSelectReturnMethod) {
+        // Always compare Uber-back against a 2nd driver + chase vehicle, on every
+        // trip regardless of length — a short local hop can still come out cheaper
+        // one way, and there's no reason to default into an expensive round trip
+        // just because chase vehicle happens to be checked. Flight/bus only get
+        // added to the comparison on genuine long hauls, where they're realistic.
+        const [flyCharges, busCharges] = longHaul
+          ? await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
+          : [null, null]
 
         const options: { label: string; flying: boolean; secondDrv: boolean; chase: boolean; charges: AdditionalCharge[]; cost: number }[] = []
 
@@ -545,7 +555,7 @@ export default function PostJobPage() {
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
-        {
+        if (busCharges) {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
@@ -553,6 +563,19 @@ export default function PostJobPage() {
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
+        }
+
+        {
+          // Uber-back — the driver goes one-way, and takes an Uber (or walks onto
+          // a ferry as a passenger, if one's involved) back to the dealership.
+          const fc = ferryCharge('oneway-walkon-return')
+          const groundHomeCharge = ferryReturnGroundTransport()
+          const charges = fc ? [...manualCharges, groundHomeCharge, fc] : [...manualCharges, groundHomeCharge]
+          const r = calculatePricing(
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            pricingSettings
+          )
+          options.push({ label: 'Uber back', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
         {
@@ -585,19 +608,19 @@ export default function PostJobPage() {
             : ''
 
         setDecisionNote(
-          `Long haul (${Math.round(oneWayHours * 10) / 10}hrs one-way) — auto-selected ${winner.label} ($${(winner.cost / 100).toFixed(2)}), cheapest of: ` +
+          `${longHaul ? `Long haul (${Math.round(oneWayHours * 10) / 10}hrs one-way)` : 'Short trip'} — auto-selected ${winner.label} ($${(winner.cost / 100).toFixed(2)}), cheapest of: ` +
           options.map((o) => `${o.label} $${(o.cost / 100).toFixed(2)}`).join(', ') +
-          '.' + flightStopsNote
+          `. Uncheck "Auto-select cheapest return method" below to lock in a manual choice instead.` + flightStopsNote
         )
       } else {
-        // Short trip, nothing forcing a round trip — respect the manual checkboxes as-is.
+        // Auto-select is off — respect the manual checkboxes exactly as set.
         if (flyingBack) {
           setEffectiveOneWayReturn(true)
           const flyCharges = await buildFlyCharges()
           if (flyCharges) {
             const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
-            setDecisionNote('Short trip, flying back (manually selected).')
+            setDecisionNote('Flying back (manually selected).')
           } else {
             setCalcError('Could not find a flight price — add one manually below if needed.')
             const fc = ferryCharge('oneway-vehicle')
@@ -615,9 +638,10 @@ export default function PostJobPage() {
           const groundHomeCharge = ferryReturnGroundTransport()
           finalCharges = [...manualCharges, groundHomeCharge, ...(fc ? [fc] : [])]
           setDecisionNote(
-            fc
-              ? `Short trip, one-way delivery — ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare). Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (${ferryInfo?.groundHome ? `calculated, ${ferryInfo.groundHome.distanceKm}km` : 'flat estimate'}).`
-              : `Short trip, one-way delivery — no ferry on this route. Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (flat estimate).`
+            (fc
+              ? `Manual: ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare). Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (${ferryInfo?.groundHome ? `calculated, ${ferryInfo.groundHome.distanceKm}km` : 'flat estimate'}).`
+              : `Manual: Uber back — no ferry on this route. Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (flat estimate).`)
+            + ' Check "Auto-select cheapest return method" below to have this picked automatically instead.'
           )
         }
       }
@@ -629,7 +653,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -1498,6 +1522,10 @@ export default function PostJobPage() {
                 <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
               </div>
             )}
+            <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <input type="checkbox" checked={autoSelectReturnMethod} onChange={(e) => setAutoSelectReturnMethod(e.target.checked)} />
+              Auto-select cheapest return method (Uber, chase vehicle, flight, or bus)
+            </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -1506,12 +1534,13 @@ export default function PostJobPage() {
                   const checked = e.target.checked
                   setSecondDriver(checked)
                   if (checked) setChaseVehicle(true)
+                  setAutoSelectReturnMethod(false)
                 }}
               />
               Second driver required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={chaseVehicle} onChange={(e) => setChaseVehicle(e.target.checked)} />
+              <input type="checkbox" checked={chaseVehicle} onChange={(e) => { setChaseVehicle(e.target.checked); setAutoSelectReturnMethod(false) }} />
               Chase vehicle required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -1545,7 +1574,7 @@ export default function PostJobPage() {
                 <input
                   type="checkbox"
                   checked={flyingBack}
-                  onChange={(e) => setFlyingBack(e.target.checked)}
+                  onChange={(e) => { setFlyingBack(e.target.checked); setAutoSelectReturnMethod(false) }}
                 />
                 One-way trip — driver flies back (no return drive)
               </label>
