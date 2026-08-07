@@ -27,6 +27,8 @@ export default function VerifyPage() {
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
   const [licensePhoto, setLicensePhoto] = useState<string | null>(null)
   const [retakeReason, setRetakeReason] = useState('')
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [cameraReady, setCameraReady] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -51,8 +53,10 @@ export default function VerifyPage() {
     if (step !== 'face' && step !== 'license') {
       streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = null
+      setCameraReady(false)
       return
     }
+    setCameraReady(false)
     const facingMode = step === 'face' ? 'user' : 'environment'
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 960 } } })
@@ -62,6 +66,7 @@ export default function VerifyPage() {
           videoRef.current.srcObject = stream
           videoRef.current.play().catch(() => {})
         }
+        setCameraReady(true)
       })
       .catch(() => {
         setErrorMsg('Could not access your camera. Please allow camera access and reload this page.')
@@ -71,6 +76,37 @@ export default function VerifyPage() {
       streamRef.current = null
     }
   }, [step])
+
+  // Once the camera's actually streaming, count down and capture automatically —
+  // gives the person a moment to line themselves/their ID up in the frame without
+  // needing to tap anything, while "Take photo now" below still works if they're
+  // ready sooner.
+  useEffect(() => {
+    if (!cameraReady || (step !== 'face' && step !== 'license')) {
+      setCountdown(null)
+      return
+    }
+    setCountdown(3)
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c === null) return null
+        if (c <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [cameraReady, step])
+
+  useEffect(() => {
+    if (countdown === 0) {
+      if (step === 'face') handleCaptureFace()
+      else if (step === 'license') handleCaptureLicense()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown])
 
   function capture(): string | null {
     const video = videoRef.current
@@ -87,6 +123,7 @@ export default function VerifyPage() {
   function handleCaptureFace() {
     const photo = capture()
     if (photo) {
+      setCountdown(null)
       setFacePhoto(photo)
       setStep('license')
     }
@@ -95,6 +132,7 @@ export default function VerifyPage() {
   function handleCaptureLicense() {
     const photo = capture()
     if (photo) {
+      setCountdown(null)
       setLicensePhoto(photo)
       submit(facePhoto, photo)
     }
@@ -177,8 +215,8 @@ export default function VerifyPage() {
           </p>
           <p className="text-xs text-gray-500 text-center mb-3">
             {step === 'face'
-              ? 'Line your face up inside the oval, in good lighting.'
-              : 'Line your driver\u2019s license or photo ID up inside the frame.'}
+              ? 'Line your face up inside the oval, in good lighting. We\u2019ll take the photo automatically.'
+              : 'Line your driver\u2019s license or photo ID up inside the frame. We\u2019ll take the photo automatically.'}
           </p>
           {retakeReason && <p className="text-xs text-red-600 text-center mb-2">⚠️ {retakeReason}</p>}
           <div className="relative w-full aspect-[4/3] bg-black rounded-xl overflow-hidden">
@@ -192,12 +230,17 @@ export default function VerifyPage() {
                 <rect x="35" y="55" width="230" height="115" rx="10" fill="none" stroke="white" strokeWidth="3" strokeDasharray="8 6" opacity="0.9" />
               </svg>
             )}
+            {countdown != null && countdown > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-white text-6xl font-bold drop-shadow-lg">{countdown}</span>
+              </div>
+            )}
           </div>
           <button
             onClick={step === 'face' ? handleCaptureFace : handleCaptureLicense}
             className="mt-4 bg-[#378ADD] text-white text-sm font-medium px-6 py-3 rounded-lg hover:bg-[#2d6ead] w-full"
           >
-            Take photo
+            Take photo now
           </button>
         </div>
       )}

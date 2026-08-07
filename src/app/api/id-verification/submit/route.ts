@@ -7,6 +7,9 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 // record completion. All of that is gated by the unguessable token itself,
 // not by a logged-in user, which is why RLS is bypassed here specifically.
 function serviceClient() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set — the id-verification submit route cannot look up jobs by token without it.')
+  }
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -76,13 +79,14 @@ export async function POST(req: NextRequest) {
 
   const supabase = serviceClient()
 
-  const { data: job } = await supabase
+  const { data: job, error: jobLookupError } = await supabase
     .from('jobs')
     .select('id, id_verification_completed_at')
     .eq('id_verification_token', token)
     .single()
 
   if (!job) {
+    console.error(`ID verification lookup failed for token ${token}:`, jobLookupError)
     return NextResponse.json({ error: 'This verification link is invalid or has expired.' }, { status: 404 })
   }
   if (job.id_verification_completed_at) {
