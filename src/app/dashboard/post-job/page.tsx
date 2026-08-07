@@ -24,6 +24,7 @@ export default function PostJobPage() {
   const [stops, setStops] = useState<string[]>(['', ''])
 
   const [vehicleYear, setVehicleYear] = useState('')
+  const [packageDescription, setPackageDescription] = useState('')
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
   const [stockNumber, setStockNumber] = useState('')
@@ -828,6 +829,7 @@ export default function PostJobPage() {
       recipient_name: customerFullName || null,
       recipient_phone: customerPhone || null,
       vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
+      package_description: isCourier ? (packageDescription || null) : null,
       vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
@@ -1105,6 +1107,9 @@ export default function PostJobPage() {
     router.refresh()
   }
 
+  const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+  const isCourier = jobTypeName === 'Courier / Package'
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
@@ -1316,6 +1321,20 @@ export default function PostJobPage() {
             </button>
           </div>
 
+          {isCourier ? (
+            <div className="space-y-3 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-900">Package</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">What&apos;s being picked up</label>
+                <input
+                  value={packageDescription}
+                  onChange={(e) => setPackageDescription(e.target.value)}
+                  placeholder="e.g. envelope of signed paperwork, laptop, spare key fob"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-900">Vehicle</p>
             <div className="grid grid-cols-3 gap-3">
@@ -1377,8 +1396,9 @@ export default function PostJobPage() {
               </label>
             </div>
           </div>
+          )}
 
-          {multiVehicleArrangement !== 'none' && (
+          {!isCourier && multiVehicleArrangement !== 'none' && (
             <div className="space-y-4 border border-gray-200 rounded-lg p-4">
               <p className="text-sm font-medium text-gray-900">Other Vehicle(s) In This Deal</p>
 
@@ -1432,17 +1452,19 @@ export default function PostJobPage() {
               <input value={customerFullName} onChange={(e) => setCustomerFullName(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={isCourier ? '' : 'grid grid-cols-2 gap-3'}>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Phone</label>
                 <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Address</label>
-                <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-              </div>
+              {!isCourier && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Address</label>
+                  <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1471,6 +1493,7 @@ export default function PostJobPage() {
             })()}
           </div>
 
+          {!isCourier && (<>
           <div>
             <label className="block text-sm text-gray-700 mb-1">Insurance</label>
             <select
@@ -1576,10 +1599,6 @@ export default function PostJobPage() {
               Registry visit required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
-              Delivery is to a First Nations reserve
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
               Force ferry crossing (if not detected automatically)
             </label>
@@ -1637,6 +1656,12 @@ export default function PostJobPage() {
               </p>
             </div>
           </div>
+          </>)}
+
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
+            Delivery is to a First Nations reserve
+          </label>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">

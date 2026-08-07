@@ -205,6 +205,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
                 </p>
+                {job.job_types?.name === 'Courier / Package' ? (
+                  job.package_description && (
+                    <p className="text-xs text-gray-700 mt-0.5">📦 {job.package_description}</p>
+                  )
+                ) : (
+                  (job.vehicle_year || job.vehicle_make || job.stock_number) && (
+                    <p className="text-xs text-gray-700 mt-0.5">
+                      {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
+                      {job.stock_number && ` · #${job.stock_number}`}
+                    </p>
+                  )
+                )}
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
