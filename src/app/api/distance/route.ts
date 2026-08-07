@@ -21,8 +21,13 @@ async function resolveTimeZone(lat: number, lng: number, apiKey: string): Promis
       `https://maps.googleapis.com/maps/api/timezone/json?location=${lat},${lng}&timestamp=${timestamp}&key=${apiKey}`
     )
     const data = await res.json()
-    return data.status === 'OK' ? data.timeZoneId : null
-  } catch {
+    if (data.status !== 'OK') {
+      console.error(`Timezone API failed for ${lat},${lng}: status=${data.status}, message=${data.errorMessage || 'none'}`)
+      return null
+    }
+    return data.timeZoneId
+  } catch (e) {
+    console.error(`Timezone API request failed for ${lat},${lng}:`, e)
     return null
   }
 }
