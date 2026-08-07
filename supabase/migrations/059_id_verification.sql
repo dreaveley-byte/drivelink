@@ -33,6 +33,7 @@ for select using (
 
 -- Public (token-gated) read access for the verification page itself, and to let
 -- the customer submit their photos without needing an authenticated account.
+drop function if exists get_verification_info(uuid);
 create or replace function get_verification_info(p_token uuid)
 returns table (
   job_id uuid,
@@ -42,16 +43,19 @@ returns table (
   vehicle_model text,
   driver_name text,
   status text,
-  id_verification_completed_at timestamptz
+  id_verification_completed_at timestamptz,
+  organization_phone text,
+  organization_name text
 )
 language sql
 security definer
 stable
 as $$
   select j.id, j.customer_full_name, j.vehicle_year, j.vehicle_make, j.vehicle_model,
-         p.full_name, j.status, j.id_verification_completed_at
+         p.full_name, j.status, j.id_verification_completed_at, o.phone, o.name
   from jobs j
   left join profiles p on p.id = j.driver_id
+  left join organizations o on o.id = j.organization_id
   where j.id_verification_token = p_token;
 $$;
 grant execute on function get_verification_info(uuid) to anon, authenticated;

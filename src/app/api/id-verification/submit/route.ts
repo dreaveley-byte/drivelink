@@ -73,6 +73,79 @@ async function validatePhoto(base64DataUrl: string, kind: 'face' | 'license'): P
   }
 }
 
+// Cross-checks the face photo against the person pictured on the ID, and the
+// name printed on the ID against who the delivery is actually for. Only
+// rejects on a confident mismatch — genuinely uncertain cases (odd angle,
+// glare, a legal middle name left off, etc.) pass through rather than
+// blocking a real customer over an AI false-negative.
+async function validateIdentityMatch(
+  faceDataUrl: string,
+  licenseDataUrl: string,
+  expectedName: string | null
+): Promise<{ ok: boolean; reason?: string; retakeTarget?: 'face' | 'license'; notes: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return { ok: true, notes: 'AI identity check not configured (no ANTHROPIC_API_KEY).' }
+
+  const faceMatch = faceDataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+  const licenseMatch = licenseDataUrl.match(/^data:(image\/\w+);base64,(.+)$/)
+  if (!faceMatch || !licenseMatch) return { ok: true, notes: 'Could not parse images for identity check.' }
+
+  const prompt =
+    `Image 1 is a photo of a person's face. Image 2 is a photo of a government ID or driver's license.\n\n` +
+    `1) Does the face in Image 1 appear to be the same person as the photo on the ID in Image 2?\n` +
+    `2) What full name is printed on the ID in Image 2?\n` +
+    (expectedName
+      ? `3) Does that name reasonably match "${expectedName}" (allow for minor formatting differences, middle names/initials, or common nicknames — only flag a real mismatch)?\n`
+      : '') +
+    `\nReply in EXACTLY this format, nothing else:\n` +
+    `FACE_MATCH: yes|no|unclear\n` +
+    `ID_NAME: <name printed on the ID, or "unreadable">\n` +
+    `NAME_MATCH: yes|no|unclear|n/a\n` +
+    `REASON: <short reason if either is "no", otherwise "ok">`
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 150,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: faceMatch[1], data: faceMatch[2] } },
+              { type: 'image', source: { type: 'base64', media_type: licenseMatch[1], data: licenseMatch[2] } },
+              { type: 'text', text: prompt },
+            ],
+          },
+        ],
+      }),
+    })
+    const data = await res.json()
+    const text: string = data.content?.[0]?.text?.trim() ?? ''
+
+    const faceMatchResult = /FACE_MATCH:\s*(yes|no|unclear)/i.exec(text)?.[1]?.toLowerCase()
+    const nameMatchResult = /NAME_MATCH:\s*(yes|no|unclear|n\/a)/i.exec(text)?.[1]?.toLowerCase()
+    const reason = /REASON:\s*(.+)/i.exec(text)?.[1]?.trim()
+
+    if (faceMatchResult === 'no') {
+      return { ok: false, reason: `The face photo doesn't appear to match the person on the ID${reason && reason !== 'ok' ? ` (${reason})` : ''}.`, retakeTarget: 'face', notes: text }
+    }
+    if (nameMatchResult === 'no') {
+      return { ok: false, reason: `The name on the ID doesn't appear to match the delivery recipient${reason && reason !== 'ok' ? ` (${reason})` : ''}.`, retakeTarget: 'license', notes: text }
+    }
+    return { ok: true, notes: text }
+  } catch (e) {
+    console.error('ID verification identity match check failed:', e)
+    return { ok: true, notes: 'Identity match check failed to run (infra error) — accepted without it.' }
+  }
+}
+
 function base64ToBuffer(dataUrl: string): Buffer {
   const base64 = dataUrl.split(',')[1] ?? ''
   return Buffer.from(base64, 'base64')
@@ -109,6 +182,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `ID photo: ${licenseCheck.reason}. Please retake it.`, retake: 'license' }, { status: 422 })
   }
 
+  const identityCheck = await validateIdentityMatch(facePhoto, licensePhoto, job.customer_full_name)
+  if (!identityCheck.ok) {
+    return NextResponse.json({ error: `${identityCheck.reason} Please retake.`, retake: identityCheck.retakeTarget ?? 'face' }, { status: 422 })
+  }
+
   const facePath = `${job.job_id}/id-verification-face-${Date.now()}.jpg`
   const licensePath = `${job.job_id}/id-verification-license-${Date.now()}.jpg`
 
@@ -132,6 +210,24 @@ export async function POST(req: NextRequest) {
   if (submitError || !submitOk) {
     console.error('ID verification submit failed:', submitError)
     return NextResponse.json({ error: 'Could not complete verification. Please try again.' }, { status: 500 })
+  }
+
+  await supabase.from('jobs').update({ id_verification_match_notes: identityCheck.notes }).eq('id_verification_token', token)
+
+  // Let the dealer know verification is done and they can review/approve it.
+  if (job.organization_phone) {
+    try {
+      const host = req.headers.get('host')
+      const protocol = host?.includes('localhost') ? 'http' : 'https'
+      const { sendSms } = await import('@/lib/sms')
+      const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
+      await sendSms(
+        job.organization_phone,
+        `${job.customer_full_name || 'The customer'}'s identity has been verified for the ${vehicleDesc || 'vehicle'} delivery. Review and approve: ${protocol}://${host}/dashboard/jobs/${job.job_id}/receipt`
+      )
+    } catch (e) {
+      console.error('Dealer notification SMS failed (verification still succeeded):', e)
+    }
   }
 
   return NextResponse.json({ ok: true })

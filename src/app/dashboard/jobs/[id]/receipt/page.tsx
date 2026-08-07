@@ -7,6 +7,7 @@ import { buildDeliveryDisclosureText } from '@/lib/checklist'
 import DealerFeedbackForm from '@/components/DealerFeedbackForm'
 import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
+import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -421,6 +422,14 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 <img src={idVerificationUrls.license} alt="Customer ID verification" className="w-32 h-32 rounded-lg object-cover border border-gray-200" />
               </a>
             </div>
+            {job.id_verification_match_notes && (
+              <p className="text-xs text-gray-400 mt-3 whitespace-pre-line">AI check: {job.id_verification_match_notes}</p>
+            )}
+            {job.id_verification_approved_at ? (
+              <p className="text-xs text-green-600 mt-3">✓ Approved {fmtDateTime(job.id_verification_approved_at)}</p>
+            ) : (
+              <ApproveIdVerificationButton jobId={job.id} />
+            )}
           </div>
         </div>
       )}
