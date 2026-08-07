@@ -614,16 +614,18 @@ export default function EditJobPage() {
             finalCharges = fc ? [...manualCharges, fc] : manualCharges
           }
         } else {
-          // No trade-in, no chase+2nd driver, not flying — the vehicle only goes one way.
-          // If a ferry's involved, the driver returns as a walk-on passenger (much cheaper
-          // than a second vehicle fare) plus a ride from the terminal back home.
+          // No trade-in, no chase+2nd driver, not flying — the vehicle only goes one way,
+          // so the driver always needs some way back to the dealership. That's an Uber-style
+          // ground transport charge regardless of route — if a ferry's ALSO involved, the
+          // driver returns as a walk-on passenger (much cheaper than a second vehicle fare)
+          // on top of that same ride home.
           const fc = ferryCharge('oneway-walkon-return')
           const groundHomeCharge = ferryReturnGroundTransport()
-          finalCharges = fc ? [...manualCharges, fc, groundHomeCharge] : manualCharges
+          finalCharges = [...manualCharges, groundHomeCharge, ...(fc ? [fc] : [])]
           setDecisionNote(
             fc
               ? `Short trip, one-way delivery — ferry return is walk-on passenger + Uber home (not a 2nd vehicle fare). Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (${ferryInfo?.groundHome ? `calculated, ${ferryInfo.groundHome.distanceKm}km` : 'flat estimate'}).`
-              : 'Short trip, one-way delivery — no ferry detected on this route.'
+              : `Short trip, one-way delivery — no ferry on this route. Ground transport home: $${(groundHomeCharge.dealerAmountCents / 100).toFixed(2)} (flat estimate).`
           )
         }
       }
