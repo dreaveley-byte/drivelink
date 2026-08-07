@@ -1658,10 +1658,12 @@ export default function PostJobPage() {
           </div>
           </>)}
 
+          {!isCourier && (
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
             Delivery is to a First Nations reserve
           </label>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
