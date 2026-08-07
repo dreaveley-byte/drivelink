@@ -34,22 +34,30 @@ export async function POST(req: NextRequest) {
   const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
 
   // Give a real ETA window based on current traffic-aware drive time from the
-  // driver's live position — a single point estimate reads as more precise than
-  // it is, so widen it into a realistic 2-hour arrival window instead.
+  // driver's live position. Window runs from the raw ETA forward by a % buffer
+  // of the drive time (configurable in Admin -> Pricing) — a flat window reads
+  // wrong on short local hops and too tight on long hauls, so scaling by drive
+  // time keeps it sensible either way. Must be shown in the DESTINATION's local
+  // timezone, not the server's, or a Vancouver->local delivery reads hours off.
   let etaText = ''
   if (job.driver_lat != null && job.driver_lng != null) {
     try {
-      const distanceRes = await fetch(`${protocol}://${host}/api/distance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: [`${job.driver_lat},${job.driver_lng}`, job.dropoff_address] }),
-      })
+      const [distanceRes, settingsRes] = await Promise.all([
+        fetch(`${protocol}://${host}/api/distance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addresses: [`${job.driver_lat},${job.driver_lng}`, job.dropoff_address] }),
+        }),
+        supabase.from('pricing_settings').select('eta_window_buffer_percent').eq('id', 1).single(),
+      ])
       const distanceData = await distanceRes.json()
+      const bufferPercent = settingsRes.data?.eta_window_buffer_percent
       if (distanceRes.ok && distanceData.durationMinutes != null) {
-        const etaCenter = new Date(Date.now() + distanceData.durationMinutes * 60 * 1000)
-        const windowStart = new Date(etaCenter.getTime() - 60 * 60 * 1000)
-        const windowEnd = new Date(etaCenter.getTime() + 60 * 60 * 1000)
-        const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        const windowStart = new Date(Date.now() + distanceData.durationMinutes * 60 * 1000)
+        const bufferMinutes = distanceData.durationMinutes * ((Number.isFinite(bufferPercent) ? bufferPercent : 20) / 100)
+        const windowEnd = new Date(windowStart.getTime() + bufferMinutes * 60 * 1000)
+        const tz = distanceData.destinationTimeZone as string | undefined
+        const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(tz && { timeZone: tz }) })
         etaText = ` Estimated arrival: ${fmt(windowStart)}–${fmt(windowEnd)}.`
       }
     } catch {

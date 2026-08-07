@@ -42,6 +42,7 @@ type Settings = {
   drivflo_insurance_tow_deductible_fee_cents: number
   max_daily_meal_budget_cents: number
   preferred_driver_window_minutes: number
+  eta_window_buffer_percent: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
   max_driving_hours_before_overnight: number
@@ -366,6 +367,13 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">A fresh job is only visible to a dealer's preferred drivers for this long, then opens up to everyone</p>
               <input type="number" step="1" value={settings.preferred_driver_window_minutes}
                 onChange={(e) => updateNumberField('preferred_driver_window_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">ETA window buffer (%)</label>
+              <p className="text-xs text-gray-400 mb-1">Customer ETA text shows a window from the raw arrival time forward by this % of drive time (e.g. 20% on a 30min drive = 6min window, on a 5hr drive = 1hr window)</p>
+              <input type="number" step="1" value={settings.eta_window_buffer_percent}
+                onChange={(e) => updateNumberField('eta_window_buffer_percent', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
