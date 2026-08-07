@@ -375,17 +375,20 @@ export default function PostJobPage() {
       }
 
       // Foot-passenger ferry returns still need a ride from the arrival terminal
-      // back to the dealer/home. Uses the real driven distance from the ferry API
-      // when available (same Uber base+per-km formula as the airport leg), falling
-      // back to the flat admin estimate otherwise.
+      // back to the dealer/home. Uses the real driven distance when available —
+      // from the ferry terminal if a ferry's involved, otherwise the same one-way
+      // route we already calculated for this delivery (this function is only ever
+      // called for the local Uber-back case, never the fly-back case, which has
+      // its own separate flat estimate since we don't know the airport's location).
       function ferryReturnGroundTransport(): AdditionalCharge {
-        if (ferryInfo?.groundHome) {
-          const km = ferryInfo.groundHome.distanceKm
+        const km = ferryInfo?.groundHome?.distanceKm ?? data.distanceKm
+        const minutes = ferryInfo?.groundHome?.durationMinutes ?? data.durationMinutes
+        if (km != null && minutes != null) {
           return {
-            description: `Return ground transport (${km}km from terminal)`,
+            description: ferryInfo?.groundHome ? `Return ground transport (${km}km from terminal)` : `Return ground transport (${km}km)`,
             kind: 'ground-home' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
-            hoursAdded: Math.round((ferryInfo.groundHome.durationMinutes / 60) * 100) / 100,
+            hoursAdded: Math.round((minutes / 60) * 100) / 100,
             paidToDriver: true,
           }
         }
