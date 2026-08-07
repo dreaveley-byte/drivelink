@@ -62,6 +62,29 @@ export default function PostJobPage() {
   const [secondTradeInMake, setSecondTradeInMake] = useState('')
   const [secondTradeInModel, setSecondTradeInModel] = useState('')
   const [secondTradeInVin, setSecondTradeInVin] = useState('')
+
+  // Dealer-to-dealer: any number of vehicles to drop off and/or pick up (0-7
+  // each), unlike the fixed-at-2 multi-vehicle scenarios above. Every vehicle
+  // beyond the first needs its own driver.
+  type DealerVehicle = { year: string; make: string; model: string; stockNumber: string; vin: string }
+  const blankDealerVehicle = (): DealerVehicle => ({ year: '', make: '', model: '', stockNumber: '', vin: '' })
+  const [dealerDropoffCount, setDealerDropoffCount] = useState(0)
+  const [dealerPickupCount, setDealerPickupCount] = useState(0)
+  const [dealerDropoffVehicles, setDealerDropoffVehicles] = useState<DealerVehicle[]>([])
+  const [dealerPickupVehicles, setDealerPickupVehicles] = useState<DealerVehicle[]>([])
+
+  function resizeDealerVehicles(count: number, list: DealerVehicle[], setList: (v: DealerVehicle[]) => void) {
+    const next = [...list]
+    while (next.length < count) next.push(blankDealerVehicle())
+    next.length = count
+    setList(next)
+  }
+
+  function updateDealerVehicle(list: DealerVehicle[], setList: (v: DealerVehicle[]) => void, index: number, field: keyof DealerVehicle, value: string) {
+    const next = [...list]
+    next[index] = { ...next[index], [field]: value }
+    setList(next)
+  }
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
@@ -489,8 +512,10 @@ export default function PostJobPage() {
       // A multi-vehicle deal is always a "drive it back" situation (never flying) —
       // that shouldn't depend on chase vehicle being checked, since chase vehicle
       // is a different concept (one driver following another in the same vehicle
-      // pairing) that never actually applies to a multi-vehicle deal.
-      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver) || multiVehicleArrangement !== 'none'
+      // pairing) that never actually applies to a multi-vehicle deal. Dealer-to-dealer
+      // trades with any pickup vehicles are the same story — there's a real vehicle
+      // driving back, so it's never a fly/Uber-back scenario.
+      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver) || multiVehicleArrangement !== 'none' || dealerPickupCount > 0
       const longHaul = oneWayHours > 4
 
       let finalCharges: AdditionalCharge[] = manualCharges
@@ -631,14 +656,17 @@ export default function PostJobPage() {
       return
     }
 
-    const outboundVehicleCount =
-      multiVehicleArrangement === 'two_purchases_one_trade' || multiVehicleArrangement === 'two_vehicles_two_trades'
+    const isDealerToDealerMultiVehicle = dealerDropoffCount > 0 || dealerPickupCount > 0
+    const outboundVehicleCount = isDealerToDealerMultiVehicle
+      ? Math.max(dealerDropoffCount, 1)
+      : multiVehicleArrangement === 'two_purchases_one_trade' || multiVehicleArrangement === 'two_vehicles_two_trades'
         ? 2
         : multiVehicleArrangement === 'two_trades_one_purchase'
           ? 1
           : undefined
-    const returnVehicleCount =
-      multiVehicleArrangement === 'two_trades_one_purchase' || multiVehicleArrangement === 'two_vehicles_two_trades'
+    const returnVehicleCount = isDealerToDealerMultiVehicle
+      ? (dealerPickupCount > 0 ? dealerPickupCount : undefined)
+      : multiVehicleArrangement === 'two_trades_one_purchase' || multiVehicleArrangement === 'two_vehicles_two_trades'
         ? 2
         : multiVehicleArrangement === 'two_purchases_one_trade'
           ? 1
@@ -649,7 +677,7 @@ export default function PostJobPage() {
         distanceKm,
         durationMinutes,
         vehicleMode,
-        numDrivers: secondDriver ? 2 : 1,
+        numDrivers: isDealerToDealerMultiVehicle ? Math.max(dealerDropoffCount, dealerPickupCount, 1) : (secondDriver ? 2 : 1),
         outOfProvinceInspection,
         registryVisit,
         ferryRequired: false,
@@ -664,7 +692,7 @@ export default function PostJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, dealerDropoffCount, dealerPickupCount, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -1012,6 +1040,91 @@ export default function PostJobPage() {
                   Vehicle section below, grouped together.
                 </p>
               )}
+            </div>
+          )}
+
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Dealer to Dealer' && (
+            <div className="space-y-4 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-900">Vehicles In This Trade</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Vehicles to drop off</label>
+                  <select
+                    value={dealerDropoffCount}
+                    onChange={(e) => {
+                      const count = parseInt(e.target.value)
+                      setDealerDropoffCount(count)
+                      resizeDealerVehicles(count, dealerDropoffVehicles, setDealerDropoffVehicles)
+                      const driverCount = Math.max(count, dealerPickupCount, 1)
+                      setSecondDriver(driverCount > 1)
+                      // No drop-off but at least one pick-up means there's nothing to drive
+                      // there with — default to a chase vehicle convoy to get everyone there,
+                      // unless the dealer turns it off manually (falls back to Uber/bus/etc).
+                      setChaseVehicle(count === 0 && dealerPickupCount > 0)
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {Array.from({ length: 8 }, (_, n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Vehicles to pick up</label>
+                  <select
+                    value={dealerPickupCount}
+                    onChange={(e) => {
+                      const count = parseInt(e.target.value)
+                      setDealerPickupCount(count)
+                      resizeDealerVehicles(count, dealerPickupVehicles, setDealerPickupVehicles)
+                      const driverCount = Math.max(dealerDropoffCount, count, 1)
+                      setSecondDriver(driverCount > 1)
+                      setChaseVehicle(dealerDropoffCount === 0 && count > 0)
+                      setIsTradeIn(count > 0)
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    {Array.from({ length: 8 }, (_, n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {(dealerDropoffCount > 0 || dealerPickupCount > 0) && (
+                <p className="text-xs text-gray-400 -mt-2">
+                  {Math.max(dealerDropoffCount, dealerPickupCount, 1)} driver{Math.max(dealerDropoffCount, dealerPickupCount, 1) === 1 ? '' : 's'} needed —
+                  each additional driver beyond the first gets their own independent job post automatically when you submit.
+                  {dealerDropoffCount === 0 && dealerPickupCount > 0 && (
+                    <> Chase vehicle selected below to get everyone to the pickup — turn it off to use Uber/bus/flight/ferry instead.</>
+                  )}
+                </p>
+              )}
+
+              {dealerDropoffVehicles.map((v, i) => (
+                <div key={`dropoff-${i}`} className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="block text-xs text-gray-500">Vehicle to drop off #{i + 1}</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={v.year} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'year', e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={v.make} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'make', e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={v.model} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'model', e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                  <input value={v.stockNumber} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'stockNumber', e.target.value)} placeholder="Stock #" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <input value={v.vin} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'vin', e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+              ))}
+
+              {dealerPickupVehicles.map((v, i) => (
+                <div key={`pickup-${i}`} className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="block text-xs text-gray-500">Vehicle to pick up #{i + 1}</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={v.year} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'year', e.target.value)} placeholder="Year" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={v.make} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'make', e.target.value)} placeholder="Make" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    <input value={v.model} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'model', e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </div>
+                  <input value={v.vin} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'vin', e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                </div>
+              ))}
             </div>
           )}
 

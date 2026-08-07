@@ -51,7 +51,7 @@ export type PricingInput = {
   distanceKm: number // one-way, from Google
   durationMinutes: number // one-way, from Google
   vehicleMode: 'driven' | 'towed'
-  numDrivers: 1 | 2
+  numDrivers: number
   outOfProvinceInspection: boolean
   registryVisit: boolean
   ferryRequired: boolean
