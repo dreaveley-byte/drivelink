@@ -84,6 +84,19 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
     })
   )
 
+  // The id-verification bucket's storage policy only grants signed URLs to
+  // platform admin or the job's own dealer (org admin) — anyone else, this
+  // naturally comes back null and nothing renders, no extra check needed here.
+  const idVerificationUrls = await (async () => {
+    if (!job.id_verification_face_path || !job.id_verification_license_path) return null
+    const [face, license] = await Promise.all([
+      supabase.storage.from('id-verification').createSignedUrl(job.id_verification_face_path, 60 * 15),
+      supabase.storage.from('id-verification').createSignedUrl(job.id_verification_license_path, 60 * 15),
+    ])
+    if (!face.data?.signedUrl || !license.data?.signedUrl) return null
+    return { face: face.data.signedUrl, license: license.data.signedUrl }
+  })()
+
   const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
   const driverName = driverInfo?.full_name as string | undefined
   const driverPhone = driverInfo?.phone as string | undefined
@@ -387,6 +400,30 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           </p>
         </div>
       </div>
+
+      {idVerificationUrls && (
+        <div className="max-w-2xl mx-auto px-6 pb-8">
+          <div className="border border-gray-200 rounded-xl p-6">
+            <p className="text-sm font-medium text-gray-900 mb-1">Customer identity verification</p>
+            <p className="text-xs text-gray-400 mb-3">
+              {job.id_verification_completed_at && `Verified ${fmtDateTime(job.id_verification_completed_at)}`}
+              {' — visible to admin/dealer only, not shown to the driver.'}
+            </p>
+            <div className="flex gap-4">
+              <a href={idVerificationUrls.face} target="_blank" rel="noopener noreferrer" className="block">
+                <p className="text-xs text-gray-500 mb-1">Face photo</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={idVerificationUrls.face} alt="Customer face verification" className="w-32 h-32 rounded-lg object-cover border border-gray-200" />
+              </a>
+              <a href={idVerificationUrls.license} target="_blank" rel="noopener noreferrer" className="block">
+                <p className="text-xs text-gray-500 mb-1">Photo ID</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={idVerificationUrls.license} alt="Customer ID verification" className="w-32 h-32 rounded-lg object-cover border border-gray-200" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
