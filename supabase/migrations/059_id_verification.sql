@@ -67,6 +67,12 @@ begin
       id_verification_license_path = p_license_path,
       id_verification_completed_at = now()
   where id_verification_token = p_token;
+
+  update job_checklist_items
+  set completed_at = now()
+  where item_type = 'customer_id_verification'
+    and job_id = (select id from jobs where id_verification_token = p_token);
+
   return found;
 end;
 $$;

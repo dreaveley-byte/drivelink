@@ -50,6 +50,7 @@ export default function VerifyPage() {
   }, [token])
 
   useEffect(() => {
+    setCountdown(null)
     if (step !== 'face' && step !== 'license') {
       streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = null
@@ -77,16 +78,12 @@ export default function VerifyPage() {
     }
   }, [step])
 
-  // Once the camera's actually streaming, count down and capture automatically —
-  // gives the person a moment to line themselves/their ID up in the frame without
-  // needing to tap anything, while "Take photo now" below still works if they're
-  // ready sooner.
+  // Countdown only starts once the person says they're ready — auto-starting
+  // it the instant the camera turns on didn't give people time to actually
+  // line their face/ID up first.
   useEffect(() => {
-    if (!cameraReady || (step !== 'face' && step !== 'license')) {
-      setCountdown(null)
-      return
-    }
-    setCountdown(3)
+    if (countdown === null) return
+    if (countdown <= 0) return
     const interval = setInterval(() => {
       setCountdown((c) => {
         if (c === null) return null
@@ -98,7 +95,11 @@ export default function VerifyPage() {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [cameraReady, step])
+  }, [countdown === null])
+
+  function startCountdown() {
+    setCountdown(4)
+  }
 
   useEffect(() => {
     if (countdown === 0) {
@@ -215,8 +216,8 @@ export default function VerifyPage() {
           </p>
           <p className="text-xs text-gray-500 text-center mb-3">
             {step === 'face'
-              ? 'Line your face up inside the oval, in good lighting. We\u2019ll take the photo automatically.'
-              : 'Line your driver\u2019s license or photo ID up inside the frame. We\u2019ll take the photo automatically.'}
+              ? 'Line your face up inside the oval, in good lighting, then tap when ready.'
+              : 'Line your driver\u2019s license or photo ID up inside the frame, then tap when ready.'}
           </p>
           {retakeReason && <p className="text-xs text-red-600 text-center mb-2">⚠️ {retakeReason}</p>}
           <div className="relative w-full aspect-[4/3] bg-black rounded-xl overflow-hidden">
@@ -231,17 +232,27 @@ export default function VerifyPage() {
               </svg>
             )}
             {countdown != null && countdown > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-white text-6xl font-bold drop-shadow-lg">{countdown}</span>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20">
+                <span className="text-white text-7xl font-bold drop-shadow-lg">{countdown}</span>
               </div>
             )}
           </div>
-          <button
-            onClick={step === 'face' ? handleCaptureFace : handleCaptureLicense}
-            className="mt-4 bg-[#378ADD] text-white text-sm font-medium px-6 py-3 rounded-lg hover:bg-[#2d6ead] w-full"
-          >
-            Take photo now
-          </button>
+          {countdown == null ? (
+            <button
+              onClick={startCountdown}
+              disabled={!cameraReady}
+              className="mt-4 bg-[#378ADD] text-white text-sm font-medium px-6 py-3 rounded-lg hover:bg-[#2d6ead] w-full disabled:opacity-50"
+            >
+              {cameraReady ? "I'm ready" : 'Starting camera…'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setCountdown(null)}
+              className="mt-4 bg-gray-100 text-gray-600 text-sm font-medium px-6 py-3 rounded-lg hover:bg-gray-200 w-full"
+            >
+              Cancel and reposition
+            </button>
+          )}
         </div>
       )}
 
