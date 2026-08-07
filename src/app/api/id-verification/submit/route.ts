@@ -170,21 +170,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This delivery has already been verified.' }, { status: 409 })
   }
 
+  // After 2 failed AI attempts, stop asking the customer to keep retaking photos
+  // — hand it off to the driver to confirm the ID in person instead.
+  async function registerFailureAndCheckOverride(reason: string, retake: 'face' | 'license') {
+    const { data: failureCount } = await supabase.rpc('increment_id_verification_failures', { p_token: token })
+    if ((failureCount ?? 0) >= 2) {
+      return NextResponse.json(
+        {
+          error: 'We\u2019re having trouble verifying this automatically. Your driver will confirm your ID in person instead.',
+          manualOverrideRequired: true,
+        },
+        { status: 422 }
+      )
+    }
+    return NextResponse.json({ error: `${reason} Please retake.`, retake }, { status: 422 })
+  }
+
   const [faceCheck, licenseCheck] = await Promise.all([
     validatePhoto(facePhoto, 'face'),
     validatePhoto(licensePhoto, 'license'),
   ])
 
   if (!faceCheck.ok) {
-    return NextResponse.json({ error: `Face photo: ${faceCheck.reason}. Please retake it.`, retake: 'face' }, { status: 422 })
+    return await registerFailureAndCheckOverride(`Face photo: ${faceCheck.reason}.`, 'face')
   }
   if (!licenseCheck.ok) {
-    return NextResponse.json({ error: `ID photo: ${licenseCheck.reason}. Please retake it.`, retake: 'license' }, { status: 422 })
+    return await registerFailureAndCheckOverride(`ID photo: ${licenseCheck.reason}.`, 'license')
   }
 
   const identityCheck = await validateIdentityMatch(facePhoto, licensePhoto, job.customer_full_name)
   if (!identityCheck.ok) {
-    return NextResponse.json({ error: `${identityCheck.reason} Please retake.`, retake: identityCheck.retakeTarget ?? 'face' }, { status: 422 })
+    return await registerFailureAndCheckOverride(identityCheck.reason ?? 'Identity check failed.', identityCheck.retakeTarget ?? 'face')
   }
 
   const facePath = `${job.job_id}/id-verification-face-${Date.now()}.jpg`
@@ -214,20 +230,30 @@ export async function POST(req: NextRequest) {
 
   await supabase.from('jobs').update({ id_verification_match_notes: identityCheck.notes }).eq('id_verification_token', token)
 
-  // Let the dealer know verification is done and they can review/approve it.
-  if (job.organization_phone) {
-    try {
-      const host = req.headers.get('host')
-      const protocol = host?.includes('localhost') ? 'http' : 'https'
-      const { sendSms } = await import('@/lib/sms')
-      const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
-      await sendSms(
-        job.organization_phone,
-        `${job.customer_full_name || 'The customer'}'s identity has been verified for the ${vehicleDesc || 'vehicle'} delivery. Review and approve: ${protocol}://${host}/dashboard/jobs/${job.job_id}/receipt`
-      )
-    } catch (e) {
-      console.error('Dealer notification SMS failed (verification still succeeded):', e)
-    }
+  // Let the dealer know verification is done, through the job's own chat thread
+  // (which also triggers their normal SMS chat notification) rather than a
+  // separate one-off text — keeps everything about this delivery in one place.
+  try {
+    const host = req.headers.get('host')
+    const protocol = host?.includes('localhost') ? 'http' : 'https'
+    const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
+    const { data: settings } = await supabase.from('pricing_settings').select('id_verification_approval_wait_minutes').eq('id', 1).single()
+    const waitMinutes = settings?.id_verification_approval_wait_minutes ?? 5
+    const chatBody =
+      `✅ ${job.customer_full_name || 'The customer'}'s identity has been verified for the ${vehicleDesc || 'vehicle'} delivery. ` +
+      `Please approve within ${waitMinutes} minutes — after that the driver will proceed automatically. Review: ${protocol}://${host}/dashboard/jobs/${job.job_id}/receipt`
+
+    await supabase.rpc('post_id_verification_chat_message', { p_token: token, p_body: chatBody })
+
+    // Reuse the existing chat SMS notifier so the dealer gets the same
+    // notification experience as any other message on this job.
+    await fetch(`${protocol}://${host}/api/job-chat/notify-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.job_id, senderRole: 'platform_admin', senderName: 'Drivflo', body: chatBody }),
+    })
+  } catch (e) {
+    console.error('Dealer chat notification failed (verification still succeeded):', e)
   }
 
   return NextResponse.json({ ok: true })

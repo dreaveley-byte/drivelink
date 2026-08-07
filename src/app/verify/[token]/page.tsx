@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
 
-type Step = 'loading' | 'intro' | 'face' | 'license' | 'submitting' | 'done' | 'error' | 'already_done'
+type Step = 'loading' | 'intro' | 'face' | 'license' | 'submitting' | 'done' | 'error' | 'already_done' | 'manual_override'
 
 type VerificationInfo = {
   job_id: string
@@ -151,6 +151,10 @@ export default function VerifyPage() {
       })
       const data = await res.json()
       if (!res.ok) {
+        if (data.manualOverrideRequired) {
+          setStep('manual_override')
+          return
+        }
         if (data.retake === 'face') {
           setFacePhoto(null)
           setStep('face')
@@ -267,6 +271,16 @@ export default function VerifyPage() {
           <p className="text-lg font-medium text-gray-900">Verified! ✓</p>
           <p className="text-sm text-gray-500 mt-2">
             Thanks — you&apos;re all set. Your driver will bring your keys out now.
+          </p>
+        </div>
+      )}
+
+      {step === 'manual_override' && (
+        <div className="mt-10 text-center max-w-sm">
+          <p className="text-lg font-medium text-gray-900">Almost there</p>
+          <p className="text-sm text-gray-500 mt-2">
+            We couldn&apos;t verify your photos automatically. No problem — your driver will confirm your ID in person
+            before handing over the keys.
           </p>
         </div>
       )}

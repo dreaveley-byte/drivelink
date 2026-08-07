@@ -44,6 +44,9 @@ type Job = {
   pickup_gps_at: string | null
   id_verification_completed_at: string | null
   id_verification_sent_at: string | null
+  id_verification_approved_at: string | null
+  id_verification_failed_attempts: number
+  id_verification_manual_override: boolean
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string; address: string | null; phone: string | null }[] | { name: string; address: string | null; phone: string | null } | null
 }
@@ -141,6 +144,13 @@ export default function DriverJobActions({
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
   const [sendingVerification, setSendingVerification] = useState(false)
+  const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
+  const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15000)
+    return () => clearInterval(interval)
+  }, [])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -516,6 +526,33 @@ export default function DriverJobActions({
     setSendingVerification(false)
   }
 
+  async function confirmIdMatchManually() {
+    setConfirmingIdMatch(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase
+      .from('jobs')
+      .update({
+        id_verification_manual_override: true,
+        id_verification_manual_override_by: user?.id ?? null,
+        id_verification_manual_override_at: new Date().toISOString(),
+      })
+      .eq('id', job.id)
+    if (!error) {
+      await supabase
+        .from('job_checklist_items')
+        .update({ completed_at: new Date().toISOString() })
+        .eq('job_id', job.id)
+        .eq('item_type', 'customer_id_verification')
+    }
+    setConfirmingIdMatch(false)
+    if (error) {
+      alert(`Could not save this: ${error.message}`)
+      return
+    }
+    router.refresh()
+  }
+
   async function releaseJob() {
     if (!confirm('Release this job back to the pool? Another driver will be able to claim it. Anything you\'ve already filled in stays saved.')) return
 
@@ -829,13 +866,49 @@ export default function DriverJobActions({
                   </div>
                 ) : item.item_type === 'customer_id_verification' ? (
                   <div>
-                    <p className={`text-sm mb-1 ${job.id_verification_completed_at ? 'text-gray-400' : 'text-gray-700'}`}>
-                      {job.id_verification_completed_at ? '✓ ' : ''}{displayLabel}
+                    <p className={`text-sm mb-1 ${job.id_verification_completed_at || job.id_verification_manual_override ? 'text-gray-400' : 'text-gray-700'}`}>
+                      {job.id_verification_completed_at || job.id_verification_manual_override ? '✓ ' : ''}{displayLabel}
                     </p>
-                    {job.id_verification_completed_at ? (
-                      <p className="text-xs text-green-600">
-                        Verified {new Date(job.id_verification_completed_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </p>
+                    {job.id_verification_manual_override ? (
+                      <p className="text-xs text-green-600">✓ Manually confirmed by driver</p>
+                    ) : job.id_verification_completed_at ? (() => {
+                      const waitMs = 5 * 60 * 1000
+                      const elapsedMs = now - new Date(job.id_verification_completed_at).getTime()
+                      const approved = !!job.id_verification_approved_at
+                      const waitOver = elapsedMs >= waitMs
+                      if (approved || waitOver) {
+                        return (
+                          <p className="text-xs text-green-600">
+                            Verified {new Date(job.id_verification_completed_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                            {approved ? ' — approved by dealer' : ' — you can proceed'}
+                          </p>
+                        )
+                      }
+                      const remainingMin = Math.max(0, Math.ceil((waitMs - elapsedMs) / 60000))
+                      return (
+                        <p className="text-xs text-amber-600">
+                          Verified — waiting for dealer approval (auto-continues in ~{remainingMin} min)
+                        </p>
+                      )
+                    })() : job.id_verification_failed_attempts >= 2 ? (
+                      <div>
+                        <p className="text-xs text-amber-600 mb-1">
+                          The customer&apos;s photos couldn&apos;t be auto-verified after {job.id_verification_failed_attempts} tries.
+                          Please check their photo ID in person before handing over the keys.
+                        </p>
+                        <label className="flex items-center gap-2 text-xs text-gray-700 mb-1">
+                          <input type="checkbox" checked={manualIdConfirmChecked} onChange={(e) => setManualIdConfirmChecked(e.target.checked)} />
+                          I&apos;ve confirmed in person that this customer&apos;s photo ID matches the delivery recipient
+                        </label>
+                        <button
+                          type="button"
+                          onClick={confirmIdMatchManually}
+                          disabled={!manualIdConfirmChecked || confirmingIdMatch}
+                          className="text-xs text-white bg-gray-900 rounded px-2 py-1 hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          {confirmingIdMatch ? 'Saving…' : 'Confirm'}
+                        </button>
+                      </div>
                     ) : (
                       <div>
                         <p className="text-xs text-gray-400 mb-1">
