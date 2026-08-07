@@ -120,7 +120,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, photo_url)')
+    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -188,7 +188,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
-            const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
+            const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; phone: string | null; photo_url: string | null } | null)
             const isFinished = job.status === 'completed' || job.status === 'cancelled'
             const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
             const cardBody = (
@@ -216,6 +216,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
                     )}
                     {driverInfo.full_name}
+                    {driverInfo.phone && <span className="text-gray-400">· {driverInfo.phone}</span>}
+                  </p>
+                )}
+                {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.customer_full_name || job.customer_phone) && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Customer: {job.customer_full_name}
+                    {job.customer_full_name && job.customer_phone && ' · '}
+                    {job.customer_phone}
                   </p>
                 )}
                 {job.estimated_dealer_cost_cents != null && (
@@ -235,22 +243,38 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             return (
             <div
               key={job.id}
-              className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${linkHref ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}
+              className="border border-gray-200 rounded-xl px-4 py-3"
             >
-              {linkHref ? (
-                <Link href={linkHref} target="_blank" className="flex-1">
-                  {cardBody}
-                </Link>
-              ) : (
-                <div>{cardBody}</div>
-              )}
-              <div className="flex flex-col items-end gap-2">
-                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
-                  {statusLabels[job.status] ?? job.status}
-                </span>
-                <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
-                {isTrackable && <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />}
+              <div className={`flex items-center justify-between ${linkHref ? 'hover:bg-gray-50 -mx-1 px-1 rounded-lg' : ''}`}>
+                {linkHref ? (
+                  <Link href={linkHref} target="_blank" className="flex-1">
+                    {cardBody}
+                  </Link>
+                ) : (
+                  <div className="flex-1">{cardBody}</div>
+                )}
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
+                    {statusLabels[job.status] ?? job.status}
+                  </span>
+                  <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
+                  {isTrackable && <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />}
+                </div>
               </div>
+              {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (driverInfo?.phone || job.customer_phone) && (
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
+                  {driverInfo?.phone && (
+                    <a href={`tel:${driverInfo.phone}`} className="text-xs text-[#378ADD] hover:underline">
+                      📞 Call driver
+                    </a>
+                  )}
+                  {job.customer_phone && (
+                    <a href={`tel:${job.customer_phone}`} className="text-xs text-[#378ADD] hover:underline">
+                      📞 Call customer
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           )})}
         </div>

@@ -574,13 +574,41 @@ export default function DriverJobActions({
         {joinName(job.organizations) && (
           <p className="text-xs text-gray-600 mt-0.5">{joinName(job.organizations)}</p>
         )}
-        <p className="text-xs text-gray-500 mt-0.5">
-          Drop-off: {extractCity(job.dropoff_address)}
-          {job.estimated_distance_km != null && ` · ${Math.round(job.estimated_distance_km)} km round trip`}
+        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span>Pickup: {extractCity(job.pickup_address)}</span>
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.pickup_address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[#378ADD] hover:underline"
+          >
+            🧭 Navigate
+          </a>
+        </p>
+        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <span>Drop-off: {extractCity(job.dropoff_address)}{job.estimated_distance_km != null && ` · ${Math.round(job.estimated_distance_km)} km round trip`}</span>
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.dropoff_address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-[#378ADD] hover:underline"
+          >
+            🧭 Navigate
+          </a>
         </p>
         {(job.customer_full_name || job.recipient_name) && (
           <p className="text-xs text-gray-400 mt-0.5">
             Customer: {job.customer_full_name || job.recipient_name}
+            {job.customer_phone && (
+              <>
+                {' · '}
+                <a href={`tel:${job.customer_phone}`} onClick={(e) => e.stopPropagation()} className="text-[#378ADD] hover:underline">
+                  📞 {job.customer_phone}
+                </a>
+              </>
+            )}
           </p>
         )}
         {job.estimated_driver_pay_cents != null && (

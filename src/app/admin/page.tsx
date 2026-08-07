@@ -42,7 +42,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, photo_url)')
+    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -218,11 +218,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
                       )}
                       {job.driver.full_name}
+                      {job.driver.phone && <span className="text-gray-400">· {job.driver.phone}</span>}
                     </span>
                   ) : (
                     'Unassigned'
                   )}
                 </p>
+                {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.customer_full_name || job.customer_phone) && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Customer: {job.customer_full_name}
+                    {job.customer_full_name && job.customer_phone && ' · '}
+                    {job.customer_phone}
+                  </p>
+                )}
                 {(job.estimated_dealer_cost_cents != null || job.estimated_driver_pay_cents != null) && (
                   <p className="text-xs text-gray-500 mt-0.5">
                     {job.estimated_dealer_cost_cents != null && `Cost: ${formatCents(job.estimated_dealer_cost_cents)}`}
@@ -248,21 +256,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             return (
             <div
               key={job.id}
-              className={`border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between ${linkHref ? 'hover:border-gray-300 hover:bg-gray-50' : ''}`}
+              className="border border-gray-200 rounded-xl px-4 py-3"
             >
-              {linkHref ? (
-                <Link href={linkHref} target="_blank" className="flex-1">
-                  {cardBody}
-                </Link>
-              ) : (
-                <div>{cardBody}</div>
-              )}
-              <div className="flex flex-col items-end gap-2">
-                <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
-                  {statusLabels[job.status] ?? job.status}
-                </span>
-                <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
+              <div className={`flex items-center justify-between ${linkHref ? 'hover:bg-gray-50 -mx-1 px-1 rounded-lg' : ''}`}>
+                {linkHref ? (
+                  <Link href={linkHref} target="_blank" className="flex-1">
+                    {cardBody}
+                  </Link>
+                ) : (
+                  <div className="flex-1">{cardBody}</div>
+                )}
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                    {statusLabels[job.status] ?? job.status}
+                  </span>
+                  <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
+                </div>
               </div>
+              {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.driver?.phone || job.customer_phone) && (
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
+                  {job.driver?.phone && (
+                    <a href={`tel:${job.driver.phone}`} className="text-xs text-[#378ADD] hover:underline">
+                      📞 Call driver
+                    </a>
+                  )}
+                  {job.customer_phone && (
+                    <a href={`tel:${job.customer_phone}`} className="text-xs text-[#378ADD] hover:underline">
+                      📞 Call customer
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           )})}
         </div>
