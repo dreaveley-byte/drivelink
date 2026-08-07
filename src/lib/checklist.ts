@@ -1,6 +1,6 @@
 export type ChecklistItemType =
   | 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report'
-  | 'tristate' | 'yesno' | 'input' | 'notes'
+  | 'tristate' | 'yesno' | 'input' | 'notes' | 'customer_id_verification'
 
 export type ChecklistDefinitionItem = {
   label: string
@@ -28,7 +28,7 @@ export const VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Delivery: Photograph dash & fuel gauge with engine running (check for trouble lights)', type: 'photo' },
   { label: 'Delivery: Full 360° walkaround video', type: 'video' },
   { label: 'Delivery: Photos of any new damage', type: 'photo' },
-  { label: "Delivery: Photo of customer holding driver's license or government photo ID beside their face", type: 'photo' },
+  { label: "Delivery: Customer identity verification (face + photo ID)", type: 'customer_id_verification' },
   {
     label: 'Delivery: Customer signs delivery disclosure',
     type: 'signature',

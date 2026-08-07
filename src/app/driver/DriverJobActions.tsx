@@ -42,6 +42,8 @@ type Job = {
   pickup_gps_lat: number | null
   pickup_gps_lng: number | null
   pickup_gps_at: string | null
+  id_verification_completed_at: string | null
+  id_verification_sent_at: string | null
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string; address: string | null; phone: string | null }[] | { name: string; address: string | null; phone: string | null } | null
 }
@@ -138,6 +140,7 @@ export default function DriverJobActions({
   const [loading, setLoading] = useState(false)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
+  const [sendingVerification, setSendingVerification] = useState(false)
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -485,6 +488,14 @@ export default function DriverJobActions({
       }).catch(() => {})
     }
 
+    if (newStatus === 'delivered') {
+      fetch('/api/customer-sms/notify-arrived', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch(() => {})
+    }
+
     router.refresh()
     setLoading(false)
   }
@@ -507,6 +518,21 @@ export default function DriverJobActions({
 
     router.refresh()
     setLoading(false)
+  }
+
+  async function sendIdVerificationLink() {
+    setSendingVerification(true)
+    try {
+      await fetch('/api/customer-sms/notify-arrived', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      router.refresh()
+    } catch {
+      // Best-effort — the driver can just tap it again if it didn't go through.
+    }
+    setSendingVerification(false)
   }
 
   async function releaseJob() {
@@ -819,6 +845,33 @@ export default function DriverJobActions({
                       rows={2}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                     />
+                  </div>
+                ) : item.item_type === 'customer_id_verification' ? (
+                  <div>
+                    <p className={`text-sm mb-1 ${job.id_verification_completed_at ? 'text-gray-400' : 'text-gray-700'}`}>
+                      {job.id_verification_completed_at ? '✓ ' : ''}{displayLabel}
+                    </p>
+                    {job.id_verification_completed_at ? (
+                      <p className="text-xs text-green-600">
+                        Verified {new Date(job.id_verification_completed_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">
+                          {job.id_verification_sent_at
+                            ? `Link sent ${new Date(job.id_verification_sent_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })} — waiting for the customer to complete it.`
+                            : 'The customer verifies their own identity via a text link — no action needed from you here.'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => sendIdVerificationLink()}
+                          disabled={sendingVerification}
+                          className="text-xs text-[#378ADD] hover:underline disabled:opacity-50"
+                        >
+                          {sendingVerification ? 'Sending…' : job.id_verification_sent_at ? 'Resend verification link' : 'Send verification link'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   // Heavy items (photo/video/upload/signature/condition_report) collapse into a
