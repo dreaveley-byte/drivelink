@@ -42,6 +42,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
             driver_location_updated_at: new Date().toISOString(),
           })
           .eq('id', jobId)
+        await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
       },
       () => {
         setStatus('denied')
@@ -78,6 +79,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
               driver_location_updated_at: new Date().toISOString(),
             })
             .eq('id', jobId)
+          await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
         },
         () => {
           if (!cancelled) setStatus('denied')

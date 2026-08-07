@@ -64,6 +64,7 @@ type Props = {
   initialLocationUpdatedAt: string | null
   jobStatus: string
   publicToken?: string
+  onEtaChange?: (eta: string) => void
 }
 
 export default function GoogleMapView({
@@ -75,10 +76,12 @@ export default function GoogleMapView({
   initialLocationUpdatedAt,
   jobStatus,
   publicToken,
+  onEtaChange,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const driverMarkerRef = useRef<any>(null)
+  const trailPolylineRef = useRef<any>(null)
   const [mapError, setMapError] = useState('')
   const [locationUpdatedAt, setLocationUpdatedAt] = useState(initialLocationUpdatedAt)
   const [eta, setEta] = useState<string>('')
@@ -97,12 +100,14 @@ export default function GoogleMapView({
       })
       const data = await res.json()
       if (res.ok) {
-        setEta(`${data.durationMinutes} min (${data.distanceKm} km) to dropoff`)
+        const etaText = `${data.durationMinutes} min (${data.distanceKm} km) to dropoff`
+        setEta(etaText)
+        onEtaChange?.(etaText)
       }
     } catch {
       // ETA is a nice-to-have; fail silently if it doesn't come back.
     }
-  }, [dropoffAddress])
+  }, [dropoffAddress, onEtaChange])
 
   useEffect(() => {
     let cancelled = false
@@ -174,6 +179,28 @@ export default function GoogleMapView({
           map.fitBounds(bounds)
           if (!isTerminal) updateEta(initialDriverLat, initialDriverLng)
         }
+
+        // The driven trail — a solid line that grows to show exactly where the
+        // driver has actually been since marking "in progress", separate from
+        // the lighter planned-route line above.
+        trailPolylineRef.current = new google.maps.Polyline({
+          map,
+          path: [],
+          strokeColor: '#1D1D1F',
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+        })
+        if (isTracking) {
+          const supabase = createClient()
+          const trailQuery = publicToken
+            ? supabase.rpc('get_job_location_trail', { p_token: publicToken })
+            : supabase.rpc('get_job_location_trail_by_id', { p_job_id: jobId })
+          trailQuery.then(({ data }: { data: any }) => {
+            if (cancelled || !Array.isArray(data) || data.length === 0) return
+            const path = data.map((p: any) => ({ lat: p.lat, lng: p.lng }))
+            trailPolylineRef.current?.setPath(path)
+          })
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -223,6 +250,13 @@ export default function GoogleMapView({
             icon: driverCarIcon(window.google),
             title: 'Driver',
           })
+        }
+        if (trailPolylineRef.current) {
+          const path = trailPolylineRef.current.getPath()
+          const last = path.getLength() > 0 ? path.getAt(path.getLength() - 1) : null
+          if (!last || last.lat() !== pos.lat || last.lng() !== pos.lng) {
+            path.push(new window.google.maps.LatLng(pos.lat, pos.lng))
+          }
         }
         setLocationUpdatedAt(updatedAt)
         updateEta(driverLat, driverLng)

@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import GoogleMapView from '@/components/GoogleMapView'
+import TrackingPanel from '@/components/TrackingPanel'
 import ChatPanel from '@/components/ChatPanel'
 import CustomerSmsThread from '@/components/CustomerSmsThread'
 import CollapsibleSection from '@/components/CollapsibleSection'
@@ -92,21 +92,11 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
               <Logo height={18} />
             </div>
             <h1 className="text-lg font-semibold text-gray-900">{jobTypeName}</h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              {driverPhoto && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={driverPhoto} alt="" className="w-6 h-6 rounded-full object-cover border border-gray-200" />
-              )}
-              <p className="text-sm text-gray-500">
-                {statusLabels[job.status] ?? job.status}
-                {driverName && ` · Driver: ${driverName}`}
-              </p>
-            </div>
           </div>
           <CloseButton />
         </div>
 
-        <GoogleMapView
+        <TrackingPanel
           jobId={job.id}
           pickupAddress={job.pickup_address}
           dropoffAddress={job.dropoff_address}
@@ -114,6 +104,9 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           initialDriverLng={job.driver_lng}
           initialLocationUpdatedAt={job.driver_location_updated_at}
           jobStatus={job.status}
+          driverName={driverName}
+          driverPhotoUrl={driverPhoto}
+          statusLabel={statusLabels[job.status] ?? job.status}
         />
 
         <div className="mt-4">

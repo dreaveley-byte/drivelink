@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import GoogleMapView from '@/components/GoogleMapView'
+import TrackingPanel from '@/components/TrackingPanel'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 import Logo from '@/components/Logo'
 
@@ -44,16 +44,6 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
               {vehicleDesc && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-3">
-            {info.driver_photo_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={info.driver_photo_url} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
-            )}
-            <p className="text-sm text-gray-500">
-              {statusLabels[info.status] ?? info.status}
-              {info.driver_name && ` · Driver: ${info.driver_name}`}
-            </p>
-          </div>
         </div>
 
         {info.status === 'delivered' || info.status === 'completed' ? (
@@ -62,7 +52,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             <p className="text-xs text-gray-400 mt-1">Live tracking for this delivery has ended.</p>
           </div>
         ) : (
-          <GoogleMapView
+          <TrackingPanel
             jobId=""
             pickupAddress={info.pickup_address}
             dropoffAddress={info.dropoff_address}
@@ -71,6 +61,9 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             initialLocationUpdatedAt={info.driver_location_updated_at}
             jobStatus={info.status}
             publicToken={token}
+            driverName={info.driver_name}
+            driverPhotoUrl={info.driver_photo_url}
+            statusLabel={statusLabels[info.status] ?? info.status}
           />
         )}
 
