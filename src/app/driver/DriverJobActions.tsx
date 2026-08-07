@@ -448,7 +448,13 @@ export default function DriverJobActions({
       }
     }
 
-    await supabase.from('jobs').update(jobUpdate).eq('id', job.id)
+    const { error: updateError } = await supabase.from('jobs').update(jobUpdate).eq('id', job.id)
+    if (updateError) {
+      console.error('Status update failed:', updateError)
+      alert(`Could not update the job status: ${updateError.message}. Please try again or contact support.`)
+      setLoading(false)
+      return
+    }
     await supabase.from('job_status_events').insert({
       job_id: job.id,
       status: newStatus,

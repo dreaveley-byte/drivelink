@@ -270,7 +270,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                     {statusLabels[job.status] ?? job.status}
                   </span>
-                  <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
+                  <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} isAdmin />
                 </div>
               </div>
               {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.driver?.phone || job.customer_phone) && (
