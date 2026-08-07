@@ -73,6 +73,12 @@ export default function EditJobPage() {
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
   const [flightPriceOverride, setFlightPriceOverride] = useState('')
   const [flightHoursOverride, setFlightHoursOverride] = useState('')
+  // True whenever the driver does NOT drive the vehicle back themselves — covers
+  // both flying back AND the short-trip Uber/walk-on-return case. Gas and driver
+  // hours should only be charged one-way in either case; flyingBack alone used to
+  // gate this, which silently billed a full round trip's worth of gas/hours even
+  // when the driver only drove one-way and took an Uber back.
+  const [effectiveOneWayReturn, setEffectiveOneWayReturn] = useState(false)
   const [multiVehicleArrangement, setMultiVehicleArrangement] = useState<'none' | 'two_trades_one_purchase' | 'two_purchases_one_trade' | 'two_vehicles_two_trades'>('none')
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null)
   const [linkedJobQuery, setLinkedJobQuery] = useState('')
@@ -537,6 +543,7 @@ export default function EditJobPage() {
       let finalCharges: AdditionalCharge[] = manualCharges
 
       if (forcedRoundTrip) {
+        setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
         if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
@@ -578,6 +585,7 @@ export default function EditJobPage() {
         }
 
         const winner = options.reduce((best, o) => (o.cost < best.cost ? o : best))
+        setEffectiveOneWayReturn(winner.flying)
         finalCharges = winner.charges
         setFlyingBack(winner.flying)
         setSecondDriver(winner.secondDrv)
@@ -603,6 +611,7 @@ export default function EditJobPage() {
       } else {
         // Short trip, nothing forcing a round trip — respect the manual checkboxes as-is.
         if (flyingBack) {
+          setEffectiveOneWayReturn(true)
           const flyCharges = await buildFlyCharges()
           if (flyCharges) {
             const fc = ferryCharge('oneway-vehicle')
@@ -618,7 +627,9 @@ export default function EditJobPage() {
           // so the driver always needs some way back to the dealership. That's an Uber-style
           // ground transport charge regardless of route — if a ferry's ALSO involved, the
           // driver returns as a walk-on passenger (much cheaper than a second vehicle fare)
-          // on top of that same ride home.
+          // on top of that same ride home. Since the driver isn't actually driving back
+          // themselves, gas/hours need to be billed one-way too, not as a full round trip.
+          setEffectiveOneWayReturn(true)
           const fc = ferryCharge('oneway-walkon-return')
           const groundHomeCharge = ferryReturnGroundTransport()
           finalCharges = [...manualCharges, groundHomeCharge, ...(fc ? [fc] : [])]
@@ -692,7 +703,7 @@ export default function EditJobPage() {
         useGarageInsurance,
         includeTowDeductibleCoverage,
         additionalCharges,
-        oneWayFlightBack: flyingBack,
+        oneWayFlightBack: effectiveOneWayReturn,
         outboundVehicleCount,
         returnVehicleCount,
       },
@@ -700,7 +711,7 @@ export default function EditJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -733,7 +744,7 @@ export default function EditJobPage() {
               useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
               additionalCharges: additionalCharges.filter((c) => !c.kind),
-              oneWayFlightBack: flyingBack,
+              oneWayFlightBack: effectiveOneWayReturn,
             },
             pricingSettings
           )
@@ -827,7 +838,7 @@ export default function EditJobPage() {
           useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
           additionalCharges: additionalCharges.filter((c) => !c.kind),
-          oneWayFlightBack: flyingBack,
+          oneWayFlightBack: effectiveOneWayReturn,
         },
         pricingSettings
       )
