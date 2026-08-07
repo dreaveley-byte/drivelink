@@ -10,6 +10,30 @@ declare global {
   }
 }
 
+// A small white car silhouette (top-down) with the Drivflo blue accent, used as
+// the live driver marker instead of a generic dot — reinforces the brand and
+// reads clearly as "a car" at a glance on the map.
+const DRIVER_CAR_ICON_SVG = encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <circle cx="22" cy="22" r="21" fill="#ffffff" stroke="#378ADD" stroke-width="2"/>
+  <g transform="translate(22,23) rotate(0)">
+    <path d="M-9,2 L-8,-4 Q-7,-8 -3,-8 L3,-8 Q7,-8 8,-4 L9,2 Q9,5 6,5 L-6,5 Q-9,5 -9,2 Z"
+      fill="#378ADD" stroke="#1D1D1F" stroke-width="0.5"/>
+    <path d="M-6,-3.5 L-5,-6.5 Q-4,-7.5 -2,-7.5 L2,-7.5 Q4,-7.5 5,-6.5 L6,-3.5 Z" fill="#ffffff" opacity="0.85"/>
+    <circle cx="-5.5" cy="5" r="2" fill="#1D1D1F"/>
+    <circle cx="5.5" cy="5" r="2" fill="#1D1D1F"/>
+  </g>
+</svg>
+`.trim())
+
+function driverCarIcon(google: any) {
+  return {
+    url: `data:image/svg+xml,${DRIVER_CAR_ICON_SVG}`,
+    scaledSize: new google.maps.Size(44, 44),
+    anchor: new google.maps.Point(22, 22),
+  }
+}
+
 function loadGoogleMaps(): Promise<void> {
   if (window.google?.maps) return Promise.resolve()
   if (window.__driveLinkMapsLoading) return window.__driveLinkMapsLoading
@@ -143,14 +167,7 @@ export default function GoogleMapView({
           driverMarkerRef.current = new google.maps.Marker({
             position: pos,
             map,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#2563eb',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-            },
+            icon: driverCarIcon(google),
             title: 'Driver',
           })
           bounds.extend(pos)
@@ -203,14 +220,7 @@ export default function GoogleMapView({
           driverMarkerRef.current = new window.google.maps.Marker({
             position: pos,
             map: mapRef.current,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: '#2563eb',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-            },
+            icon: driverCarIcon(window.google),
             title: 'Driver',
           })
         }
