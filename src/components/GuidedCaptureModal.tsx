@@ -8,16 +8,27 @@ type Props = {
   onClose: () => void
 }
 
-const CAR_OUTLINE_IMAGE = '/condition-report/driver-side.jpg'
+const OUTLINE_FRAMES = [
+  '/condition-report/outline-frames/frame_00.png', // front
+  '/condition-report/outline-frames/frame_01.png', // front 3/4
+  '/condition-report/outline-frames/frame_02.png', // side
+  '/condition-report/outline-frames/frame_03.png', // rear 3/4
+  '/condition-report/outline-frames/frame_04.png', // rear
+  '/condition-report/outline-frames/frame_05.png', // rear 3/4 (other side)
+  '/condition-report/outline-frames/frame_06.png', // side (other side)
+  '/condition-report/outline-frames/frame_07.png', // front 3/4 (other side)
+]
+const OUTLINE_STEP_SECONDS = 2.5
 
-// The real car-outline art from the condition report, blended onto the live
-// camera feed — multiply blend makes the white background disappear, leaving
-// just the dark outline visible over the video, like a transparent overlay.
-function CarOutlineOverlay() {
+// The outline itself rotates through all 8 angles — front, counter-clockwise
+// around the car, and back to front — cycling automatically so the driver has
+// a live guide to follow as they actually walk the loop while recording.
+function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
+  const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={CAR_OUTLINE_IMAGE}
+      src={OUTLINE_FRAMES[index]}
       alt=""
       className="absolute inset-0 w-full h-full object-contain pointer-events-none"
       style={{ mixBlendMode: 'multiply', opacity: 0.85 }}
@@ -26,18 +37,46 @@ function CarOutlineOverlay() {
 }
 
 // A real short looping video showing the car rotating through all 8 angles
-// (front, front 3/4, side, rear 3/4, rear, rear 3/4, side, front 3/4) so
-// drivers see an actual demonstration of the walk before they start.
+// so drivers see an actual demonstration of the walk before they start.
+// Autoplay is unreliable in some mobile/PWA contexts even when muted, so this
+// explicitly calls play() and falls back to a tap-to-play button if blocked.
 function WalkaroundDemo() {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [needsTap, setNeedsTap] = useState(false)
+
+  useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    video.muted = true
+    const playPromise = video.play()
+    if (playPromise) {
+      playPromise.catch(() => setNeedsTap(true))
+    }
+  }, [])
+
   return (
-    <video
-      src="/condition-report/walkaround-360-demo.mp4"
-      autoPlay
-      loop
-      muted
-      playsInline
-      className="w-full max-w-xs mx-auto rounded-lg"
-    />
+    <div className="relative w-full max-w-xs mx-auto">
+      <video
+        ref={ref}
+        src="/condition-report/walkaround-360-demo.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        onCanPlay={() => ref.current?.play().catch(() => setNeedsTap(true))}
+        className="w-full rounded-lg"
+      />
+      {needsTap && (
+        <button
+          onClick={() => {
+            ref.current?.play().then(() => setNeedsTap(false)).catch(() => {})
+          }}
+          className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg"
+        >
+          <span className="text-white text-3xl">▶</span>
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -158,7 +197,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
 
           {mode === 'walkaround' ? (
             <>
-              <CarOutlineOverlay />
+              <CarOutlineOverlay elapsedSeconds={recording ? seconds : 0} />
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
                 <p className="text-white text-xs text-center leading-snug">
                   {recording
