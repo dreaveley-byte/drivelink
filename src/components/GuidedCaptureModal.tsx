@@ -225,10 +225,20 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
               </div>
             </>
           ) : (
-            <svg viewBox="0 0 300 225" className="absolute inset-0 w-full h-full pointer-events-none">
-              <rect x="20" y="40" width="260" height="145" rx="10" fill="none" stroke="white" strokeWidth="3" strokeDasharray="8 6" opacity="0.9" />
-              <text x="150" y="30" textAnchor="middle" fill="white" fontSize="13" fontWeight="600">Frame the dash + fuel gauge here</text>
-            </svg>
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/condition-report/dash-outline.png"
+                alt=""
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                style={{ mixBlendMode: 'multiply', opacity: 0.9 }}
+              />
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
+                <p className="text-white text-xs text-center leading-snug">
+                  Line the instrument cluster up inside the outline, then take the photo.
+                </p>
+              </div>
+            </>
           )}
 
           {mode === 'walkaround' && recording && (
