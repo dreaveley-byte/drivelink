@@ -8,21 +8,12 @@ type Props = {
   onClose: () => void
 }
 
-const OUTLINE_FRAMES = [
-  '/condition-report/outline-frames/frame_00.png', // front
-  '/condition-report/outline-frames/frame_01.png', // front 3/4
-  '/condition-report/outline-frames/frame_02.png', // side
-  '/condition-report/outline-frames/frame_03.png', // rear 3/4
-  '/condition-report/outline-frames/frame_04.png', // rear
-  '/condition-report/outline-frames/frame_05.png', // rear 3/4 (other side)
-  '/condition-report/outline-frames/frame_06.png', // side (other side)
-  '/condition-report/outline-frames/frame_07.png', // front 3/4 (other side)
-]
-const OUTLINE_STEP_SECONDS = 2.5
+const OUTLINE_FRAMES = Array.from({ length: 16 }, (_, i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
+const OUTLINE_STEP_SECONDS = 2
 
-// The outline itself rotates through all 8 angles — front, counter-clockwise
-// around the car, and back to front — cycling automatically so the driver has
-// a live guide to follow as they actually walk the loop while recording.
+// The outline itself rotates through all 16 angles from the full reference
+// set — front, counter-clockwise around the car, and back to front — cycling
+// automatically so the driver has a live guide to follow as they walk the loop.
 function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
   const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
   return (
@@ -31,8 +22,30 @@ function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
       src={OUTLINE_FRAMES[index]}
       alt=""
       className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-      style={{ mixBlendMode: 'multiply', opacity: 0.85 }}
+      style={{ mixBlendMode: 'multiply', opacity: 0.9, transform: 'scale(1.35)' }}
     />
+  )
+}
+
+// A curved arrow showing which way to walk — counter-clockwise around the car.
+function DirectionArrow() {
+  return (
+    <svg viewBox="0 0 300 225" className="absolute inset-0 w-full h-full pointer-events-none">
+      <defs>
+        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#378ADD" />
+        </marker>
+      </defs>
+      <path
+        d="M 245,60 A 120,95 0 1 1 235,180"
+        fill="none"
+        stroke="#378ADD"
+        strokeWidth="4"
+        strokeLinecap="round"
+        markerEnd="url(#arrowhead)"
+        opacity="0.9"
+      />
+    </svg>
   )
 }
 
@@ -198,11 +211,12 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
           {mode === 'walkaround' ? (
             <>
               <CarOutlineOverlay elapsedSeconds={recording ? seconds : 0} />
+              {recording && <DirectionArrow />}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
                 <p className="text-white text-xs text-center leading-snug">
                   {recording
-                    ? 'Keep the vehicle inside the outline — walk counter-clockwise around it, ending back at the front.'
-                    : 'Line the vehicle up inside the outline, then start recording.'}
+                    ? 'Keep the vehicle inside the outline — follow the arrow counter-clockwise around it, ending back at the front.'
+                    : 'Line up and start recording.'}
                 </p>
               </div>
             </>
