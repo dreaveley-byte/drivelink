@@ -8,48 +8,76 @@ type Props = {
   onClose: () => void
 }
 
-// Order corrected to match the demo video's actual rotation direction:
-// front -> front driver 3/4 -> driver side -> rear driver 3/4 -> rear ->
-// rear passenger 3/4 -> passenger side -> front passenger 3/4 -> front.
+// Order confirmed against the full storyboard: front -> front driver 3/4 ->
+// driver side -> rear driver 3/4 -> rear -> rear passenger 3/4 -> passenger
+// side -> front passenger 3/4 -> front. Index 3 (driver side) and index 9
+// (passenger side) are the full-profile shots that get a slow pan across the
+// car instead of a static hold.
 const OUTLINE_STEP_INDICES = [0, 10, 11, 9, 7, 8, 6, 4, 5, 3, 1, 2, 0, 0, 0, 0]
 const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
 const OUTLINE_STEP_SECONDS = 2
+const PAN_SEQUENCE_INDICES = [3, 9] // driver side, passenger side — both are a front-to-back sweep on screen
+// Arrow points left while walking the driver side (front -> driver side ->
+// rear), then right while walking the passenger side (rear -> passenger side
+// -> front) — matches the direction the outline appears to move on screen.
+const LEFT_ARROW_INDICES = new Set([0, 1, 2, 3, 4, 5, 6])
 
 // The outline itself rotates through all 16 angles from the full reference
 // set — front, counter-clockwise around the car, and back to front — cycling
 // automatically so the driver has a live guide to follow as they walk the loop.
+// The two full side-profile shots pan slowly across the car (zoomed in) rather
+// than holding static, sweeping the same on-screen direction as the walk.
 function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
   const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
+  const isPan = PAN_SEQUENCE_INDICES.includes(index)
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={OUTLINE_FRAMES[index]}
-      alt=""
-      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-      style={{ mixBlendMode: 'multiply', opacity: 0.9, transform: 'scale(1.35)' }}
-    />
+    <>
+      <style>{`
+        @keyframes outline-pan-sweep {
+          0% { transform: scale(1.7) translateX(16%); }
+          100% { transform: scale(1.7) translateX(-16%); }
+        }
+      `}</style>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={index}
+        src={OUTLINE_FRAMES[index]}
+        alt=""
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+        style={{
+          mixBlendMode: 'multiply',
+          opacity: 0.9,
+          transform: isPan ? undefined : 'scale(1.35)',
+          animation: isPan ? `outline-pan-sweep ${OUTLINE_STEP_SECONDS}s linear forwards` : undefined,
+        }}
+      />
+    </>
   )
 }
 
-// A curved arrow showing which way to walk — counter-clockwise around the car.
-function DirectionArrow() {
+// A simple flashing arrow (not a curved arc) showing which way to step next.
+function DirectionArrow({ elapsedSeconds }: { elapsedSeconds: number }) {
+  const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
+  const pointLeft = LEFT_ARROW_INDICES.has(index)
   return (
-    <svg viewBox="0 0 300 225" className="absolute inset-0 w-full h-full pointer-events-none">
-      <defs>
-        <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-          <path d="M0,0 L8,4 L0,8 Z" fill="#378ADD" />
-        </marker>
-      </defs>
-      <path
-        d="M 235,180 A 120,95 0 1 0 245,60"
-        fill="none"
-        stroke="#378ADD"
-        strokeWidth="4"
-        strokeLinecap="round"
-        markerEnd="url(#arrowhead)"
-        opacity="0.9"
-      />
-    </svg>
+    <div
+      className="absolute top-1/2 -translate-y-1/2 text-[#378ADD]"
+      style={{ [pointLeft ? 'left' : 'right']: '5%', animation: 'arrow-flash 1s ease-in-out infinite' }}
+    >
+      <style>{`
+        @keyframes arrow-flash {
+          0%, 100% { opacity: 0.25; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        {pointLeft ? (
+          <path d="M36,10 L18,28 L36,46" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <path d="M20,10 L38,28 L20,46" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
+    </div>
   )
 }
 
@@ -215,7 +243,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
           {mode === 'walkaround' ? (
             <>
               <CarOutlineOverlay elapsedSeconds={recording ? seconds : 0} />
-              {recording && <DirectionArrow />}
+              {recording && <DirectionArrow elapsedSeconds={seconds} />}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
                 <p className="text-white text-xs text-center leading-snug">
                   {recording
