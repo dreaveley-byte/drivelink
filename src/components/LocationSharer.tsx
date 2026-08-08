@@ -42,7 +42,8 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
             driver_location_updated_at: new Date().toISOString(),
           })
           .eq('id', jobId)
-        await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
+        const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
+        if (pingError) console.error('Location ping insert failed:', pingError)
       },
       () => {
         setStatus('denied')
@@ -79,7 +80,8 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
               driver_location_updated_at: new Date().toISOString(),
             })
             .eq('id', jobId)
-          await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
+          const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
+        if (pingError) console.error('Location ping insert failed:', pingError)
         },
         () => {
           if (!cancelled) setStatus('denied')
