@@ -8,7 +8,11 @@ type Props = {
   onClose: () => void
 }
 
-const OUTLINE_FRAMES = Array.from({ length: 16 }, (_, i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
+// Order corrected to match the demo video's actual rotation direction:
+// front -> front driver 3/4 -> driver side -> rear driver 3/4 -> rear ->
+// rear passenger 3/4 -> passenger side -> front passenger 3/4 -> front.
+const OUTLINE_STEP_INDICES = [0, 10, 11, 9, 7, 8, 6, 4, 5, 3, 1, 2, 0, 0, 0, 0]
+const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
 const OUTLINE_STEP_SECONDS = 2
 
 // The outline itself rotates through all 16 angles from the full reference
@@ -37,7 +41,7 @@ function DirectionArrow() {
         </marker>
       </defs>
       <path
-        d="M 245,60 A 120,95 0 1 1 235,180"
+        d="M 235,180 A 120,95 0 1 0 245,60"
         fill="none"
         stroke="#378ADD"
         strokeWidth="4"
