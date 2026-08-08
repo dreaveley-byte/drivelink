@@ -25,24 +25,19 @@ function CarOutlineOverlay() {
   )
 }
 
-// A quick animated preview shown before recording starts — the same outline
-// with an arrow that circles around it once or twice, demonstrating the
-// counter-clockwise walking path so drivers know what they're about to do.
+// A real short looping video showing the car rotating through all 8 angles
+// (front, front 3/4, side, rear 3/4, rear, rear 3/4, side, front 3/4) so
+// drivers see an actual demonstration of the walk before they start.
 function WalkaroundDemo() {
   return (
-    <div className="relative w-full max-w-xs mx-auto aspect-[900/357]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={CAR_OUTLINE_IMAGE} alt="" className="w-full h-full object-contain" />
-      <svg viewBox="0 0 900 357" className="absolute inset-0 w-full h-full">
-        <ellipse cx="450" cy="180" rx="420" ry="150" fill="none" />
-        <g>
-          <circle r="16" fill="#378ADD">
-            <animateMotion dur="4s" repeatCount="indefinite"
-              path="M 450,30 A 420,150 0 1 0 449.9,30" />
-          </circle>
-        </g>
-      </svg>
-    </div>
+    <video
+      src="/condition-report/walkaround-360-demo.mp4"
+      autoPlay
+      loop
+      muted
+      playsInline
+      className="w-full max-w-xs mx-auto rounded-lg"
+    />
   )
 }
 
