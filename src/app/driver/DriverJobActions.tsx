@@ -8,6 +8,7 @@ import { formatCents } from '@/lib/pricing'
 import { getDefaultChecklist, getDocumentTextForLabel, buildDeliveryDisclosureText, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
+import GuidedCaptureModal from '@/components/GuidedCaptureModal'
 
 type Job = {
   id: string
@@ -146,6 +147,7 @@ export default function DriverJobActions({
   const [sendingVerification, setSendingVerification] = useState(false)
   const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
   const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
+  const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 15000)
@@ -1072,6 +1074,25 @@ export default function DriverJobActions({
                         )}
 
                         {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
+                          item.label.includes('360° walkaround video') ? (
+                            <button
+                              type="button"
+                              onClick={() => setGuidedCaptureItem({ item, mode: 'walkaround' })}
+                              disabled={uploadingItemId === item.id}
+                              className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                            >
+                              {uploadingItemId === item.id ? 'Uploading...' : '🎥 Record guided walkaround'}
+                            </button>
+                          ) : item.label.startsWith('Delivery: Photograph dash') ? (
+                            <button
+                              type="button"
+                              onClick={() => setGuidedCaptureItem({ item, mode: 'dash' })}
+                              disabled={uploadingItemId === item.id}
+                              className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                            >
+                              {uploadingItemId === item.id ? 'Uploading...' : '📷 Take guided photo'}
+                            </button>
+                          ) : (
                           <label className="inline-block text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] cursor-pointer">
                             {uploadingItemId === item.id
                               ? 'Uploading...'
@@ -1094,6 +1115,7 @@ export default function DriverJobActions({
                               }}
                             />
                           </label>
+                          )
                         )}
                       </div>
                     )}
@@ -1123,6 +1145,18 @@ export default function DriverJobActions({
             </span>
           )}
         </div>
+      )}
+
+      {guidedCaptureItem && (
+        <GuidedCaptureModal
+          mode={guidedCaptureItem.mode}
+          onClose={() => setGuidedCaptureItem(null)}
+          onCapture={(file) => {
+            const item = guidedCaptureItem.item
+            setGuidedCaptureItem(null)
+            uploadFilesForItem(item, [file])
+          }}
+        />
       )}
     </div>
   )
