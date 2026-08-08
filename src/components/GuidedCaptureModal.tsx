@@ -8,26 +8,18 @@ type Props = {
   onClose: () => void
 }
 
-// A simple top-down car silhouette with an animated dot circling it, showing
-// the driver exactly where to start, which direction to walk, and where to
-// end — front, around the passenger side, rear, driver side, back to front.
-function WalkaroundGuide() {
+// A car outline overlaid directly on the live camera view — the driver lines
+// the real vehicle up inside it before starting, then keeps it framed inside
+// the outline while walking counter-clockwise around the car and filming.
+function CarOutline() {
   return (
-    <svg viewBox="0 0 220 220" className="w-full h-full">
-      <ellipse cx="110" cy="110" rx="95" ry="70" fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 5" opacity="0.7" />
-      <g transform="translate(110,110)">
-        <path d="M-15,-45 L15,-45 Q28,-45 30,-30 L34,20 Q35,45 15,45 L-15,45 Q-35,45 -34,20 L-30,-30 Q-28,-45 -15,-45 Z"
-          fill="#378ADD" stroke="white" strokeWidth="1.5" />
-        <rect x="-12" y="-33" width="24" height="20" rx="3" fill="white" opacity="0.85" />
-      </g>
-      <circle r="6" fill="#ffffff" stroke="#378ADD" strokeWidth="2">
-        <animateMotion dur="10s" repeatCount="indefinite"
-          path="M 110,40 A 95,70 0 1 1 109.9,40" />
-      </circle>
-      <text x="110" y="30" textAnchor="middle" fill="white" fontSize="11" fontWeight="600">Front</text>
-      <text x="205" y="114" textAnchor="middle" fill="white" fontSize="11" fontWeight="600">Side</text>
-      <text x="110" y="196" textAnchor="middle" fill="white" fontSize="11" fontWeight="600">Rear</text>
-      <text x="15" y="114" textAnchor="middle" fill="white" fontSize="11" fontWeight="600">Side</text>
+    <svg viewBox="0 0 320 200" className="absolute inset-0 w-full h-full pointer-events-none">
+      <path
+        d="M40,150 L40,110 Q42,95 60,90 L95,75 Q115,62 150,60 L210,60 Q240,62 255,80 L275,95 Q288,100 288,115 L288,150 Q288,158 280,158 L260,158 Q258,145 245,145 Q232,145 230,158 L100,158 Q98,145 85,145 Q72,145 70,158 L48,158 Q40,158 40,150 Z"
+        fill="none" stroke="white" strokeWidth="3" strokeDasharray="10 7" opacity="0.9"
+      />
+      <circle cx="85" cy="158" r="14" fill="none" stroke="white" strokeWidth="2.5" strokeDasharray="4 4" opacity="0.85" />
+      <circle cx="245" cy="158" r="14" fill="none" stroke="white" strokeWidth="2.5" strokeDasharray="4 4" opacity="0.85" />
     </svg>
   )
 }
@@ -104,27 +96,31 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{ height: '100dvh' }}>
+      <div className="flex items-center justify-between px-4 py-2 shrink-0">
         <button onClick={onClose} className="text-white text-sm">✕ Cancel</button>
-        <p className="text-white text-sm font-medium">
-          {mode === 'walkaround' ? '360° Walkaround Video' : 'Dash & Fuel Gauge Photo'}
-        </p>
         <div className="w-12" />
       </div>
 
       {error ? (
-        <div className="flex-1 flex items-center justify-center px-6">
+        <div className="flex-1 flex items-center justify-center px-6 min-h-0">
           <p className="text-white text-sm text-center">{error}</p>
         </div>
       ) : (
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-h-0 overflow-hidden">
           <video ref={videoRef} autoPlay playsInline muted={mode === 'dash'} className="w-full h-full object-cover" />
 
           {mode === 'walkaround' ? (
-            <div className="absolute bottom-4 left-4 w-36 h-36 bg-black/40 rounded-xl">
-              <WalkaroundGuide />
-            </div>
+            <>
+              <CarOutline />
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
+                <p className="text-white text-xs text-center leading-snug">
+                  {recording
+                    ? 'Keep the vehicle inside the outline — walk counter-clockwise around it, ending back at the front.'
+                    : 'Line the front of the vehicle up inside the outline, then start recording.'}
+                </p>
+              </div>
+            </>
           ) : (
             <svg viewBox="0 0 300 225" className="absolute inset-0 w-full h-full pointer-events-none">
               <rect x="20" y="40" width="260" height="145" rx="10" fill="none" stroke="white" strokeWidth="3" strokeDasharray="8 6" opacity="0.9" />
@@ -133,7 +129,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
           )}
 
           {mode === 'walkaround' && recording && (
-            <div className="absolute top-4 right-4 bg-red-600 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5">
               <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
               {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
             </div>
@@ -141,7 +137,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
         </div>
       )}
 
-      <div className="px-6 py-6 flex justify-center">
+      <div className="px-6 py-4 flex justify-center shrink-0">
         {mode === 'dash' ? (
           <button onClick={capturePhoto} className="bg-[#378ADD] text-white text-sm font-medium px-8 py-3 rounded-full">
             Take photo
@@ -161,3 +157,4 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
     </div>
   )
 }
+
