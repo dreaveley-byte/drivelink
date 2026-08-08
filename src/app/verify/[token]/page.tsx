@@ -27,6 +27,7 @@ export default function VerifyPage() {
   const [facePhoto, setFacePhoto] = useState<string | null>(null)
   const [licensePhoto, setLicensePhoto] = useState<string | null>(null)
   const [retakeReason, setRetakeReason] = useState('')
+  const [identityMismatch, setIdentityMismatch] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [cameraReady, setCameraReady] = useState(false)
 
@@ -143,6 +144,7 @@ export default function VerifyPage() {
     if (!face || !license) return
     setStep('submitting')
     setRetakeReason('')
+    setIdentityMismatch(false)
     try {
       const res = await fetch('/api/id-verification/submit', {
         method: 'POST',
@@ -155,6 +157,7 @@ export default function VerifyPage() {
           setStep('manual_override')
           return
         }
+        setIdentityMismatch(data.failureType === 'identity_mismatch')
         if (data.retake === 'face') {
           setFacePhoto(null)
           setStep('face')
@@ -223,6 +226,9 @@ export default function VerifyPage() {
               ? 'Line your face up inside the oval, in good lighting, then tap when ready.'
               : 'Line your driver\u2019s license or photo ID up inside the frame, then tap when ready.'}
           </p>
+          {identityMismatch && (
+            <p className="text-base font-bold text-red-600 text-center mb-1">Cannot verify ID</p>
+          )}
           {retakeReason && <p className="text-xs text-red-600 text-center mb-2">⚠️ {retakeReason}</p>}
           <div className="relative w-full aspect-[4/3] bg-black rounded-xl overflow-hidden">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />

@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
 
   // After 2 failed AI attempts, stop asking the customer to keep retaking photos
   // — hand it off to the driver to confirm the ID in person instead.
-  async function registerFailureAndCheckOverride(reason: string, retake: 'face' | 'license') {
+  async function registerFailureAndCheckOverride(reason: string, retake: 'face' | 'license', failureType: 'quality' | 'identity_mismatch') {
     const { data: failureCount } = await supabase.rpc('increment_id_verification_failures', { p_token: token })
     if ((failureCount ?? 0) >= 2) {
       return NextResponse.json(
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
         { status: 422 }
       )
     }
-    return NextResponse.json({ error: `${reason} Please retake.`, retake }, { status: 422 })
+    return NextResponse.json({ error: `${reason} Please retake.`, retake, failureType }, { status: 422 })
   }
 
   const [faceCheck, licenseCheck] = await Promise.all([
@@ -192,15 +192,15 @@ export async function POST(req: NextRequest) {
   ])
 
   if (!faceCheck.ok) {
-    return await registerFailureAndCheckOverride(`Face photo: ${faceCheck.reason}.`, 'face')
+    return await registerFailureAndCheckOverride(`Face photo: ${faceCheck.reason}.`, 'face', 'quality')
   }
   if (!licenseCheck.ok) {
-    return await registerFailureAndCheckOverride(`ID photo: ${licenseCheck.reason}.`, 'license')
+    return await registerFailureAndCheckOverride(`ID photo: ${licenseCheck.reason}.`, 'license', 'quality')
   }
 
   const identityCheck = await validateIdentityMatch(facePhoto, licensePhoto, job.customer_full_name)
   if (!identityCheck.ok) {
-    return await registerFailureAndCheckOverride(identityCheck.reason ?? 'Identity check failed.', identityCheck.retakeTarget ?? 'face')
+    return await registerFailureAndCheckOverride(identityCheck.reason ?? 'Identity check failed.', identityCheck.retakeTarget ?? 'face', 'identity_mismatch')
   }
 
   const facePath = `${job.job_id}/id-verification-face-${Date.now()}.jpg`
