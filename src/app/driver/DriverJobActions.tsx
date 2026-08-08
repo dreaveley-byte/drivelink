@@ -1083,7 +1083,7 @@ export default function DriverJobActions({
                             >
                               {uploadingItemId === item.id ? 'Uploading...' : '🎥 Record guided walkaround'}
                             </button>
-                          ) : item.label.startsWith('Delivery: Photograph dash') ? (
+                          ) : item.label.startsWith('Delivery: Photograph dash') || item.label.includes('Photograph odometer') ? (
                             <button
                               type="button"
                               onClick={() => setGuidedCaptureItem({ item, mode: 'dash' })}
