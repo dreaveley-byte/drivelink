@@ -8,19 +8,41 @@ type Props = {
   onClose: () => void
 }
 
-// A car outline overlaid directly on the live camera view — the driver lines
-// the real vehicle up inside it before starting, then keeps it framed inside
-// the outline while walking counter-clockwise around the car and filming.
-function CarOutline() {
+const CAR_OUTLINE_IMAGE = '/condition-report/driver-side.jpg'
+
+// The real car-outline art from the condition report, blended onto the live
+// camera feed — multiply blend makes the white background disappear, leaving
+// just the dark outline visible over the video, like a transparent overlay.
+function CarOutlineOverlay() {
   return (
-    <svg viewBox="0 0 320 200" className="absolute inset-0 w-full h-full pointer-events-none">
-      <path
-        d="M40,150 L40,110 Q42,95 60,90 L95,75 Q115,62 150,60 L210,60 Q240,62 255,80 L275,95 Q288,100 288,115 L288,150 Q288,158 280,158 L260,158 Q258,145 245,145 Q232,145 230,158 L100,158 Q98,145 85,145 Q72,145 70,158 L48,158 Q40,158 40,150 Z"
-        fill="none" stroke="white" strokeWidth="3" strokeDasharray="10 7" opacity="0.9"
-      />
-      <circle cx="85" cy="158" r="14" fill="none" stroke="white" strokeWidth="2.5" strokeDasharray="4 4" opacity="0.85" />
-      <circle cx="245" cy="158" r="14" fill="none" stroke="white" strokeWidth="2.5" strokeDasharray="4 4" opacity="0.85" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={CAR_OUTLINE_IMAGE}
+      alt=""
+      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+      style={{ mixBlendMode: 'multiply', opacity: 0.85 }}
+    />
+  )
+}
+
+// A quick animated preview shown before recording starts — the same outline
+// with an arrow that circles around it once or twice, demonstrating the
+// counter-clockwise walking path so drivers know what they're about to do.
+function WalkaroundDemo() {
+  return (
+    <div className="relative w-full max-w-xs mx-auto aspect-[900/357]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={CAR_OUTLINE_IMAGE} alt="" className="w-full h-full object-contain" />
+      <svg viewBox="0 0 900 357" className="absolute inset-0 w-full h-full">
+        <ellipse cx="450" cy="180" rx="420" ry="150" fill="none" />
+        <g>
+          <circle r="16" fill="#378ADD">
+            <animateMotion dur="4s" repeatCount="indefinite"
+              path="M 450,30 A 420,150 0 1 0 449.9,30" />
+          </circle>
+        </g>
+      </svg>
+    </div>
   )
 }
 
@@ -31,10 +53,12 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const [recording, setRecording] = useState(false)
+  const [showingDemo, setShowingDemo] = useState(mode === 'walkaround')
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (showingDemo) return
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: mode === 'walkaround' })
       .then((stream) => {
@@ -49,7 +73,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [mode])
+  }, [mode, showingDemo])
 
   useEffect(() => {
     if (!recording) return
@@ -95,6 +119,33 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
     }, 'image/jpeg', 0.9)
   }
 
+  if (showingDemo) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{ height: '100dvh' }}>
+        <div className="flex items-center justify-between px-4 py-2 shrink-0">
+          <button onClick={onClose} className="text-white text-sm">✕ Cancel</button>
+          <div className="w-12" />
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6 min-h-0">
+          <p className="text-white text-sm font-medium text-center">Here&apos;s what to do</p>
+          <WalkaroundDemo />
+          <p className="text-white text-xs text-center max-w-xs leading-relaxed">
+            Start at the front of the vehicle, walk counter-clockwise all the way around it while recording,
+            and end back where you started. Keep the vehicle framed inside the outline the whole way.
+          </p>
+        </div>
+        <div className="px-6 py-4 shrink-0">
+          <button
+            onClick={() => setShowingDemo(false)}
+            className="w-full bg-[#378ADD] text-white text-sm font-medium px-8 py-3 rounded-full"
+          >
+            Got it, start
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{ height: '100dvh' }}>
       <div className="flex items-center justify-between px-4 py-2 shrink-0">
@@ -112,12 +163,12 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
 
           {mode === 'walkaround' ? (
             <>
-              <CarOutline />
+              <CarOutlineOverlay />
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
                 <p className="text-white text-xs text-center leading-snug">
                   {recording
                     ? 'Keep the vehicle inside the outline — walk counter-clockwise around it, ending back at the front.'
-                    : 'Line the front of the vehicle up inside the outline, then start recording.'}
+                    : 'Line the vehicle up inside the outline, then start recording.'}
                 </p>
               </div>
             </>
