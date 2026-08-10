@@ -85,6 +85,8 @@ export default async function AdminApplicationsPage() {
                 bucket="driver-documents"
                 userId={app.user_id}
                 profilePhotoPath={app.profile_photo_path}
+                driverFullName={app.full_name}
+                driverPhone={app.cell_phone}
                 docs={[
                   { label: 'Profile photo', path: app.profile_photo_path },
                   { label: "Driver's license", path: app.drivers_license_path },

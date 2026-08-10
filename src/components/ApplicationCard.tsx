@@ -16,6 +16,8 @@ export default function ApplicationCard({
   docs,
   userId,
   profilePhotoPath,
+  driverFullName,
+  driverPhone,
   dealerSubmittedBy,
   dealerOrganizationId,
   dealerBusinessName,
@@ -29,6 +31,8 @@ export default function ApplicationCard({
   docs: Doc[]
   userId?: string
   profilePhotoPath?: string | null
+  driverFullName?: string | null
+  driverPhone?: string | null
   dealerSubmittedBy?: string
   dealerOrganizationId?: string | null
   dealerBusinessName?: string | null
@@ -84,7 +88,17 @@ export default function ApplicationCard({
         }
         // This is the actual activation step — without it, an "approved" driver
         // never shows up in the admin drivers list or is able to claim jobs.
-        const { error: activateError } = await supabase.from('profiles').update({ role: 'driver' }).eq('id', userId)
+        // Also copies name/phone from the application, since the profile itself
+        // never collects these anywhere else — without this, every approved
+        // driver would show up as "Unnamed driver, no phone on file".
+        const { error: activateError } = await supabase
+          .from('profiles')
+          .update({
+            role: 'driver',
+            ...(driverFullName && { full_name: driverFullName }),
+            ...(driverPhone && { phone: driverPhone }),
+          })
+          .eq('id', userId)
         if (activateError) {
           setUpdating(false)
           alert(`Approved, but activating the driver's account failed: ${activateError.message}. They may not show up correctly — contact support if this persists.`)
