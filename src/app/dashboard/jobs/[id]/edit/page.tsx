@@ -498,6 +498,14 @@ export default function EditJobPage() {
             hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
           })
+        } else {
+          result.push({
+            description: 'Ground transport to airport (flat estimate)',
+            kind: 'ground-to-airport' as const,
+            dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
+            hoursAdded: pricingSettings!.return_ground_transport_hours,
+            paidToDriver: true,
+          })
         }
         if (hasOverride) {
           result.push({
