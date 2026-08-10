@@ -546,7 +546,11 @@ export default function EditJobPage() {
 
       let finalCharges: AdditionalCharge[] = manualCharges
 
-      if (forcedRoundTrip) {
+      if (isCourierJob) {
+        setEffectiveOneWayReturn(true)
+        finalCharges = manualCharges
+        setDecisionNote('Courier/Package — one-way only, no return-transport charge applies.')
+      } else if (forcedRoundTrip) {
         setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges

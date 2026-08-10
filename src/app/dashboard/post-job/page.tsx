@@ -533,7 +533,15 @@ export default function PostJobPage() {
 
       let finalCharges: AdditionalCharge[] = manualCharges
 
-      if (forcedRoundTrip) {
+      if (isCourierJob) {
+        // Courier/Package is always purely one-way — driver drives there with
+        // their own vehicle, and there's no billed charge of any kind for how
+        // they get back (no Uber, no chase vehicle, no comparison). Bypasses
+        // the whole auto-select/manual return-method system entirely.
+        setEffectiveOneWayReturn(true)
+        finalCharges = manualCharges
+        setDecisionNote('Courier/Package — one-way only, no return-transport charge applies.')
+      } else if (forcedRoundTrip) {
         setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
