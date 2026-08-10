@@ -1523,7 +1523,7 @@ export default function EditJobPage() {
                 <span className="text-base font-semibold text-gray-900">{formatCents(pricing.estimatedDealerCostCents)}</span>
               </div>
               <p className="text-xs text-gray-400 pt-1">
-                Final actual charges may vary slightly. Additional charges may apply for anything not listed above.
+                Estimated price. Additional charges may apply for wait time, repairs, tolls, parking, storage, additional mileage, or other job-related expenses. Final pricing may vary.
               </p>
               {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
                 <NearbyDatesFlightCheck
