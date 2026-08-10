@@ -8,6 +8,7 @@ import DealerFeedbackForm from '@/components/DealerFeedbackForm'
 import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
 import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
+import ExpenseReviewList from '@/components/ExpenseReviewList'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +100,29 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   })()
 
   const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
+
+  const { data: rawExpenses } = await supabase
+    .from('job_expenses')
+    .select('id, category, description, amount_cents, status, receipt_photo_path, created_at, submitted_by:submitted_by(full_name)')
+    .eq('job_id', job.id)
+    .order('created_at', { ascending: false })
+
+  const expenses = await Promise.all(
+    (rawExpenses ?? []).map(async (exp) => {
+      const { data } = await supabase.storage.from('expense-receipts').createSignedUrl(exp.receipt_photo_path, 60 * 15)
+      const submitter = Array.isArray(exp.submitted_by) ? exp.submitted_by[0] : exp.submitted_by
+      return {
+        id: exp.id,
+        category: exp.category,
+        description: exp.description,
+        amount_cents: exp.amount_cents,
+        status: exp.status,
+        created_at: exp.created_at,
+        receipt_url: data?.signedUrl ?? null,
+        submitted_by_name: submitter?.full_name ?? null,
+      }
+    })
+  )
   const driverName = driverInfo?.full_name as string | undefined
   const driverPhone = driverInfo?.phone as string | undefined
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : job.job_types?.name
@@ -357,8 +381,20 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             <div className="space-y-1">
               {job.estimated_dealer_cost_cents != null && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Dealer charged</span>
+                  <span className="text-gray-600">Dealer charged (original estimate)</span>
                   <span className="text-gray-900 font-medium">{formatCents(job.estimated_dealer_cost_cents)}</span>
+                </div>
+              )}
+              {job.approved_expenses_cents > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Approved additional expenses</span>
+                  <span className="text-gray-900 font-medium">+{formatCents(job.approved_expenses_cents)}</span>
+                </div>
+              )}
+              {job.approved_expenses_cents > 0 && job.estimated_dealer_cost_cents != null && (
+                <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
+                  <span className="text-gray-900 font-medium">Final total</span>
+                  <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents)}</span>
                 </div>
               )}
               {job.estimated_driver_pay_cents != null && (
@@ -398,9 +434,25 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             </div>
           ) : (
             job.estimated_dealer_cost_cents != null && (
-              <div className="flex justify-between">
-                <span className="text-base text-gray-700">Total charged</span>
-                <span className="text-lg font-semibold text-gray-900">{formatCents(job.estimated_dealer_cost_cents)}</span>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-base text-gray-700">{job.approved_expenses_cents > 0 ? 'Original estimate' : 'Total charged'}</span>
+                  <span className={job.approved_expenses_cents > 0 ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
+                    {formatCents(job.estimated_dealer_cost_cents)}
+                  </span>
+                </div>
+                {job.approved_expenses_cents > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-base text-gray-700">Approved additional expenses</span>
+                      <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-gray-200">
+                      <span className="text-base text-gray-900 font-medium">Total charged</span>
+                      <span className="text-lg font-semibold text-gray-900">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             )
           )}
@@ -439,6 +491,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               <ApproveIdVerificationButton jobId={job.id} />
             )}
           </div>
+        </div>
+      )}
+
+      {expenses.length > 0 && (
+        <div className="max-w-2xl mx-auto px-6 pb-8">
+          <ExpenseReviewList jobId={job.id} expenses={expenses} isAdmin={isAdmin} />
         </div>
       )}
     </div>

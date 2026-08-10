@@ -152,6 +152,13 @@ export default function DriverJobActions({
   const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
   const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
   const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' } | null>(null)
+  const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [expenseCategory, setExpenseCategory] = useState('wait_time')
+  const [expenseDescription, setExpenseDescription] = useState('')
+  const [expenseAmount, setExpenseAmount] = useState('')
+  const [expenseReceiptFile, setExpenseReceiptFile] = useState<File | null>(null)
+  const [submittingExpense, setSubmittingExpense] = useState(false)
+  const [expenseError, setExpenseError] = useState('')
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 15000)
@@ -555,6 +562,59 @@ export default function DriverJobActions({
     setSendingVerification(false)
   }
 
+  async function submitExpense() {
+    setExpenseError('')
+    const amountCents = Math.round(parseFloat(expenseAmount || '0') * 100)
+    if (!amountCents || amountCents <= 0) {
+      setExpenseError('Enter a valid amount.')
+      return
+    }
+    if (!expenseReceiptFile) {
+      setExpenseError('A photo of the receipt is required.')
+      return
+    }
+    setSubmittingExpense(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Generate the ID client-side so the storage path can be scoped to it
+    // before the row exists — the storage policy checks the folder name
+    // against this same expense ID.
+    const expenseId = crypto.randomUUID()
+    const ext = expenseReceiptFile.name.split('.').pop() || 'jpg'
+    const path = `${expenseId}/receipt.${ext}`
+
+    const { error: uploadError } = await supabase.storage.from('expense-receipts').upload(path, expenseReceiptFile)
+    if (uploadError) {
+      setExpenseError(`Could not upload the receipt photo: ${uploadError.message}`)
+      setSubmittingExpense(false)
+      return
+    }
+
+    const { error: insertError } = await supabase.from('job_expenses').insert({
+      id: expenseId,
+      job_id: job.id,
+      submitted_by: user?.id,
+      category: expenseCategory,
+      description: expenseDescription || null,
+      amount_cents: amountCents,
+      receipt_photo_path: path,
+    })
+
+    setSubmittingExpense(false)
+    if (insertError) {
+      setExpenseError(`Could not submit the expense: ${insertError.message}`)
+      return
+    }
+
+    setShowExpenseForm(false)
+    setExpenseCategory('wait_time')
+    setExpenseDescription('')
+    setExpenseAmount('')
+    setExpenseReceiptFile(null)
+    router.refresh()
+  }
+
   async function confirmIdMatchManually() {
     setConfirmingIdMatch(true)
     const supabase = createClient()
@@ -761,6 +821,77 @@ export default function DriverJobActions({
                 Total wait so far: {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee: ${formatCents(job.idle_fee_cents)}`}
               </p>
             )}
+            <div className="mt-1">
+              {!showExpenseForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowExpenseForm(true)}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Submit an expense (repairs, tolls, parking, storage, etc.)
+                </button>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-3 mt-1 space-y-2 bg-gray-50">
+                  <p className="text-xs font-medium text-gray-700">Submit expense for reimbursement</p>
+                  {expenseError && <p className="text-xs text-red-600">{expenseError}</p>}
+                  <select
+                    value={expenseCategory}
+                    onChange={(e) => setExpenseCategory(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                  >
+                    <option value="wait_time">Wait time</option>
+                    <option value="repairs">Repairs</option>
+                    <option value="tolls">Tolls</option>
+                    <option value="parking">Parking</option>
+                    <option value="storage">Storage</option>
+                    <option value="additional_mileage">Additional mileage</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    placeholder="Amount ($)"
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    value={expenseDescription}
+                    onChange={(e) => setExpenseDescription(e.target.value)}
+                    placeholder="Notes (optional)"
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                  />
+                  <label className="block">
+                    <span className="text-xs text-gray-500">Photo of the receipt (required)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => setExpenseReceiptFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-xs mt-0.5"
+                    />
+                  </label>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={submitExpense}
+                      disabled={submittingExpense}
+                      className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                    >
+                      {submittingExpense ? 'Submitting…' : 'Submit for approval'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowExpenseForm(false); setExpenseError('') }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
