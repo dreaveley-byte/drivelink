@@ -84,7 +84,12 @@ export default function ApplicationCard({
         }
         // This is the actual activation step — without it, an "approved" driver
         // never shows up in the admin drivers list or is able to claim jobs.
-        await supabase.from('profiles').update({ role: 'driver' }).eq('id', userId)
+        const { error: activateError } = await supabase.from('profiles').update({ role: 'driver' }).eq('id', userId)
+        if (activateError) {
+          setUpdating(false)
+          alert(`Approved, but activating the driver's account failed: ${activateError.message}. They may not show up correctly — contact support if this persists.`)
+          return
+        }
       }
 
       if (table === 'dealer_applications' && dealerSubmittedBy) {
@@ -96,22 +101,32 @@ export default function ApplicationCard({
             .insert({ name: dealerBusinessName || 'New Dealer', org_type: 'dealer_customer' })
             .select('id')
             .single()
-          if (!orgError && newOrg) {
-            orgId = newOrg.id
-            await supabase.from('dealer_applications').update({ organization_id: orgId }).eq('id', id)
+          if (orgError || !newOrg) {
+            setUpdating(false)
+            alert(`Could not create this dealer's organization: ${orgError?.message ?? 'unknown error'}. The dealer was not activated — nothing was approved yet, try again.`)
+            return
           }
+          orgId = newOrg.id
+          await supabase.from('dealer_applications').update({ organization_id: orgId }).eq('id', id)
         }
 
         // Same idea as the driver activation above — without linking the org,
         // an "approved" dealer never gets a working dashboard or shows up for admin.
-        if (orgId) {
-          await supabase.from('profiles').update({ organization_id: orgId, role: 'org_admin' }).eq('id', dealerSubmittedBy)
+        const { error: linkError } = await supabase.from('profiles').update({ organization_id: orgId, role: 'org_admin' }).eq('id', dealerSubmittedBy)
+        if (linkError) {
+          setUpdating(false)
+          alert(`Organization was created, but linking the dealer's account to it failed: ${linkError.message}. They won't show up correctly yet — contact support if retrying doesn't fix it.`)
+          return
         }
       }
     }
 
-    await supabase.from(table).update({ status: newStatus }).eq('id', id)
+    const { error: statusError } = await supabase.from(table).update({ status: newStatus }).eq('id', id)
     setUpdating(false)
+    if (statusError) {
+      alert(`Could not update the application status: ${statusError.message}`)
+      return
+    }
     router.refresh()
   }
 
