@@ -8,19 +8,19 @@ type Props = {
   onClose: () => void
 }
 
-// Order confirmed against the full storyboard: front -> front driver 3/4 ->
-// driver side -> rear driver 3/4 -> rear -> rear passenger 3/4 -> passenger
-// side -> front passenger 3/4 -> front. Index 3 (driver side) and index 9
-// (passenger side) are the full-profile shots that get a slow pan across the
-// car instead of a static hold.
-const OUTLINE_STEP_INDICES = [0, 10, 11, 9, 7, 8, 6, 4, 5, 3, 1, 2, 0, 0, 0, 0]
+// Matches the 9-step storyboard exactly: front -> front driver 3/4 -> driver
+// side -> rear driver 3/4 -> rear -> rear passenger 3/4 -> passenger side ->
+// front passenger 3/4 -> front. No "closer" zoom variants, no repeated holds —
+// kept as simple as the reference itself so there's nothing left to drift out
+// of sync with it.
+const OUTLINE_STEP_INDICES = [0, 10, 9, 7, 6, 4, 3, 1, 0]
 const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
-const OUTLINE_STEP_SECONDS = 2
-const PAN_SEQUENCE_INDICES = [3, 9] // driver side, passenger side — both are a front-to-back sweep on screen
+const OUTLINE_STEP_SECONDS = 4 // ~4s/step matches the storyboard's own ~4s-per-step pacing
+const PAN_SEQUENCE_INDICES = [2, 6] // driver side, passenger side — both are a front-to-back sweep on screen
 // Arrow points left while walking the driver side (front -> driver side ->
 // rear), then right while walking the passenger side (rear -> passenger side
 // -> front) — matches the direction the outline appears to move on screen.
-const LEFT_ARROW_INDICES = new Set([0, 1, 2, 3, 4, 5, 6])
+const LEFT_ARROW_INDICES = new Set([0, 1, 2, 3, 4])
 
 // The outline itself rotates through all 16 angles from the full reference
 // set — front, counter-clockwise around the car, and back to front — cycling
