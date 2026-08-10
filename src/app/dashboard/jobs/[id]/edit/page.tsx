@@ -312,6 +312,7 @@ export default function EditJobPage() {
   const runCalculation = useCallback(async () => {
     setCalcError('')
     setDecisionNote('')
+    const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -577,7 +578,7 @@ export default function EditJobPage() {
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
-        {
+        if (!isCourierJob) {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(

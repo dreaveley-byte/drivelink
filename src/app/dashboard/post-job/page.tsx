@@ -295,6 +295,7 @@ export default function PostJobPage() {
   const runCalculation = useCallback(async () => {
     setCalcError('')
     setDecisionNote('')
+    const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -584,7 +585,10 @@ export default function PostJobPage() {
           options.push({ label: 'Uber back', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
-        {
+        // A courier/package run is always one-way — no vehicle-delivery concept
+        // of a chase vehicle or 2nd driver applies, so that option is excluded
+        // from the comparison entirely rather than possibly winning by cost.
+        if (!isCourierJob) {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
