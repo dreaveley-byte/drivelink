@@ -261,7 +261,6 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                   href={`/admin/dealers/${dealer.id}/agreement`}
                   className="text-xs text-blue-600 hover:underline"
                   target="_blank"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   Print signed agreement →
                 </Link>
