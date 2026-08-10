@@ -25,6 +25,7 @@ export default function PostJobPage() {
 
   const [vehicleYear, setVehicleYear] = useState('')
   const [packageDescription, setPackageDescription] = useState('')
+  const [packageDirection, setPackageDirection] = useState<'pickup' | 'dropoff'>('dropoff')
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
   const [stockNumber, setStockNumber] = useState('')
@@ -836,6 +837,7 @@ export default function PostJobPage() {
       recipient_phone: customerPhone || null,
       vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
       package_description: useSimplifiedForm ? (packageDescription || null) : null,
+      package_direction: isCourier ? packageDirection : null,
       vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
@@ -1336,9 +1338,22 @@ export default function PostJobPage() {
           {useSimplifiedForm ? (
             <div className="space-y-3 border border-gray-200 rounded-lg p-4">
               <p className="text-sm font-medium text-gray-900">{isPaperworkSigning ? 'Paperwork' : 'Package'}</p>
+              {isCourier && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Pick up or drop off</label>
+                  <select
+                    value={packageDirection}
+                    onChange={(e) => setPackageDirection(e.target.value as 'pickup' | 'dropoff')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="pickup">Pick up</option>
+                    <option value="dropoff">Drop off</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
-                  {isPaperworkSigning ? "What's being signed" : "What's being picked up"}
+                  {isPaperworkSigning ? "What's being signed" : "What's being picked up / dropped off"}
                 </label>
                 <input
                   value={packageDescription}

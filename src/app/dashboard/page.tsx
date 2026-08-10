@@ -120,7 +120,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -201,7 +201,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
                 {['Courier / Package', 'Paperwork Signing'].includes(jobTypeName ?? '') ? (
                   job.package_description && (
-                    <p className="text-xs text-gray-700 mt-0.5">📦 {job.package_description}</p>
+                    <p className="text-xs text-gray-700 mt-0.5">
+                      📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}{job.package_description}
+                    </p>
                   )
                 ) : (
                   (job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
