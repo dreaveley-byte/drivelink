@@ -205,7 +205,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
                 </p>
-                {job.job_types?.name === 'Courier / Package' ? (
+                {['Courier / Package', 'Paperwork Signing'].includes(job.job_types?.name ?? '') ? (
                   job.package_description && (
                     <p className="text-xs text-gray-700 mt-0.5">📦 {job.package_description}</p>
                   )

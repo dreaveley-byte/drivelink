@@ -296,6 +296,7 @@ export default function PostJobPage() {
     setCalcError('')
     setDecisionNote('')
     const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
+    const isPaperworkSigningJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Paperwork Signing'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -526,7 +527,7 @@ export default function PostJobPage() {
       // pairing) that never actually applies to a multi-vehicle deal. Dealer-to-dealer
       // trades with any pickup vehicles are the same story — there's a real vehicle
       // driving back, so it's never a fly/Uber-back scenario.
-      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver) || multiVehicleArrangement !== 'none' || dealerPickupCount > 0
+      const forcedRoundTrip = isTradeIn || (chaseVehicle && secondDriver) || multiVehicleArrangement !== 'none' || dealerPickupCount > 0 || isPaperworkSigningJob
       const longHaul = oneWayHours > 4
 
       let finalCharges: AdditionalCharge[] = manualCharges
@@ -538,7 +539,8 @@ export default function PostJobPage() {
         if (dealerPickupCount > 0) {
           const driverCount = Math.max(dealerDropoffCount, dealerPickupCount, 1)
           setDecisionNote(`Dealer trade: ${dealerDropoffCount} to drop off, ${dealerPickupCount} to pick up — ${driverCount} driver${driverCount === 1 ? '' : 's'} needed, billed accordingly. Treated as a round trip since vehicles are being driven back.`)
-        } else if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
+        } else if (isPaperworkSigningJob) setDecisionNote('Paperwork signing — driver takes their own vehicle there and back, always a round trip.')
+        else if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
       } else if (autoSelectReturnMethod) {
         // Always compare Uber-back against a 2nd driver + chase vehicle, on every
@@ -833,7 +835,7 @@ export default function PostJobPage() {
       recipient_name: customerFullName || null,
       recipient_phone: customerPhone || null,
       vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
-      package_description: isCourier ? (packageDescription || null) : null,
+      package_description: useSimplifiedForm ? (packageDescription || null) : null,
       vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
@@ -1113,6 +1115,12 @@ export default function PostJobPage() {
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
   const isCourier = jobTypeName === 'Courier / Package'
+  const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
+  // Paperwork Signing uses the same simplified form as Courier/Package (no
+  // vehicle section, no insurance, etc.) — the only difference is Paperwork
+  // Signing is always a round trip on the driver's own vehicle, never a
+  // one-way Uber-back/chase-vehicle scenario like a courier package can be.
+  const useSimplifiedForm = isCourier || isPaperworkSigning
 
   return (
     <div className="min-h-screen bg-white">
@@ -1325,15 +1333,17 @@ export default function PostJobPage() {
             </button>
           </div>
 
-          {isCourier ? (
+          {useSimplifiedForm ? (
             <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-900">Package</p>
+              <p className="text-sm font-medium text-gray-900">{isPaperworkSigning ? 'Paperwork' : 'Package'}</p>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">What&apos;s being picked up</label>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {isPaperworkSigning ? "What's being signed" : "What's being picked up"}
+                </label>
                 <input
                   value={packageDescription}
                   onChange={(e) => setPackageDescription(e.target.value)}
-                  placeholder="e.g. envelope of signed paperwork, laptop, spare key fob"
+                  placeholder={isPaperworkSigning ? 'e.g. loan documents, bill of sale, trade paperwork' : 'e.g. envelope of signed paperwork, laptop, spare key fob'}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
@@ -1402,7 +1412,7 @@ export default function PostJobPage() {
           </div>
           )}
 
-          {!isCourier && multiVehicleArrangement !== 'none' && (
+          {!useSimplifiedForm && multiVehicleArrangement !== 'none' && (
             <div className="space-y-4 border border-gray-200 rounded-lg p-4">
               <p className="text-sm font-medium text-gray-900">Other Vehicle(s) In This Deal</p>
 
@@ -1456,13 +1466,13 @@ export default function PostJobPage() {
               <input value={customerFullName} onChange={(e) => setCustomerFullName(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
-            <div className={isCourier ? '' : 'grid grid-cols-2 gap-3'}>
+            <div className={useSimplifiedForm ? '' : 'grid grid-cols-2 gap-3'}>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Phone</label>
                 <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
-              {!isCourier && (
+              {!useSimplifiedForm && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Address</label>
                   <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
@@ -1497,7 +1507,7 @@ export default function PostJobPage() {
             })()}
           </div>
 
-          {!isCourier && (<>
+          {!useSimplifiedForm && (<>
           <div>
             <label className="block text-sm text-gray-700 mb-1">Insurance</label>
             <select
@@ -1662,7 +1672,7 @@ export default function PostJobPage() {
           </div>
           </>)}
 
-          {!isCourier && (
+          {!useSimplifiedForm && (
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
             Delivery is to a First Nations reserve
