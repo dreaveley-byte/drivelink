@@ -10,48 +10,29 @@ type Props = {
 
 // Matches the 9-step storyboard exactly: front -> front driver 3/4 -> driver
 // side -> rear driver 3/4 -> rear -> rear passenger 3/4 -> passenger side ->
-// front passenger 3/4 -> front. No "closer" zoom variants, no repeated holds —
-// kept as simple as the reference itself so there's nothing left to drift out
-// of sync with it.
+// front passenger 3/4 -> front. Nine static images, nothing added — no zoom,
+// no pan, no extra frames beyond exactly what's in the reference.
 const OUTLINE_STEP_INDICES = [0, 10, 9, 7, 6, 4, 3, 1, 0]
 const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
 const OUTLINE_STEP_SECONDS = 4 // ~4s/step matches the storyboard's own ~4s-per-step pacing
-const PAN_SEQUENCE_INDICES = [2, 6] // driver side, passenger side — both are a front-to-back sweep on screen
 // Arrow points left while walking the driver side (front -> driver side ->
 // rear), then right while walking the passenger side (rear -> passenger side
 // -> front) — matches the direction the outline appears to move on screen.
 const LEFT_ARROW_INDICES = new Set([0, 1, 2, 3, 4])
 
-// The outline itself rotates through all 16 angles from the full reference
-// set — front, counter-clockwise around the car, and back to front — cycling
+// The outline itself steps through the 9 static angles from the storyboard —
+// front, counter-clockwise around the car, and back to front — cycling
 // automatically so the driver has a live guide to follow as they walk the loop.
-// The two full side-profile shots pan slowly across the car (zoomed in) rather
-// than holding static, sweeping the same on-screen direction as the walk.
 function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
   const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
-  const isPan = PAN_SEQUENCE_INDICES.includes(index)
   return (
-    <>
-      <style>{`
-        @keyframes outline-pan-sweep {
-          0% { transform: scale(1.7) translateX(16%); }
-          100% { transform: scale(1.7) translateX(-16%); }
-        }
-      `}</style>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={index}
-        src={OUTLINE_FRAMES[index]}
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        style={{
-          mixBlendMode: 'multiply',
-          opacity: 0.9,
-          transform: isPan ? undefined : 'scale(1.35)',
-          animation: isPan ? `outline-pan-sweep ${OUTLINE_STEP_SECONDS}s linear forwards` : undefined,
-        }}
-      />
-    </>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={OUTLINE_FRAMES[index]}
+      alt=""
+      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+      style={{ mixBlendMode: 'multiply', opacity: 0.9, transform: 'scale(1.35)' }}
+    />
   )
 }
 
