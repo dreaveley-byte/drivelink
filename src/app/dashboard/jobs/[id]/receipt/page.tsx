@@ -373,6 +373,14 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-900 font-medium">{job.actual_driver_hours.toFixed(1)} hrs</span>
                 </div>
               )}
+              {job.total_wait_minutes > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Wait time at stops</span>
+                  <span className="text-gray-900 font-medium">
+                    {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee ${formatCents(job.idle_fee_cents)}`}
+                  </span>
+                </div>
+              )}
               {(job.customer_rating != null || job.customer_feedback) && (
                 <div className="text-sm mt-2">
                   <span className="text-gray-600">Customer rating: </span>

@@ -81,7 +81,12 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
             })
             .eq('id', jobId)
           const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
-        if (pingError) console.error('Location ping insert failed:', pingError)
+          if (pingError) console.error('Location ping insert failed:', pingError)
+          fetch('/api/driver-idle-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobId, lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          }).catch(() => {})
         },
         () => {
           if (!cancelled) setStatus('denied')

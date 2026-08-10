@@ -43,6 +43,10 @@ type Settings = {
   max_daily_meal_budget_cents: number
   preferred_driver_window_minutes: number
   eta_window_buffer_percent: number
+  admin_alert_phone: string | null
+  idle_alert_minutes: number
+  idle_fee_grace_minutes: number
+  idle_fee_per_minute_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
   max_driving_hours_before_overnight: number
@@ -89,6 +93,11 @@ export default function PricingSettingsPage() {
   function updateNumberField(key: keyof Settings, value: string) {
     if (!settings) return
     setSettings({ ...settings, [key]: parseFloat(value || '0') })
+  }
+
+  function updateTextField(key: keyof Settings, value: string) {
+    if (!settings) return
+    setSettings({ ...settings, [key]: value || null })
   }
 
   async function handleSave() {
@@ -374,6 +383,35 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Customer ETA text shows a window from the raw arrival time forward by this % of drive time (e.g. 20% on a 30min drive = 6min window, on a 5hr drive = 1hr window)</p>
               <input type="number" step="1" value={settings.eta_window_buffer_percent}
                 onChange={(e) => updateNumberField('eta_window_buffer_percent', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Admin alert phone number</label>
+              <p className="text-xs text-gray-400 mb-1">Gets a text if a driver appears to be idle too long on an active job. Leave blank to disable idle alerts.</p>
+              <input type="tel" value={settings.admin_alert_phone ?? ''}
+                onChange={(e) => updateTextField('admin_alert_phone', e.target.value)}
+                placeholder="+1 604 555 0123"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Idle alert threshold (minutes)</label>
+              <p className="text-xs text-gray-400 mb-1">How long a driver's location can stay unchanged (within ~100m) before admin gets alerted</p>
+              <input type="number" step="1" value={settings.idle_alert_minutes}
+                onChange={(e) => updateNumberField('idle_alert_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Idle fee grace period (minutes)</label>
+              <p className="text-xs text-gray-400 mb-1">When a driver manually starts a wait timer at a stop, this much time is free before the idle fee kicks in</p>
+              <input type="number" step="1" value={settings.idle_fee_grace_minutes}
+                onChange={(e) => updateNumberField('idle_fee_grace_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Idle fee rate ($/minute)</label>
+              <p className="text-xs text-gray-400 mb-1">Charged per minute of wait time beyond the grace period</p>
+              <input type="number" step="0.01" value={dollars(settings.idle_fee_per_minute_cents)}
+                onChange={(e) => updateDollarField('idle_fee_per_minute_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>

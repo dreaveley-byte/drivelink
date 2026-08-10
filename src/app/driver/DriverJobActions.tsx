@@ -49,6 +49,9 @@ type Job = {
   id_verification_approved_at: string | null
   id_verification_failed_attempts: number
   id_verification_manual_override: boolean
+  wait_time_started_at: string | null
+  total_wait_minutes: number
+  idle_fee_cents: number
   job_types: { name: string }[] | { name: string } | null
   organizations: { name: string; address: string | null; phone: string | null }[] | { name: string; address: string | null; phone: string | null } | null
 }
@@ -514,6 +517,29 @@ export default function DriverJobActions({
     setLoading(false)
   }
 
+  async function toggleWaitTimer() {
+    const supabase = createClient()
+    if (job.wait_time_started_at) {
+      const elapsedMinutes = (Date.now() - new Date(job.wait_time_started_at).getTime()) / 60000
+      const newTotal = Math.round((job.total_wait_minutes + elapsedMinutes) * 10) / 10
+      const { data: settings } = await supabase
+        .from('pricing_settings')
+        .select('idle_fee_grace_minutes, idle_fee_per_minute_cents')
+        .eq('id', 1)
+        .single()
+      const grace = settings?.idle_fee_grace_minutes ?? 15
+      const rate = settings?.idle_fee_per_minute_cents ?? 100
+      const newFeeCents = Math.round(Math.max(0, newTotal - grace) * rate)
+      await supabase
+        .from('jobs')
+        .update({ wait_time_started_at: null, total_wait_minutes: newTotal, idle_fee_cents: newFeeCents })
+        .eq('id', job.id)
+    } else {
+      await supabase.from('jobs').update({ wait_time_started_at: new Date().toISOString() }).eq('id', job.id)
+    }
+    router.refresh()
+  }
+
   async function sendIdVerificationLink() {
     setSendingVerification(true)
     try {
@@ -710,6 +736,32 @@ export default function DriverJobActions({
               <span className="text-gray-500 font-normal"> + {formatCents(job.estimated_driver_reimbursement_cents)} reimbursement</span>
             )}
           </p>
+        )}
+        {!['completed', 'cancelled', 'awaiting_driver'].includes(job.status) && (
+          <div className="mt-1.5">
+            {job.wait_time_started_at ? (
+              <button
+                type="button"
+                onClick={toggleWaitTimer}
+                className="text-xs bg-amber-100 text-amber-800 border border-amber-300 rounded-lg px-2.5 py-1 hover:bg-amber-200"
+              >
+                ⏱ Waiting since {new Date(job.wait_time_started_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })} — tap to stop
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={toggleWaitTimer}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Start wait timer (dealer/customer not ready)
+              </button>
+            )}
+            {job.total_wait_minutes > 0 && !job.wait_time_started_at && (
+              <p className="text-xs text-gray-400 mt-0.5">
+                Total wait so far: {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee: ${formatCents(job.idle_fee_cents)}`}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
