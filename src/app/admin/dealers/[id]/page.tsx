@@ -6,6 +6,7 @@ import SettingsGearLink from '@/components/SettingsGearLink'
 import ApplicationCard from '@/components/ApplicationCard'
 import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
+import DealerExpenseVisibilityToggle from '@/components/DealerExpenseVisibilityToggle'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
 import PendingInvitesList from '@/components/PendingInvitesList'
@@ -177,6 +178,8 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
             <p className="text-gray-400">{totalCompleted} completed job{totalCompleted === 1 ? '' : 's'} all-time</p>
           </div>
         </div>
+
+        <DealerExpenseVisibilityToggle organizationId={dealer.id} initialValue={!!dealer.dealer_can_view_expenses} />
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Company Info</p>

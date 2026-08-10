@@ -14,7 +14,10 @@ type Expense = {
   receipt_url: string | null
   created_at: string
   submitted_by_name: string | null
+  approved_addition_cents?: number | null
 }
+
+type Baselines = { fuel: number; inspection: number; food: number }
 
 const CATEGORY_LABELS: Record<string, string> = {
   wait_time: 'Wait time',
@@ -29,6 +32,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
+// Fuel, inspection, and food are already budgeted for in the base job price.
+// A receipt in one of these categories should only add to the job's total if
+// (and to the extent) the driver's actual cost exceeded what was already
+// priced in — food specifically should never add anything at all, per policy.
+const BASELINE_CATEGORIES = ['fuel', 'inspection', 'food'] as const
+
 function categoryLabel(exp: Expense) {
   if (exp.category === 'other' && exp.custom_category) return exp.custom_category
   return CATEGORY_LABELS[exp.category] ?? exp.category
@@ -38,14 +47,40 @@ function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
 }
 
-export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId: string; expenses: Expense[]; isAdmin: boolean }) {
+// How much approving this specific expense would actually add to the job's
+// total, given everything already approved in the same category so far.
+function computeAddAmount(expense: Expense, allExpenses: Expense[], baselines: Baselines): number {
+  if (expense.category === 'food') return 0
+  if (expense.category !== 'fuel' && expense.category !== 'inspection') return expense.amount_cents
+
+  const baseline = baselines[expense.category as 'fuel' | 'inspection']
+  const priorApprovedSum = allExpenses
+    .filter((e) => e.category === expense.category && e.status === 'approved' && e.id !== expense.id)
+    .reduce((sum, e) => sum + e.amount_cents, 0)
+  const newSum = priorApprovedSum + expense.amount_cents
+  return Math.max(0, newSum - baseline) - Math.max(0, priorApprovedSum - baseline)
+}
+
+export default function ExpenseReviewList({
+  jobId,
+  expenses,
+  isAdmin,
+  baselines,
+}: {
+  jobId: string
+  expenses: Expense[]
+  isAdmin: boolean
+  baselines: Baselines
+}) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  async function review(expenseId: string, approve: boolean, amountCents: number) {
-    setLoadingId(expenseId)
+  async function review(expense: Expense, approve: boolean) {
+    setLoadingId(expense.id)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+
+    const addAmount = approve ? computeAddAmount(expense, expenses, baselines) : 0
 
     const { error } = await supabase
       .from('job_expenses')
@@ -53,14 +88,15 @@ export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId:
         status: approve ? 'approved' : 'rejected',
         reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
+        approved_addition_cents: approve ? addAmount : null,
       })
-      .eq('id', expenseId)
+      .eq('id', expense.id)
 
-    if (!error && approve) {
+    if (!error && approve && addAmount > 0) {
       const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
       await supabase
         .from('jobs')
-        .update({ approved_expenses_cents: (job?.approved_expenses_cents ?? 0) + amountCents })
+        .update({ approved_expenses_cents: (job?.approved_expenses_cents ?? 0) + addAmount })
         .eq('id', jobId)
     }
 
@@ -73,22 +109,23 @@ export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId:
   }
 
   // Reverts an approve/reject decision back to pending — for when a button
-  // was tapped by accident. If it was approved, subtracts the amount back
-  // out of the job's running total so the receipt stays accurate.
-  async function undoReview(expenseId: string, wasApproved: boolean, amountCents: number) {
-    setLoadingId(expenseId)
+  // was tapped by accident. Subtracts back exactly what was added at approval
+  // time (stored on the row), so this can never drift out of sync.
+  async function undoReview(expense: Expense) {
+    setLoadingId(expense.id)
     const supabase = createClient()
 
     const { error } = await supabase
       .from('job_expenses')
-      .update({ status: 'pending', reviewed_by: null, reviewed_at: null })
-      .eq('id', expenseId)
+      .update({ status: 'pending', reviewed_by: null, reviewed_at: null, approved_addition_cents: null })
+      .eq('id', expense.id)
 
-    if (!error && wasApproved) {
+    const addedAmount = expense.approved_addition_cents ?? 0
+    if (!error && addedAmount > 0) {
       const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
       await supabase
         .from('jobs')
-        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - amountCents) })
+        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - addedAmount) })
         .eq('id', jobId)
     }
 
@@ -106,72 +143,88 @@ export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId:
     <div className="border border-gray-200 rounded-xl p-6">
       <p className="text-sm font-medium text-gray-900 mb-3">Submitted expenses</p>
       <div className="space-y-3">
-        {expenses.map((exp) => (
-          <div key={exp.id} className="flex items-start gap-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
-            {exp.receipt_url && (
-              <a href={exp.receipt_url} target="_blank" rel="noopener noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={exp.receipt_url} alt="Receipt" className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
-              </a>
-            )}
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">
-                {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
-              </p>
-              {exp.description && <p className="text-xs text-gray-500">{exp.description}</p>}
-              <p className="text-xs text-gray-400">
-                {exp.submitted_by_name || 'Driver'} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
-              </p>
-              {exp.status === 'approved' && isAdmin && (
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-xs text-green-600">✓ Approved</p>
-                  <button
-                    onClick={() => undoReview(exp.id, true, exp.amount_cents)}
-                    disabled={loadingId === exp.id}
-                    className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
-                  >
-                    Undo
-                  </button>
-                </div>
+        {expenses.map((exp) => {
+          const isBaselineCategory = (BASELINE_CATEGORIES as readonly string[]).includes(exp.category)
+          const previewAddAmount = exp.status === 'pending' ? computeAddAmount(exp, expenses, baselines) : null
+          return (
+            <div key={exp.id} className="flex items-start gap-3 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+              {exp.receipt_url && (
+                <a href={exp.receipt_url} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={exp.receipt_url} alt="Receipt" className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                </a>
               )}
-              {exp.status === 'approved' && !isAdmin && <p className="text-xs text-green-600 mt-1">✓ Approved</p>}
-              {exp.status === 'rejected' && isAdmin && (
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-xs text-red-600">✕ Rejected</p>
-                  <button
-                    onClick={() => undoReview(exp.id, false, exp.amount_cents)}
-                    disabled={loadingId === exp.id}
-                    className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
-                  >
-                    Undo
-                  </button>
-                </div>
-              )}
-              {exp.status === 'rejected' && !isAdmin && <p className="text-xs text-red-600 mt-1">✕ Rejected</p>}
-              {exp.status === 'pending' && isAdmin && (
-                <div className="flex gap-2 mt-1">
-                  <button
-                    onClick={() => review(exp.id, true, exp.amount_cents)}
-                    disabled={loadingId === exp.id}
-                    className="text-xs bg-gray-900 text-white rounded px-2.5 py-1 hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => review(exp.id, false, exp.amount_cents)}
-                    disabled={loadingId === exp.id}
-                    className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-              {exp.status === 'pending' && !isAdmin && (
-                <p className="text-xs text-amber-600 mt-1">Pending admin review</p>
-              )}
+              <div className="flex-1">
+                <p className="text-sm text-gray-900">
+                  {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
+                </p>
+                {exp.description && <p className="text-xs text-gray-500">{exp.description}</p>}
+                {isBaselineCategory && exp.status === 'pending' && isAdmin && (
+                  <p className="text-xs text-gray-400">
+                    {exp.category === 'food'
+                      ? 'Food is already covered by the base price — approving this won\u2019t add to the total.'
+                      : previewAddAmount === 0
+                      ? `Covered by the ${formatCents(baselines[exp.category as 'fuel' | 'inspection'])} already priced in — approving this won't add to the total.`
+                      : `Only the amount beyond what's already priced in (${formatCents(baselines[exp.category as 'fuel' | 'inspection'])}) will be added — approving this adds ${formatCents(previewAddAmount ?? 0)}.`}
+                  </p>
+                )}
+                <p className="text-xs text-gray-400">
+                  {exp.submitted_by_name || 'Driver'} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                </p>
+                {exp.status === 'approved' && isAdmin && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-green-600">
+                      ✓ Approved{!!exp.approved_addition_cents && exp.approved_addition_cents !== exp.amount_cents && ` (added ${formatCents(exp.approved_addition_cents)})`}
+                      {exp.approved_addition_cents === 0 && ' (no charge added — covered by base price)'}
+                    </p>
+                    <button
+                      onClick={() => undoReview(exp)}
+                      disabled={loadingId === exp.id}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
+                    >
+                      Undo
+                    </button>
+                  </div>
+                )}
+                {exp.status === 'approved' && !isAdmin && <p className="text-xs text-green-600 mt-1">✓ Approved</p>}
+                {exp.status === 'rejected' && isAdmin && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-red-600">✕ Rejected</p>
+                    <button
+                      onClick={() => undoReview(exp)}
+                      disabled={loadingId === exp.id}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
+                    >
+                      Undo
+                    </button>
+                  </div>
+                )}
+                {exp.status === 'rejected' && !isAdmin && <p className="text-xs text-red-600 mt-1">✕ Rejected</p>}
+                {exp.status === 'pending' && isAdmin && (
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => review(exp, true)}
+                      disabled={loadingId === exp.id}
+                      className="text-xs bg-gray-900 text-white rounded px-2.5 py-1 hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => review(exp, false)}
+                      disabled={loadingId === exp.id}
+                      className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+                {exp.status === 'pending' && !isAdmin && (
+                  <p className="text-xs text-amber-600 mt-1">Pending admin review</p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

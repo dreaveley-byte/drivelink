@@ -893,6 +893,9 @@ export default function PostJobPage() {
       estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
       estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
       estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
+      baseline_fuel_cents: pricing?.gasCostCents ?? 0,
+      baseline_inspection_cents: pricing?.inspectionFeeCents ?? 0,
+      baseline_food_cents: pricing?.mealCostCents ?? 0,
       trade_in_year: isDealerToDealerMultiVehicle
         ? (primaryDropoffVehicle && primaryPickupVehicle?.year ? parseInt(primaryPickupVehicle.year) : null)
         : (isTradeIn && tradeInYear ? parseInt(tradeInYear) : null),

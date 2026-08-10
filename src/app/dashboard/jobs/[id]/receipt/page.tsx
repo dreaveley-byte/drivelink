@@ -41,7 +41,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name, address, phone), driver:driver_id(full_name, phone)')
+    .select('*, job_types(name), organizations(name, address, phone, dealer_can_view_expenses), driver:driver_id(full_name, phone)')
     .eq('id', jobId)
     .single()
 
@@ -60,6 +60,9 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   }
 
   if (!job) notFound()
+
+  const orgInfo = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
+  const canViewExpenses = isAdmin || !!orgInfo?.dealer_can_view_expenses
 
   const { data: events } = await supabase
     .from('job_status_events')
@@ -103,7 +106,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: rawExpenses } = await supabase
     .from('job_expenses')
-    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, submitted_by:submitted_by(full_name)')
+    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, submitted_by:submitted_by(full_name)')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
 
@@ -119,6 +122,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         amount_cents: exp.amount_cents,
         status: exp.status,
         created_at: exp.created_at,
+        approved_addition_cents: exp.approved_addition_cents,
         receipt_url: data?.signedUrl ?? null,
         submitted_by_name: submitter?.full_name ?? null,
       }
@@ -495,9 +499,21 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {expenses.length > 0 && (
+      {expenses.length > 0 && canViewExpenses && (
         <div className="max-w-2xl mx-auto px-6 pb-8">
-          <ExpenseReviewList jobId={job.id} expenses={expenses} isAdmin={isAdmin} />
+          <ExpenseReviewList
+            jobId={job.id}
+            expenses={expenses}
+            isAdmin={isAdmin}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0 }}
+          />
+        </div>
+      )}
+      {expenses.length > 0 && !canViewExpenses && (
+        <div className="max-w-2xl mx-auto px-6 pb-8">
+          <div className="border border-gray-200 rounded-xl p-6">
+            <p className="text-sm text-gray-500">Expense receipts for this job are only visible to admin.</p>
+          </div>
         </div>
       )}
     </div>
