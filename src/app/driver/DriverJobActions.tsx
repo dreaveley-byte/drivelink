@@ -8,6 +8,7 @@ import { formatCents } from '@/lib/pricing'
 import { getDefaultChecklist, getDocumentTextForLabel, buildDeliveryDisclosureText, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
+import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
 
 type Job = {
@@ -1022,11 +1023,7 @@ export default function DriverJobActions({
                                       {cd.smell && `Smell: ${cd.smell}`}
                                     </p>
                                   )}
-                                  {cd && cd.markers.length > 0 && (
-                                    <ul className="text-xs text-gray-600 mt-0.5 list-disc list-inside">
-                                      {cd.markers.map((m, i) => <li key={i}>{m.note}</li>)}
-                                    </ul>
-                                  )}
+                                  {cd && cd.markers.length > 0 && <ConditionReportView data={cd} />}
                                   <FilePreviewRow filePaths={pickupCondition.file_paths} fileUrls={fileUrls} />
                                 </div>
                               )
