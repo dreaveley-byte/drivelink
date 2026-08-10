@@ -151,7 +151,7 @@ export default function DriverJobActions({
   const [sendingVerification, setSendingVerification] = useState(false)
   const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
   const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
-  const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' } | null>(null)
+  const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' | 'windshield' } | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState('wait_time')
   const [expenseDescription, setExpenseDescription] = useState('')
@@ -195,6 +195,10 @@ export default function DriverJobActions({
       if (data && data.length > 0) {
         setChecklist(data)
         refreshFileUrls(data.flatMap((i) => i.file_paths))
+        if (job.status === 'assigned') {
+          const conditionItem = data.find((i) => i.item_type === 'condition_report')
+          if (conditionItem) setExpandedId(conditionItem.id)
+        }
         return
       }
 
@@ -210,7 +214,13 @@ export default function DriverJobActions({
         .from('job_checklist_items')
         .insert(rows)
         .select('id, label, item_type, completed_at, file_paths, notes, condition_data')
-      if (created) setChecklist(created)
+      if (created) {
+        setChecklist(created)
+        if (job.status === 'assigned') {
+          const conditionItem = created.find((i) => i.item_type === 'condition_report')
+          if (conditionItem) setExpandedId(conditionItem.id)
+        }
+      }
     }
 
     loadChecklist()
@@ -441,6 +451,13 @@ export default function DriverJobActions({
     setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+
+    if (newStatus === 'picked_up') {
+      // The condition report was auto-expanded for the whole "assigned" phase
+      // so it's front-and-center while the driver documents the vehicle —
+      // once pickup is actually confirmed, collapse it back down.
+      setExpandedId(null)
+    }
 
     const jobUpdate: Record<string, string | number> = { status: newStatus }
 
@@ -1262,6 +1279,15 @@ export default function DriverJobActions({
                               className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
                             >
                               {uploadingItemId === item.id ? 'Uploading...' : '🎥 Record guided walkaround'}
+                            </button>
+                          ) : item.label.includes('Photograph windshield') ? (
+                            <button
+                              type="button"
+                              onClick={() => setGuidedCaptureItem({ item, mode: 'windshield' })}
+                              disabled={uploadingItemId === item.id}
+                              className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                            >
+                              {uploadingItemId === item.id ? 'Uploading...' : '📷 Take guided photo'}
                             </button>
                           ) : item.label.startsWith('Delivery: Photograph dash') || item.label.includes('Photograph odometer') ? (
                             <button

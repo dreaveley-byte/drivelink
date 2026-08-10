@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 type Props = {
-  mode: 'walkaround' | 'dash'
+  mode: 'walkaround' | 'dash' | 'windshield'
   onCapture: (file: File) => void
   onClose: () => void
 }
@@ -172,7 +172,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
     if (!ctx) return
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
     canvas.toBlob((blob) => {
-      if (blob) onCapture(new File([blob], `dash-${Date.now()}.jpg`, { type: 'image/jpeg' }))
+      if (blob) onCapture(new File([blob], `${mode}-${Date.now()}.jpg`, { type: 'image/jpeg' }))
     }, 'image/jpeg', 0.9)
   }
 
@@ -216,7 +216,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
         </div>
       ) : (
         <div className="flex-1 relative min-h-0 overflow-hidden">
-          <video ref={videoRef} autoPlay playsInline muted={mode === 'dash'} className="w-full h-full object-cover" />
+          <video ref={videoRef} autoPlay playsInline muted={mode !== 'walkaround'} className="w-full h-full object-cover" />
 
           {mode === 'walkaround' ? (
             <>
@@ -227,6 +227,20 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
                   {recording
                     ? 'Keep the vehicle inside the outline — follow the arrow counter-clockwise around it, ending back at the front.'
                     : 'Line up and start recording.'}
+                </p>
+              </div>
+            </>
+          ) : mode === 'windshield' ? (
+            <>
+              <svg viewBox="0 0 300 225" className="absolute inset-0 w-full h-full pointer-events-none">
+                <path
+                  d="M25,190 L55,45 Q60,32 75,30 L225,30 Q240,32 245,45 L275,190 Q275,198 265,198 L35,198 Q25,198 25,190 Z"
+                  fill="none" stroke="white" strokeWidth="3" strokeDasharray="8 6" opacity="0.9"
+                />
+              </svg>
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
+                <p className="text-white text-xs text-center leading-snug">
+                  Stand back far enough to get a clear photo of the entire windshield, edge to edge.
                 </p>
               </div>
             </>
@@ -257,7 +271,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
       )}
 
       <div className="px-6 py-4 flex justify-center shrink-0">
-        {mode === 'dash' ? (
+        {mode === 'dash' || mode === 'windshield' ? (
           <button onClick={capturePhoto} className="bg-[#378ADD] text-white text-sm font-medium px-8 py-3 rounded-full">
             Take photo
           </button>
