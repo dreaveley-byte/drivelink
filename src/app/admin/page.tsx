@@ -222,22 +222,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
-                  Driver:
-                  {job.driver?.full_name ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      {job.driver.photo_url ? (
-                        <img src={job.driver.photo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                      ) : (
-                        <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
-                      )}
-                      {job.driver.full_name}
-                      {job.driver.phone && <span className="text-gray-400">· {job.driver.phone}</span>}
-                    </span>
-                  ) : (
-                    'Unassigned'
-                  )}
-                </p>
+                {!job.driver?.full_name && (
+                  <p className="text-xs text-gray-400 mt-0.5">Driver: Unassigned</p>
+                )}
                 {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.customer_full_name || job.customer_phone) && (
                   <p className="text-xs text-gray-400 mt-0.5">
                     Customer: {job.customer_full_name}
@@ -287,6 +274,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} isAdmin />
                 </div>
               </div>
+              {job.driver?.full_name && job.driver_id && (
+                <Link
+                  href={`/admin/drivers/${job.driver_id}`}
+                  className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-600 hover:text-gray-900 w-fit"
+                >
+                  {job.driver.photo_url ? (
+                    <img src={job.driver.photo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
+                  )}
+                  Driver: <span className="text-[#378ADD] hover:underline">{job.driver.full_name}</span>
+                  {job.driver.phone && <span className="text-gray-400">· {job.driver.phone}</span>}
+                </Link>
+              )}
               {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.driver?.phone || job.customer_phone) && (
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
                   {job.driver?.phone && (
