@@ -154,9 +154,12 @@ export default function DriverJobActions({
   const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' | 'windshield' } | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState('wait_time')
+  const [expenseCustomCategory, setExpenseCustomCategory] = useState('')
   const [expenseDescription, setExpenseDescription] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseReceiptFile, setExpenseReceiptFile] = useState<File | null>(null)
+  const [scanningReceipt, setScanningReceipt] = useState(false)
+  const [receiptScanNote, setReceiptScanNote] = useState('')
   const [submittingExpense, setSubmittingExpense] = useState(false)
   const [expenseError, setExpenseError] = useState('')
   const [now, setNow] = useState(() => Date.now())
@@ -579,6 +582,44 @@ export default function DriverJobActions({
     setSendingVerification(false)
   }
 
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleReceiptFileSelected(file: File | null) {
+    setExpenseReceiptFile(file)
+    setReceiptScanNote('')
+    if (!file) return
+    setScanningReceipt(true)
+    try {
+      const base64 = await fileToBase64(file)
+      const res = await fetch('/api/expense-receipt-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: base64 }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        if (data.amount) setExpenseAmount(String(data.amount))
+        if (data.category) setExpenseCategory(data.category)
+        if (data.description || data.vendor) {
+          setExpenseDescription([data.vendor, data.description].filter(Boolean).join(' — '))
+        }
+        setReceiptScanNote('Filled in from the receipt — double check before submitting.')
+      } else {
+        setReceiptScanNote('Could not read the receipt automatically — enter the details yourself.')
+      }
+    } catch {
+      setReceiptScanNote('Could not read the receipt automatically — enter the details yourself.')
+    }
+    setScanningReceipt(false)
+  }
+
   async function submitExpense() {
     setExpenseError('')
     const amountCents = Math.round(parseFloat(expenseAmount || '0') * 100)
@@ -588,6 +629,10 @@ export default function DriverJobActions({
     }
     if (!expenseReceiptFile) {
       setExpenseError('A photo of the receipt is required.')
+      return
+    }
+    if (expenseCategory === 'other' && !expenseCustomCategory.trim()) {
+      setExpenseError('Enter what kind of expense this is.')
       return
     }
     setSubmittingExpense(true)
@@ -613,6 +658,7 @@ export default function DriverJobActions({
       job_id: job.id,
       submitted_by: user?.id,
       category: expenseCategory,
+      custom_category: expenseCategory === 'other' ? expenseCustomCategory.trim() : null,
       description: expenseDescription || null,
       amount_cents: amountCents,
       receipt_photo_path: path,
@@ -626,9 +672,11 @@ export default function DriverJobActions({
 
     setShowExpenseForm(false)
     setExpenseCategory('wait_time')
+    setExpenseCustomCategory('')
     setExpenseDescription('')
     setExpenseAmount('')
     setExpenseReceiptFile(null)
+    setReceiptScanNote('')
     router.refresh()
   }
 
@@ -851,19 +899,42 @@ export default function DriverJobActions({
                 <div className="border border-gray-200 rounded-lg p-3 mt-1 space-y-2 bg-gray-50">
                   <p className="text-xs font-medium text-gray-700">Submit expense for reimbursement</p>
                   {expenseError && <p className="text-xs text-red-600">{expenseError}</p>}
+                  <label className="block">
+                    <span className="text-xs text-gray-500">Photo of the receipt (required)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => handleReceiptFileSelected(e.target.files?.[0] ?? null)}
+                      className="block w-full text-xs mt-0.5"
+                    />
+                  </label>
+                  {scanningReceipt && <p className="text-xs text-gray-400">Reading the receipt…</p>}
+                  {receiptScanNote && !scanningReceipt && <p className="text-xs text-amber-600">{receiptScanNote}</p>}
                   <select
                     value={expenseCategory}
                     onChange={(e) => setExpenseCategory(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
                   >
                     <option value="wait_time">Wait time</option>
+                    <option value="fuel">Fuel</option>
+                    <option value="food">Food</option>
                     <option value="repairs">Repairs</option>
+                    <option value="inspection">Inspection</option>
                     <option value="tolls">Tolls</option>
                     <option value="parking">Parking</option>
                     <option value="storage">Storage</option>
                     <option value="additional_mileage">Additional mileage</option>
                     <option value="other">Other</option>
                   </select>
+                  {expenseCategory === 'other' && (
+                    <input
+                      value={expenseCustomCategory}
+                      onChange={(e) => setExpenseCustomCategory(e.target.value)}
+                      placeholder="What kind of expense is this?"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                    />
+                  )}
                   <input
                     type="number"
                     step="0.01"
@@ -879,16 +950,6 @@ export default function DriverJobActions({
                     placeholder="Notes (optional)"
                     className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
                   />
-                  <label className="block">
-                    <span className="text-xs text-gray-500">Photo of the receipt (required)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => setExpenseReceiptFile(e.target.files?.[0] ?? null)}
-                      className="block w-full text-xs mt-0.5"
-                    />
-                  </label>
                   <div className="flex gap-2 pt-1">
                     <button
                       type="button"

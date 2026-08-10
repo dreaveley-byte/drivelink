@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 type Expense = {
   id: string
   category: string
+  custom_category: string | null
   description: string | null
   amount_cents: number
   status: string
@@ -17,12 +18,20 @@ type Expense = {
 
 const CATEGORY_LABELS: Record<string, string> = {
   wait_time: 'Wait time',
+  fuel: 'Fuel',
+  food: 'Food',
   repairs: 'Repairs',
+  inspection: 'Inspection',
   tolls: 'Tolls',
   parking: 'Parking',
   storage: 'Storage',
   additional_mileage: 'Additional mileage',
   other: 'Other',
+}
+
+function categoryLabel(exp: Expense) {
+  if (exp.category === 'other' && exp.custom_category) return exp.custom_category
+  return CATEGORY_LABELS[exp.category] ?? exp.category
 }
 
 function formatCents(cents: number) {
@@ -63,6 +72,34 @@ export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId:
     router.refresh()
   }
 
+  // Reverts an approve/reject decision back to pending — for when a button
+  // was tapped by accident. If it was approved, subtracts the amount back
+  // out of the job's running total so the receipt stays accurate.
+  async function undoReview(expenseId: string, wasApproved: boolean, amountCents: number) {
+    setLoadingId(expenseId)
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('job_expenses')
+      .update({ status: 'pending', reviewed_by: null, reviewed_at: null })
+      .eq('id', expenseId)
+
+    if (!error && wasApproved) {
+      const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
+      await supabase
+        .from('jobs')
+        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - amountCents) })
+        .eq('id', jobId)
+    }
+
+    setLoadingId(null)
+    if (error) {
+      alert(`Could not undo this: ${error.message}`)
+      return
+    }
+    router.refresh()
+  }
+
   if (expenses.length === 0) return null
 
   return (
@@ -79,14 +116,38 @@ export default function ExpenseReviewList({ jobId, expenses, isAdmin }: { jobId:
             )}
             <div className="flex-1">
               <p className="text-sm text-gray-900">
-                {CATEGORY_LABELS[exp.category] ?? exp.category} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
+                {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
               </p>
               {exp.description && <p className="text-xs text-gray-500">{exp.description}</p>}
               <p className="text-xs text-gray-400">
                 {exp.submitted_by_name || 'Driver'} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
-              {exp.status === 'approved' && <p className="text-xs text-green-600 mt-1">✓ Approved</p>}
-              {exp.status === 'rejected' && <p className="text-xs text-red-600 mt-1">✕ Rejected</p>}
+              {exp.status === 'approved' && isAdmin && (
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-green-600">✓ Approved</p>
+                  <button
+                    onClick={() => undoReview(exp.id, true, exp.amount_cents)}
+                    disabled={loadingId === exp.id}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
+              {exp.status === 'approved' && !isAdmin && <p className="text-xs text-green-600 mt-1">✓ Approved</p>}
+              {exp.status === 'rejected' && isAdmin && (
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-red-600">✕ Rejected</p>
+                  <button
+                    onClick={() => undoReview(exp.id, false, exp.amount_cents)}
+                    disabled={loadingId === exp.id}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50"
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
+              {exp.status === 'rejected' && !isAdmin && <p className="text-xs text-red-600 mt-1">✕ Rejected</p>}
               {exp.status === 'pending' && isAdmin && (
                 <div className="flex gap-2 mt-1">
                   <button

@@ -103,7 +103,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: rawExpenses } = await supabase
     .from('job_expenses')
-    .select('id, category, description, amount_cents, status, receipt_photo_path, created_at, submitted_by:submitted_by(full_name)')
+    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, submitted_by:submitted_by(full_name)')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
 
@@ -114,6 +114,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       return {
         id: exp.id,
         category: exp.category,
+        custom_category: exp.custom_category,
         description: exp.description,
         amount_cents: exp.amount_cents,
         status: exp.status,
