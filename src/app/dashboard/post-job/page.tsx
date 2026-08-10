@@ -1177,6 +1177,18 @@ export default function PostJobPage() {
                   setDealerDropoffVehicles([])
                   setDealerPickupVehicles([])
                 }
+                // Courier/Package and Paperwork Signing hide the trade-in/2nd-driver/
+                // chase-vehicle checkboxes, but the state itself doesn't otherwise
+                // reset — a stale true value from a previously-selected job type
+                // would still silently force round-trip pricing underneath the
+                // hidden UI. Clear it all out on entering either simplified form.
+                if (newType?.name === 'Courier / Package' || newType?.name === 'Paperwork Signing') {
+                  setIsTradeIn(false)
+                  setSecondDriver(false)
+                  setChaseVehicle(false)
+                  setFlyingBack(false)
+                  setAutoSelectReturnMethod(true)
+                }
               }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             >
