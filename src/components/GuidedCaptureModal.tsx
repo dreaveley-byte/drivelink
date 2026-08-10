@@ -14,7 +14,7 @@ type Props = {
 // no pan, no extra frames beyond exactly what's in the reference.
 const OUTLINE_STEP_INDICES = [0, 10, 9, 7, 6, 4, 3, 1, 0]
 const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
-const OUTLINE_STEP_SECONDS = 4 // ~4s/step matches the storyboard's own ~4s-per-step pacing
+const OUTLINE_STEP_SECONDS = 2.5 // sped up from 4s per step
 // Arrow points left while walking the driver side (front -> driver side ->
 // rear), then right while walking the passenger side (rear -> passenger side
 // -> front) — matches the direction the outline appears to move on screen.
@@ -39,11 +39,11 @@ function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
 // A simple flashing arrow (not a curved arc) showing which way to step next.
 function DirectionArrow({ elapsedSeconds }: { elapsedSeconds: number }) {
   const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
-  const pointLeft = LEFT_ARROW_INDICES.has(index)
+  const pointLeft = !LEFT_ARROW_INDICES.has(index)
   return (
     <div
       className="absolute top-1/2 -translate-y-1/2 text-[#378ADD]"
-      style={{ [pointLeft ? 'left' : 'right']: '5%', animation: 'arrow-flash 1s ease-in-out infinite' }}
+      style={{ [pointLeft ? 'left' : 'right']: '5%', animation: 'arrow-flash 0.7s ease-in-out infinite' }}
     >
       <style>{`
         @keyframes arrow-flash {
