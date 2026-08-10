@@ -15,10 +15,6 @@ type Props = {
 const OUTLINE_STEP_INDICES = [0, 10, 9, 7, 6, 4, 3, 1, 0]
 const OUTLINE_FRAMES = OUTLINE_STEP_INDICES.map((i) => `/condition-report/outline-frames-16/step_${String(i).padStart(2, '0')}.png`)
 const OUTLINE_STEP_SECONDS = 2.5 // sped up from 4s per step
-// Arrow points left while walking the driver side (front -> driver side ->
-// rear), then right while walking the passenger side (rear -> passenger side
-// -> front) — matches the direction the outline appears to move on screen.
-const LEFT_ARROW_INDICES = new Set([0, 1, 2, 3, 4])
 
 // The outline itself steps through the 9 static angles from the storyboard —
 // front, counter-clockwise around the car, and back to front — cycling
@@ -37,9 +33,10 @@ function CarOutlineOverlay({ elapsedSeconds }: { elapsedSeconds: number }) {
 }
 
 // A simple flashing arrow (not a curved arc) showing which way to step next.
-function DirectionArrow({ elapsedSeconds }: { elapsedSeconds: number }) {
-  const index = Math.floor(elapsedSeconds / OUTLINE_STEP_SECONDS) % OUTLINE_FRAMES.length
-  const pointLeft = !LEFT_ARROW_INDICES.has(index)
+// Points one consistent direction for the whole walk — it used to flip
+// halfway through, which read as confusing rather than helpful.
+function DirectionArrow() {
+  const pointLeft = false
   return (
     <div
       className="absolute top-1/2 -translate-y-1/2 text-[#378ADD]"
@@ -224,7 +221,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
           {mode === 'walkaround' ? (
             <>
               <CarOutlineOverlay elapsedSeconds={recording ? seconds : 0} />
-              {recording && <DirectionArrow elapsedSeconds={seconds} />}
+              {recording && <DirectionArrow />}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 rounded-lg px-3 py-1.5 max-w-[90%]">
                 <p className="text-white text-xs text-center leading-snug">
                   {recording
