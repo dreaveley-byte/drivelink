@@ -1270,6 +1270,26 @@ export default function DriverJobActions({
                           </div>
                         )}
 
+                        {item.label.includes('Photograph windshield') && (
+                          <div className="mb-2">
+                            <p className="text-xs text-gray-500 mb-1">Windshield condition</p>
+                            <div className="flex gap-2">
+                              {['Good', 'Chipped', 'Cracked'].map((opt) => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  onClick={() => setTristateValue(item, opt)}
+                                  className={`text-xs px-3 py-1.5 rounded-lg border ${
+                                    item.notes === opt ? 'bg-[#378ADD] text-white border-[#378ADD]' : 'border-gray-300 text-gray-600'
+                                  }`}
+                                >
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {(item.item_type === 'photo' || item.item_type === 'video' || item.item_type === 'upload') && (
                           item.label.includes('360° walkaround video') ? (
                             <button
