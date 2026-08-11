@@ -50,7 +50,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     )
   }
 
-  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, estimated_driver_reimbursement_cents, job_types(name), organizations(name, address, phone)'
+  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
 
   const { data: myJobs } = await supabase
     .from('jobs')
@@ -112,6 +112,26 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
   const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.estimated_driver_pay_cents ?? 0), 0)
   const unreadChatJobs = await getUnreadJobChatSet(supabase, user.id, (myJobs ?? []).map((j) => j.id))
 
+  // The reimbursement figure baked into a job at post time (e.g. "Bus back",
+  // "Ground transport to airport") is only an estimate — don't show it on the
+  // job card as if it's guaranteed money until the driver has actually
+  // submitted a 'return_transport' receipt for it and admin has approved it.
+  // Build a job_id -> approved-amount map so the real number (not the
+  // estimate) is what gets displayed once it's confirmed.
+  const allJobIds = [...(myJobs ?? []), ...openJobs].map((j) => j.id)
+  const approvedReimbursementByJob: Record<string, number> = {}
+  if (allJobIds.length > 0) {
+    const { data: approvedReimbursements } = await supabase
+      .from('job_expenses')
+      .select('job_id, amount_cents')
+      .in('job_id', allJobIds)
+      .eq('category', 'return_transport')
+      .eq('status', 'approved')
+    for (const exp of approvedReimbursements ?? []) {
+      approvedReimbursementByJob[exp.job_id] = (approvedReimbursementByJob[exp.job_id] ?? 0) + exp.amount_cents
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -155,7 +175,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
             <div className="space-y-3">
               {myJobs.map((job) => (
                 <div key={job.id}>
-                  <DriverJobActions job={job} isActive />
+                  <DriverJobActions job={job} isActive approvedReimbursementCents={approvedReimbursementByJob[job.id] ?? 0} />
                   <div className="mt-2 flex items-center gap-3">
                     <LocationSharer jobId={job.id} />
                     <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />
@@ -174,7 +194,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
             )}
             {openJobs.map((job) => (
-              <DriverJobActions key={job.id} job={job} isActive={false} disabled={overlapsAnyMyJob(job)} />
+              <DriverJobActions key={job.id} job={job} isActive={false} disabled={overlapsAnyMyJob(job)} approvedReimbursementCents={approvedReimbursementByJob[job.id] ?? 0} />
             ))}
           </div>
         </div>

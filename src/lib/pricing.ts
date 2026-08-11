@@ -37,6 +37,8 @@ export type PricingSettings = {
   max_daily_meal_budget_cents: number
   bus_base_fare_cents: number
   bus_per_km_cents: number
+  job_review_hold_minutes: number
+  job_review_hold_min_distance_km: number
 }
 
 export type AdditionalCharge = {

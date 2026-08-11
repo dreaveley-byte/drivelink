@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
+import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
@@ -19,6 +20,16 @@ export default function EditJobPage() {
   const [jobTypes, setJobTypes] = useState<JobType[]>([])
   const [jobTypeId, setJobTypeId] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [reviewInfo, setReviewInfo] = useState<{
+    createdAt: string
+    estimatedDistanceKm: number | null
+    reviewApprovedAt: string | null
+    reviewClaimedBy: string | null
+    reviewClaimedByName: string | null
+    holdMinutes: number
+    holdMinDistanceKm: number
+  } | null>(null)
 
   const [stops, setStops] = useState<string[]>(['', ''])
 
@@ -120,12 +131,13 @@ export default function EditJobPage() {
         router.push('/login')
         return
       }
+      setCurrentUserId(user.id)
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role === 'platform_admin') setIsAdmin(true)
 
       const { data: job } = await supabase
         .from('jobs')
-        .select('*, job_stops(address, stop_order)')
+        .select('*, job_stops(address, stop_order), reviewer:review_claimed_by(full_name)')
         .eq('id', jobId)
         .single()
 
@@ -184,6 +196,21 @@ export default function EditJobPage() {
       setOrganizationId(job.organization_id ?? null)
       setAdditionalCharges(job.additional_charges ?? [])
       setNotes(job.notes ?? '')
+
+      const { data: settingsForHold } = await supabase
+        .from('pricing_settings')
+        .select('job_review_hold_minutes, job_review_hold_min_distance_km')
+        .eq('id', 1)
+        .single()
+      setReviewInfo({
+        createdAt: job.created_at,
+        estimatedDistanceKm: job.estimated_distance_km,
+        reviewApprovedAt: job.review_approved_at,
+        reviewClaimedBy: job.review_claimed_by,
+        reviewClaimedByName: job.reviewer?.full_name ?? null,
+        holdMinutes: settingsForHold?.job_review_hold_minutes ?? 5,
+        holdMinDistanceKm: settingsForHold?.job_review_hold_min_distance_km ?? 400,
+      })
 
       setPageLoading(false)
     })
@@ -979,6 +1006,19 @@ export default function EditJobPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
+        {isAdmin && reviewInfo && !reviewInfo.reviewApprovedAt
+          && reviewInfo.estimatedDistanceKm != null && reviewInfo.estimatedDistanceKm >= reviewInfo.holdMinDistanceKm && (
+          <div className="mb-6">
+            <ReviewHoldBadge
+              jobId={jobId}
+              createdAt={reviewInfo.createdAt}
+              holdMinutes={reviewInfo.holdMinutes}
+              reviewClaimedByName={reviewInfo.reviewClaimedByName}
+              reviewApproved={false}
+              isClaimedByMe={reviewInfo.reviewClaimedBy === currentUserId}
+            />
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm text-gray-700 mb-1">Job type</label>

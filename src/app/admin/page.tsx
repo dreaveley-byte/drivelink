@@ -7,6 +7,7 @@ import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
+import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import { formatCents } from '@/lib/pricing'
 import { sortJobsActiveFirst } from '@/lib/sortJobs'
 
@@ -42,16 +43,35 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('*, job_types(name), organizations(name), driver:driver_id(full_name, phone, photo_url), reviewer:review_claimed_by(full_name)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
   const jobs = sortJobsActiveFirst(jobsRaw ?? [], ascending)
 
+  const { data: reviewSettings } = await supabase
+    .from('pricing_settings')
+    .select('job_review_hold_minutes, job_review_hold_min_distance_km')
+    .eq('id', 1)
+    .single()
+  const holdMinutes = reviewSettings?.job_review_hold_minutes ?? 5
+  const holdMinDistanceKm = reviewSettings?.job_review_hold_min_distance_km ?? 400
+
+  // Whether this job is subject to the review hold at all — the admin badge
+  // stays visible until explicitly approved, even past the hold's actual
+  // expiry (the job may already be live to drivers by then, but review/
+  // approve is still harmless and lets admin finish the paper trail).
+  function isOnHold(job: { estimated_distance_km: number | null; review_approved_at: string | null }) {
+    if (job.review_approved_at) return false
+    if (job.estimated_distance_km == null || job.estimated_distance_km < holdMinDistanceKm) return false
+    return true
+  }
+
   const total = jobs?.length ?? 0
   const awaiting = jobs?.filter((j) => j.status === 'awaiting_driver').length ?? 0
   const active = jobs?.filter((j) => ['assigned', 'picked_up', 'in_progress'].includes(j.status)).length ?? 0
   const completed = jobs?.filter((j) => j.status === 'completed').length ?? 0
+  const awaitingReview = jobs?.filter((j) => isOnHold(j) && !j.review_approved_at).length ?? 0
 
   const { count: driverCount } = await supabase
     .from('profiles')
@@ -127,9 +147,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         <AutoRefresh />
-        <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-5 gap-4 mb-4">
           {[
             { label: 'Total Jobs', value: total },
+            { label: 'Awaiting Review', value: awaitingReview },
             { label: 'Awaiting a Driver', value: awaiting },
             { label: 'In Progress', value: active },
             { label: 'Completed', value: completed },
@@ -287,6 +308,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   Driver: <span className="text-[#378ADD] hover:underline">{job.driver.full_name}</span>
                   {job.driver.phone && <span className="text-gray-400">· {job.driver.phone}</span>}
                 </Link>
+              )}
+              {isOnHold(job) && (
+                <ReviewHoldBadge
+                  jobId={job.id}
+                  createdAt={job.created_at}
+                  holdMinutes={holdMinutes}
+                  reviewClaimedByName={job.reviewer?.full_name ?? null}
+                  reviewApproved={!!job.review_approved_at}
+                  isClaimedByMe={job.review_claimed_by === user.id}
+                />
               )}
               {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.driver?.phone || job.customer_phone) && (
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">

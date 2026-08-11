@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-import { formatCents } from '@/lib/pricing'
+import { formatCents, type AdditionalCharge } from '@/lib/pricing'
 import { getDefaultChecklist, getDocumentTextForLabel, buildDeliveryDisclosureText, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
@@ -23,6 +23,7 @@ type Job = {
   customer_full_name: string | null
   estimated_driver_pay_cents: number | null
   estimated_driver_reimbursement_cents?: number | null
+  additional_charges?: AdditionalCharge[] | null
   estimated_distance_km: number | null
   vehicle_year: number | null
   vehicle_make: string | null
@@ -139,10 +140,15 @@ export default function DriverJobActions({
   job,
   isActive,
   disabled = false,
+  approvedReimbursementCents = 0,
 }: {
   job: Job
   isActive: boolean
   disabled?: boolean
+  // Real, admin-approved total of 'return_transport' receipts submitted for
+  // this job — separate from job.estimated_driver_reimbursement_cents, which
+  // is just the pricing-time guess. See src/app/driver/page.tsx.
+  approvedReimbursementCents?: number
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -859,8 +865,13 @@ export default function DriverJobActions({
         {job.estimated_driver_pay_cents != null && (
           <p className="text-xs text-green-700 font-medium mt-0.5">
             Est. pay: {formatCents(job.estimated_driver_pay_cents)}
-            {!!job.estimated_driver_reimbursement_cents && (
-              <span className="text-gray-500 font-normal"> + {formatCents(job.estimated_driver_reimbursement_cents)} reimbursement</span>
+            {/* The pricing-time reimbursement figure (e.g. "Bus back" estimate) is just a
+                guess — only show it once the driver has submitted a 'return_transport'
+                receipt and admin has approved it, and show the real approved amount
+                rather than the estimate. See src/app/driver/page.tsx for how
+                approvedReimbursementCents is computed. */}
+            {approvedReimbursementCents > 0 && (
+              <span className="text-gray-500 font-normal"> + {formatCents(approvedReimbursementCents)} reimbursement</span>
             )}
           </p>
         )}
@@ -955,6 +966,7 @@ export default function DriverJobActions({
                     <option value="parking">Parking</option>
                     <option value="storage">Storage</option>
                     <option value="additional_mileage">Additional mileage</option>
+                    <option value="return_transport">Return transport (Uber/bus back)</option>
                     <option value="other">Other</option>
                   </select>
                   {expenseCategory === 'other' && (

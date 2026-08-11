@@ -53,6 +53,8 @@ type Settings = {
   bus_max_distance_km: number
   delivery_handling_buffer_hours: number
   max_driving_hours_before_overnight: number
+  job_review_hold_minutes: number
+  job_review_hold_min_distance_km: number
 }
 
 function dollars(cents: number) {
@@ -400,6 +402,20 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">A fresh job is only visible to a dealer's preferred drivers for this long, then opens up to everyone</p>
               <input type="number" step="1" value={settings.preferred_driver_window_minutes}
                 onChange={(e) => updateNumberField('preferred_driver_window_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Job review hold (minutes)</label>
+              <p className="text-xs text-gray-400 mb-1">Long-haul jobs (see distance threshold below) stay hidden from drivers for this long after posting, so admin can catch a bad quote before it goes live. Approving a job early releases it immediately.</p>
+              <input type="number" step="1" value={settings.job_review_hold_minutes}
+                onChange={(e) => updateNumberField('job_review_hold_minutes', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Job review hold distance threshold (km)</label>
+              <p className="text-xs text-gray-400 mb-1">Only jobs at or above this one-way distance get held for review — shorter local jobs go live to drivers instantly</p>
+              <input type="number" step="1" value={settings.job_review_hold_min_distance_km}
+                onChange={(e) => updateNumberField('job_review_hold_min_distance_km', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
