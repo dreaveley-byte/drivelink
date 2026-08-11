@@ -153,6 +153,7 @@ export default function DriverJobActions({
   const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
   const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' | 'windshield' } | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [justSubmittedExpense, setJustSubmittedExpense] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState('wait_time')
   const [expenseCustomCategory, setExpenseCustomCategory] = useState('')
   const [expenseDescription, setExpenseDescription] = useState('')
@@ -671,6 +672,7 @@ export default function DriverJobActions({
     }
 
     setShowExpenseForm(false)
+    setJustSubmittedExpense(true)
     setExpenseCategory('wait_time')
     setExpenseCustomCategory('')
     setExpenseDescription('')
@@ -886,27 +888,47 @@ export default function DriverJobActions({
                 Total wait so far: {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee: ${formatCents(job.idle_fee_cents)}`}
               </p>
             )}
-            <div className="mt-1">
-              {!showExpenseForm ? (
+            <div className="mt-2">
+              {justSubmittedExpense ? (
+                <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-center space-y-2">
+                  <p className="text-sm text-green-700 font-medium">✓ Expense submitted for approval</p>
+                  <div className="flex gap-2 justify-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setJustSubmittedExpense(false); setShowExpenseForm(true) }}
+                      className="text-sm bg-[#378ADD] text-white px-4 py-2 rounded-lg hover:bg-[#2d6ead] font-medium"
+                    >
+                      + Add another
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJustSubmittedExpense(false)}
+                      className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 font-medium"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : !showExpenseForm ? (
                 <button
                   type="button"
                   onClick={() => setShowExpenseForm(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                  className="w-full flex items-center justify-center gap-2 text-sm font-medium bg-[#378ADD] text-white px-4 py-3 rounded-xl hover:bg-[#2d6ead]"
                 >
-                  Submit an expense (repairs, tolls, parking, storage, etc.)
+                  💵 Submit an expense
                 </button>
               ) : (
-                <div className="border border-gray-200 rounded-lg p-3 mt-1 space-y-2 bg-gray-50">
-                  <p className="text-xs font-medium text-gray-700">Submit expense for reimbursement</p>
+                <div className="border-2 border-[#378ADD] rounded-xl p-4 space-y-2.5 bg-blue-50/40">
+                  <p className="text-sm font-semibold text-gray-900">Submit expense for reimbursement</p>
                   {expenseError && <p className="text-xs text-red-600">{expenseError}</p>}
                   <label className="block">
-                    <span className="text-xs text-gray-500">Photo of the receipt (required)</span>
+                    <span className="text-xs text-gray-600 font-medium">Photo of the receipt (required)</span>
                     <input
                       type="file"
                       accept="image/*"
                       capture="environment"
                       onChange={(e) => handleReceiptFileSelected(e.target.files?.[0] ?? null)}
-                      className="block w-full text-xs mt-0.5"
+                      className="block w-full text-sm mt-1"
                     />
                   </label>
                   {scanningReceipt && <p className="text-xs text-gray-400">Reading the receipt…</p>}
@@ -914,7 +936,7 @@ export default function DriverJobActions({
                   <select
                     value={expenseCategory}
                     onChange={(e) => setExpenseCategory(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"
                   >
                     <option value="wait_time">Wait time</option>
                     <option value="fuel">Fuel</option>
@@ -932,7 +954,7 @@ export default function DriverJobActions({
                       value={expenseCustomCategory}
                       onChange={(e) => setExpenseCustomCategory(e.target.value)}
                       placeholder="What kind of expense is this?"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"
                     />
                   )}
                   <input
@@ -942,27 +964,27 @@ export default function DriverJobActions({
                     value={expenseAmount}
                     onChange={(e) => setExpenseAmount(e.target.value)}
                     placeholder="Amount ($)"
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"
                   />
                   <input
                     value={expenseDescription}
                     onChange={(e) => setExpenseDescription(e.target.value)}
                     placeholder="Notes (optional)"
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"
                   />
                   <div className="flex gap-2 pt-1">
                     <button
                       type="button"
                       onClick={submitExpense}
                       disabled={submittingExpense}
-                      className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                      className="flex-1 text-sm font-medium bg-[#378ADD] text-white px-4 py-2.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
                     >
                       {submittingExpense ? 'Submitting…' : 'Submit for approval'}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowExpenseForm(false); setExpenseError('') }}
-                      className="text-xs text-gray-500 hover:text-gray-700"
+                      className="text-sm text-gray-500 hover:text-gray-700 px-3"
                     >
                       Cancel
                     </button>
