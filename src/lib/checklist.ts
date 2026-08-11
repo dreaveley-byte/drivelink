@@ -63,6 +63,7 @@ export const INSPECTION_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Inspection: Any additional repairs needed?', type: 'yesno' },
   { label: 'Inspection: Total amount', type: 'input', numeric: true },
   { label: 'Inspection: Photo upload of inspection report', type: 'upload' },
+  { label: 'Inspection: Photo of vehicle registration in customer\u2019s name (picked up after inspection)', type: 'photo' },
 ]
 
 // Document/courier jobs get a shorter checklist.
