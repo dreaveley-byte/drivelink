@@ -64,20 +64,20 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
-async function nearestAirport(address: string): Promise<{ code: string; name: string; lat: number; lng: number } | { error: string }> {
+async function nearbyAirports(address: string, maxCandidates: number, maxRadiusKm: number): Promise<{ code: string; name: string; lat: number; lng: number }[] | { error: string }> {
   const coords = await geocodeAddress(address)
   if (!coords) return { error: `Could not locate "${address}" on the map.` }
 
-  let closest = AIRPORTS[0]
-  let closestDist = Infinity
-  for (const airport of AIRPORTS) {
-    const dist = haversineKm(coords.lat, coords.lng, airport.lat, airport.lng)
-    if (dist < closestDist) {
-      closestDist = dist
-      closest = airport
-    }
-  }
-  return { code: closest.code, name: closest.name, lat: closest.lat, lng: closest.lng }
+  const withDistance = AIRPORTS.map((a) => ({ ...a, dist: haversineKm(coords.lat, coords.lng, a.lat, a.lng) }))
+    .sort((a, b) => a.dist - b.dist)
+
+  // Always include the single nearest airport regardless of radius (need at
+  // least one candidate even in remote areas), then add any others that are
+  // still reasonably close — this is what actually catches cases like
+  // Abbotsford vs. Vancouver, where the "closer" airport isn't necessarily
+  // the cheaper one to fly from.
+  const candidates = [withDistance[0], ...withDistance.slice(1).filter((a) => a.dist <= maxRadiusKm)]
+  return candidates.slice(0, maxCandidates).map(({ code, name, lat, lng }) => ({ code, name, lat, lng }))
 }
 
 async function duffelFetch(path: string, token: string, init?: RequestInit) {
@@ -163,51 +163,31 @@ export async function POST(req: NextRequest) {
 
   // The flight is the RETURN leg — the driver drives from originAddress
   // (pickup) to destinationAddress (dropoff), then flies back. So the flight
-  // itself goes destination airport -> origin airport.
-  const [flightFrom, flightTo] = await Promise.all([
-    nearestAirport(destinationAddress),
-    nearestAirport(originAddress),
+  // itself goes destination airport -> origin airport. Check the top 2
+  // closest airports on each side rather than just the single nearest one —
+  // the geographically closest airport isn't always the cheapest to fly
+  // from/to (small regional airports often cost far more than a slightly
+  // farther major hub with real competition), so this compares the actual
+  // total cost (flight + ground transport to get there) across candidates
+  // instead of assuming "closest" means "best."
+  const [fromCandidates, toCandidates] = await Promise.all([
+    nearbyAirports(destinationAddress, 2, 100),
+    nearbyAirports(originAddress, 2, 100),
   ])
 
-  if ('error' in flightFrom) {
-    return NextResponse.json({ error: `Departure airport: ${flightFrom.error}` }, { status: 404 })
+  if ('error' in fromCandidates) {
+    return NextResponse.json({ error: `Departure airport: ${fromCandidates.error}` }, { status: 404 })
   }
-  if ('error' in flightTo) {
-    return NextResponse.json({ error: `Return airport: ${flightTo.error}` }, { status: 404 })
+  if ('error' in toCandidates) {
+    return NextResponse.json({ error: `Return airport: ${toCandidates.error}` }, { status: 404 })
   }
 
   const date = departureDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-  // The drop-off location usually isn't the airport itself — the driver still
-  // needs to get themselves there. This is a real driven distance, not a guess.
-  const groundToAirport = await drivingLegToAirport(destinationAddress, flightFrom, date)
+  const supabase = await createClient()
+  const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours, uber_base_fare_cents, uber_per_km_cents, uber_minimum_fare_cents').eq('id', 1).single()
+  const AIRPORT_BUFFER_MINUTES = (pricingSettings?.flight_airport_buffer_hours ?? 3) * 60
 
-  const offerRequestRes = await duffelFetch('/air/offer_requests?return_offers=true', token, {
-    method: 'POST',
-    body: JSON.stringify({
-      data: {
-        slices: [{ origin: flightFrom.code, destination: flightTo.code, departure_date: date }],
-        passengers: [{ type: 'adult' }],
-        cabin_class: 'economy',
-      },
-    }),
-  })
-
-  if (!offerRequestRes.ok) {
-    const detail = await offerRequestRes.text()
-    console.error('Duffel offer request failed:', detail)
-    return NextResponse.json({ error: 'Could not search flights right now.' }, { status: 502 })
-  }
-
-  const offerRequestData = await offerRequestRes.json()
-  const offers = offerRequestData?.data?.offers ?? []
-
-  if (offers.length === 0) {
-    return NextResponse.json({ origin: flightFrom, destination: flightTo, flight: null, groundToAirport })
-  }
-
-  // Prefer a direct flight; if none exist, prefer the fewest total stops.
-  // Within the same stop-count, prefer the cheapest.
   type Segment = {
     marketing_carrier?: { name?: string; iata_code?: string }
     marketing_carrier_flight_number?: string
@@ -224,15 +204,6 @@ export async function POST(req: NextRequest) {
   const stopCount = (offer: Offer) =>
     offer.slices.reduce((sum, slice) => sum + Math.max(slice.segments.length - 1, 0), 0)
 
-  const sorted = [...(offers as Offer[])].sort((a, b) => {
-    const stopsDiff = stopCount(a) - stopCount(b)
-    if (stopsDiff !== 0) return stopsDiff
-    return parseFloat(a.total_amount) - parseFloat(b.total_amount)
-  })
-
-  const best = sorted[0]
-
-  // Duffel returns slice duration as an ISO 8601 duration string, e.g. "PT2H15M"
   function parseIsoDurationMinutes(iso: string | undefined): number {
     if (!iso) return 0
     const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
@@ -241,43 +212,108 @@ export async function POST(req: NextRequest) {
     return hours * 60 + minutes
   }
 
-  const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
-  const supabase = await createClient()
-  const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours').eq('id', 1).single()
-  const AIRPORT_BUFFER_MINUTES = (pricingSettings?.flight_airport_buffer_hours ?? 3) * 60
+  async function searchOneRoute(flightFrom: { code: string; name: string; lat: number; lng: number }, flightTo: { code: string; name: string; lat: number; lng: number }) {
+    const [offerRequestRes, groundToAirport] = await Promise.all([
+      duffelFetch('/air/offer_requests?return_offers=true', token!, {
+        method: 'POST',
+        body: JSON.stringify({
+          data: {
+            slices: [{ origin: flightFrom.code, destination: flightTo.code, departure_date: date }],
+            passengers: [{ type: 'adult' }],
+            cabin_class: 'economy',
+          },
+        }),
+      }),
+      drivingLegToAirport(destinationAddress, flightFrom, date),
+    ])
 
-  console.log('Duffel best offer segments (raw):', JSON.stringify(best.slices[0]?.segments))
+    if (!offerRequestRes.ok) {
+      const detail = await offerRequestRes.text()
+      console.error(`Duffel offer request failed for ${flightFrom.code}->${flightTo.code}:`, detail)
+      return null
+    }
 
-  const priceCentsRaw = Math.round(parseFloat(best.total_amount) * 100)
-  const converted = await convertToCad(priceCentsRaw, best.total_currency)
+    const offerRequestData = await offerRequestRes.json()
+    const offers = offerRequestData?.data?.offers ?? []
+    if (offers.length === 0) return { flightFrom, flightTo, flight: null, groundToAirport, effectiveCostCents: Infinity }
 
-  const segments = (best.slices[0]?.segments ?? []).map((s) => ({
-    airline: s.marketing_carrier?.name ?? s.marketing_carrier?.iata_code ?? null,
-    airlineCode: s.marketing_carrier?.iata_code ?? null,
-    flightNumber: s.marketing_carrier_flight_number
-      ? `${s.marketing_carrier?.iata_code ?? ''}${s.marketing_carrier_flight_number}`
-      : null,
-    from: s.origin?.iata_code ?? null,
-    to: s.destination?.iata_code ?? null,
-    departingAt: s.departing_at ?? null,
-    arrivingAt: s.arriving_at ?? null,
-  }))
+    const sorted = [...(offers as Offer[])].sort((a, b) => {
+      const stopsDiff = stopCount(a) - stopCount(b)
+      if (stopsDiff !== 0) return stopsDiff
+      return parseFloat(a.total_amount) - parseFloat(b.total_amount)
+    })
+    const best = sorted[0]
+    const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
+    const priceCentsRaw = Math.round(parseFloat(best.total_amount) * 100)
+    const converted = await convertToCad(priceCentsRaw, best.total_currency)
+
+    const segments = (best.slices[0]?.segments ?? []).map((s) => ({
+      airline: s.marketing_carrier?.name ?? s.marketing_carrier?.iata_code ?? null,
+      airlineCode: s.marketing_carrier?.iata_code ?? null,
+      flightNumber: s.marketing_carrier_flight_number
+        ? `${s.marketing_carrier?.iata_code ?? ''}${s.marketing_carrier_flight_number}`
+        : null,
+      from: s.origin?.iata_code ?? null,
+      to: s.destination?.iata_code ?? null,
+      departingAt: s.departing_at ?? null,
+      arrivingAt: s.arriving_at ?? null,
+    }))
+
+    // What actually matters for comparing candidates isn't just the ticket
+    // price — a cheaper flight from a farther airport can be a wash (or a
+    // loss) once the extra ground transport to reach it is factored in. Uses
+    // the same fare formula the actual pricing engine uses, so this ranking
+    // reflects the real cost, not a rough guess.
+    const groundCostEstimate = groundToAirport
+      ? Math.max(
+          Math.round((pricingSettings?.uber_base_fare_cents ?? 0) + groundToAirport.distanceKm * (pricingSettings?.uber_per_km_cents ?? 0)),
+          pricingSettings?.uber_minimum_fare_cents ?? 0
+        )
+      : 0
+    const effectiveCostCents = converted.amountCents + groundCostEstimate
+
+    return {
+      flightFrom, flightTo, groundToAirport, effectiveCostCents,
+      flight: {
+        priceCents: converted.amountCents,
+        currency: converted.currency,
+        originalPriceCents: converted.originalAmountCents,
+        originalCurrency: converted.originalCurrency,
+        stops: stopCount(best),
+        isDirect: stopCount(best) === 0,
+        flightDurationMinutes,
+        hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
+        airportBufferHours: AIRPORT_BUFFER_MINUTES / 60,
+        segments,
+      },
+    }
+  }
+
+  const combinations: [typeof fromCandidates[0], typeof toCandidates[0]][] = []
+  for (const from of fromCandidates) {
+    for (const to of toCandidates) {
+      combinations.push([from, to])
+    }
+  }
+
+  const results = await Promise.all(combinations.map(([from, to]) => searchOneRoute(from, to)))
+  const viable = results.filter((r): r is NonNullable<typeof r> => r !== null && r.flight !== null)
+
+  if (viable.length === 0) {
+    // Every combination failed outright (not just "no offers") — fall back to
+    // the single nearest-airport pair so the caller still gets a real error
+    // and the ground-transport estimate, instead of nothing at all.
+    const fallback = await searchOneRoute(fromCandidates[0], toCandidates[0])
+    return NextResponse.json({ origin: fromCandidates[0], destination: toCandidates[0], flight: null, groundToAirport: fallback?.groundToAirport ?? null })
+  }
+
+  const cheapest = viable.reduce((best, cur) => (cur.effectiveCostCents < best.effectiveCostCents ? cur : best))
 
   return NextResponse.json({
-    origin: flightFrom,
-    destination: flightTo,
-    flight: {
-      priceCents: converted.amountCents,
-      currency: converted.currency,
-      originalPriceCents: converted.originalAmountCents,
-      originalCurrency: converted.originalCurrency,
-      stops: stopCount(best),
-      isDirect: stopCount(best) === 0,
-      flightDurationMinutes,
-      hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
-      airportBufferHours: AIRPORT_BUFFER_MINUTES / 60,
-      segments,
-    },
-    groundToAirport,
+    origin: cheapest.flightFrom,
+    destination: cheapest.flightTo,
+    flight: cheapest.flight,
+    groundToAirport: cheapest.groundToAirport,
+    comparedAirports: combinations.map(([f, t]) => `${f.name} (${f.code}) \u2192 ${t.name} (${t.code})`),
   })
 }
