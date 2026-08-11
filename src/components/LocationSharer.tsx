@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isNativeApp, startBackgroundTracking, stopBackgroundTracking } from '@/lib/nativeLocationBridge'
 
 const UPDATE_INTERVAL_MS = 20000
 
@@ -67,26 +68,41 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
     let cancelled = false
     const supabase = createClient()
 
+    async function recordPing(lat: number, lng: number) {
+      setStatus('sharing')
+      await supabase
+        .from('jobs')
+        .update({ driver_lat: lat, driver_lng: lng, driver_location_updated_at: new Date().toISOString() })
+        .eq('id', jobId)
+      const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat, lng })
+      if (pingError) console.error('Location ping insert failed:', pingError)
+      fetch('/api/driver-idle-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, lat, lng }),
+      }).catch(() => {})
+    }
+
+    // Inside the native app shell, real background GPS tracking takes over —
+    // it keeps producing updates even while the app is minimized or the phone
+    // is locked, which a browser tab fundamentally cannot do. In a regular
+    // browser this branch never runs; behavior stays exactly as it was.
+    if (isNativeApp()) {
+      setStatus('sharing')
+      startBackgroundTracking((loc) => {
+        if (!cancelled) recordPing(loc.lat, loc.lng)
+      })
+      return () => {
+        cancelled = true
+        stopBackgroundTracking()
+      }
+    }
+
     function pushLocation() {
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
+        (pos) => {
           if (cancelled) return
-          setStatus('sharing')
-          await supabase
-            .from('jobs')
-            .update({
-              driver_lat: pos.coords.latitude,
-              driver_lng: pos.coords.longitude,
-              driver_location_updated_at: new Date().toISOString(),
-            })
-            .eq('id', jobId)
-          const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
-          if (pingError) console.error('Location ping insert failed:', pingError)
-          fetch('/api/driver-idle-check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jobId, lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          }).catch(() => {})
+          recordPing(pos.coords.latitude, pos.coords.longitude)
         },
         () => {
           if (!cancelled) setStatus('denied')

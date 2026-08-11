@@ -1,0 +1,20 @@
+{
+  "name": "drivflo-driver-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native iOS wrapper for Drivflo's driver pages, with background GPS tracking. Loads the live drivflo.ca driver pages inside a native shell - no UI is duplicated here.",
+  "scripts": {
+    "sync": "npx cap sync ios",
+    "open:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "@capacitor-community/background-geolocation": "^1.2.20"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  }
+}
