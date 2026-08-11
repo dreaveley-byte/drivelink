@@ -164,6 +164,39 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
     )
   }
 
+  // Admin-only profit reporting: what was actually accrued into the price at
+  // post time, what receipts came back, and the real margin after driver pay,
+  // reimbursements, and any approved additional expenses.
+  let pricingBreakdown: Record<string, number> | null = null
+  try {
+    pricingBreakdown = job.pricing_breakdown
+      ? (typeof job.pricing_breakdown === 'string' ? JSON.parse(job.pricing_breakdown) : job.pricing_breakdown)
+      : null
+  } catch {
+    pricingBreakdown = null
+  }
+  const submittedReceiptsTotalCents = expenses.reduce((sum, e) => sum + e.amount_cents, 0)
+  const approvedAdditionsTotalCents = expenses.reduce((sum, e) => sum + (e.approved_addition_cents ?? 0), 0)
+  const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
+  const actualCostCents =
+    (job.estimated_driver_pay_cents ?? 0) + (job.estimated_driver_reimbursement_cents ?? 0) + approvedAdditionsTotalCents
+  const profitCents = revenueCents - actualCostCents
+
+  const ACCRUAL_LABELS: [string, string][] = [
+    ['gasCostCents', 'Fuel'],
+    ['mealCostCents', 'Meals'],
+    ['wearAndTearCents', 'Wear & tear'],
+    ['trailerFeeCents', 'Trailer fee'],
+    ['hotelCents', 'Hotel'],
+    ['overnightFeeCents', 'Overnight fee'],
+    ['inspectionFeeCents', 'Inspection fee'],
+    ['registryFeeCents', 'Registry fee'],
+    ['ferryFeeCents', 'Ferry fee'],
+    ['garageInsuranceFeeCents', 'Drivflo insurance'],
+    ['hourlyDealerCents', 'Hourly (dealer-billed)'],
+    ['extrasDealerCents', 'Other extras'],
+  ]
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-2xl mx-auto px-6 py-8 print:px-0 print:py-0">
@@ -513,6 +546,65 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         <div className="max-w-2xl mx-auto px-6 pb-8">
           <div className="border border-gray-200 rounded-xl p-6">
             <p className="text-sm text-gray-500">Expense receipts for this job are only visible to admin.</p>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
+          <div className="border border-gray-200 rounded-xl p-6">
+            <p className="text-sm font-medium text-gray-900 mb-3">Cost breakdown & profit (admin only)</p>
+
+            {pricingBreakdown ? (
+              <div className="mb-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Accrued in base price</p>
+                <div className="space-y-1">
+                  {ACCRUAL_LABELS.map(([key, label]) =>
+                    pricingBreakdown && pricingBreakdown[key] ? (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-gray-600">{label}</span>
+                        <span className="text-gray-900">{formatCents(pricingBreakdown[key])}</span>
+                      </div>
+                    ) : null
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Driver pay (hourly, meals, wear & tear)</span>
+                    <span className="text-gray-900">{formatCents(job.estimated_driver_pay_cents ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 mb-4">No detailed pricing breakdown was saved for this job (posted before this feature, or pricing wasn&apos;t calculated).</p>
+            )}
+
+            {expenses.length > 0 && (
+              <div className="mb-4 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Receipts</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total submitted ({expenses.length} receipt{expenses.length === 1 ? '' : 's'})</span>
+                  <span className="text-gray-900">{formatCents(submittedReceiptsTotalCents)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total actually added to job (after baseline offsets)</span>
+                  <span className="text-gray-900">{formatCents(approvedAdditionsTotalCents)}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-gray-200 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Revenue (charged to dealer)</span>
+                <span className="text-gray-900 font-medium">{formatCents(revenueCents)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Actual cost (driver pay + reimbursements + approved expenses)</span>
+                <span className="text-gray-900 font-medium">{formatCents(actualCostCents)}</span>
+              </div>
+              <div className="flex justify-between text-base pt-1.5 border-t border-gray-200">
+                <span className="text-gray-900 font-semibold">Profit to Drivflo</span>
+                <span className={`font-bold ${profitCents >= 0 ? 'text-green-700' : 'text-red-600'}`}>{formatCents(profitCents)}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
