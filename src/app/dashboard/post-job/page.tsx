@@ -515,15 +515,21 @@ export default function PostJobPage() {
         return result
       }
 
-      function buildBusCharges(): AdditionalCharge[] {
+      function buildBusCharges(): AdditionalCharge[] | null {
         const km = data.distanceKm
+        // Past a certain distance, a bus simply isn't a realistic return option
+        // for a professional delivery service — treating raw distance/average
+        // speed as billable hours was producing absurd totals (20+ hours) for
+        // genuinely long trips. Bus is only offered as a comparison option
+        // within a sane distance; beyond that, only flight/2nd-driver apply.
+        if (km > pricingSettings!.bus_max_distance_km) return null
         const AVG_BUS_SPEED_KMH = 65
         return [
           {
             description: 'Bus back (estimate)',
             kind: 'bus' as const,
             dealerAmountCents: Math.round(pricingSettings!.bus_base_fare_cents + km * pricingSettings!.bus_per_km_cents),
-            hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH) * 100) / 100,
+            hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH + pricingSettings!.bus_terminal_buffer_hours) * 100) / 100,
             paidToDriver: false,
           },
         ]

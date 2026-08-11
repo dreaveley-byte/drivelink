@@ -527,15 +527,16 @@ export default function EditJobPage() {
         return result
       }
 
-      function buildBusCharges(): AdditionalCharge[] {
+      function buildBusCharges(): AdditionalCharge[] | null {
         const km = data.distanceKm
+        if (km > pricingSettings!.bus_max_distance_km) return null
         const AVG_BUS_SPEED_KMH = 65
         return [
           {
             description: 'Bus back (estimate)',
             kind: 'bus' as const,
             dealerAmountCents: Math.round(pricingSettings!.bus_base_fare_cents + km * pricingSettings!.bus_per_km_cents),
-            hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH) * 100) / 100,
+            hoursAdded: Math.round((km / AVG_BUS_SPEED_KMH + pricingSettings!.bus_terminal_buffer_hours) * 100) / 100,
             paidToDriver: false,
           },
         ]
@@ -580,7 +581,7 @@ export default function EditJobPage() {
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
-        {
+        if (busCharges) {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(

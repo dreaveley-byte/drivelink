@@ -1,6 +1,9 @@
 export type PricingSettings = {
   hourly_rate_cents: number
   fuel_price_cents_per_litre: number
+  delivery_handling_buffer_hours: number
+  bus_terminal_buffer_hours: number
+  bus_max_distance_km: number
   fuel_economy_driven_l_per_100km: number
   fuel_economy_towed_l_per_100km: number
   hotel_rate_cents: number
@@ -157,8 +160,14 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const extraDealerOnlyHours = additionalCharges
     .reduce((sum, c) => sum + c.hoursAdded, 0)
 
-  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours + extraDealerOnlyHours
-  const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours
+  // Every delivery involves real time at the destination beyond pure driving —
+  // paperwork, the walkaround, signatures, handing over keys. This wasn't
+  // accounted for anywhere before; it's a small flat addition applied to every
+  // job, not just long-haul ones, since it's real time on every single delivery.
+  const deliveryHandlingHours = settings.delivery_handling_buffer_hours
+
+  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
+  const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours + deliveryHandlingHours
 
   const hourlyDealerCents = Math.round(dealerBilledHours * settings.hourly_rate_cents * numDrivers)
   const hourlyDriverCents = Math.round(driverPaidHours * settings.hourly_rate_cents * numDrivers)
