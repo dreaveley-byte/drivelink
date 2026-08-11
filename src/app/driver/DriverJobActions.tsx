@@ -921,18 +921,26 @@ export default function DriverJobActions({
                 <div className="border-2 border-[#378ADD] rounded-xl p-4 space-y-2.5 bg-blue-50/40">
                   <p className="text-sm font-semibold text-gray-900">Submit expense for reimbursement</p>
                   {expenseError && <p className="text-xs text-red-600">{expenseError}</p>}
-                  <label className="block">
-                    <span className="text-xs text-gray-600 font-medium">Photo of the receipt (required)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => handleReceiptFileSelected(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm mt-1"
-                    />
-                  </label>
-                  {scanningReceipt && <p className="text-xs text-gray-400">Reading the receipt…</p>}
-                  {receiptScanNote && !scanningReceipt && <p className="text-xs text-amber-600">{receiptScanNote}</p>}
+
+                  <div className="bg-white border-2 border-dashed border-[#378ADD] rounded-lg p-3 text-center">
+                    <p className="text-2xl mb-1">📸</p>
+                    <label className="block cursor-pointer">
+                      <span className="text-sm font-semibold text-[#378ADD]">Take a photo of the receipt</span>
+                      <p className="text-xs text-gray-500 mt-0.5">We'll read it and fill in the amount, category, and details for you automatically</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => handleReceiptFileSelected(e.target.files?.[0] ?? null)}
+                        className="block w-full text-sm mt-2"
+                      />
+                    </label>
+                  </div>
+                  {scanningReceipt && <p className="text-xs text-gray-500 text-center">🔎 Reading the receipt…</p>}
+                  {receiptScanNote && !scanningReceipt && <p className="text-xs text-amber-600 text-center">{receiptScanNote}</p>}
+
+                  <p className="text-xs text-gray-500 font-medium pt-1">Details</p>
+
                   <select
                     value={expenseCategory}
                     onChange={(e) => setExpenseCategory(e.target.value)}
