@@ -448,9 +448,31 @@ export default function DriverJobActions({
         resolve(null)
         return
       }
+      let settled = false
+      // Belt-and-suspenders timeout independent of the geolocation API's own
+      // `timeout` option below — inside the native app's webview, that option
+      // wasn't reliably being honored, leaving this permanently unresolved and
+      // the whole calling function stuck forever on this await with no error
+      // ever thrown (so no amount of try/catch around the caller could help).
+      const hardTimeout = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          resolve(null)
+        }
+      }, 9000)
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve(pos),
-        () => resolve(null),
+        (pos) => {
+          if (settled) return
+          settled = true
+          clearTimeout(hardTimeout)
+          resolve(pos)
+        },
+        () => {
+          if (settled) return
+          settled = true
+          clearTimeout(hardTimeout)
+          resolve(null)
+        },
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       )
     })
@@ -461,6 +483,23 @@ export default function DriverJobActions({
     if (!newStatus) return
     setLoading(true)
     try {
+      await Promise.race([
+        advanceStatusInner(newStatus),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out — check your connection and try again.')), 20000)),
+      ])
+    } catch (e) {
+      // Final safety net: no matter what hangs or throws anywhere above (a
+      // known geolocation quirk, or anything else we haven't hit yet), this
+      // guarantees the button can never get stuck forever again with the
+      // status silently never having been saved.
+      console.error('advanceStatus failed:', e)
+      alert(`Something went wrong updating this job: ${e instanceof Error ? e.message : String(e)}. Please try again.`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function advanceStatusInner(newStatus: string) {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
@@ -529,16 +568,6 @@ export default function DriverJobActions({
       }
 
       router.refresh()
-    } catch (e) {
-      // Without this, any unexpected failure here (e.g. a geolocation/auth
-      // quirk specific to the native app's webview) would leave the button
-      // stuck showing "loading" forever with no update actually applied and
-      // no visible error — exactly what was happening before this fix.
-      console.error('advanceStatus failed:', e)
-      alert(`Something went wrong updating this job: ${e instanceof Error ? e.message : String(e)}. Please try again.`)
-    } finally {
-      setLoading(false)
-    }
   }
 
   async function goBackStatus() {
