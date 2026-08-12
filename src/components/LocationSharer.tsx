@@ -38,8 +38,24 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
       return
     }
     const supabase = createClient()
+    let settled = false
+    // Same independent safety net as everywhere else — the geolocation
+    // call's own timeout option isn't reliably honored inside this webview,
+    // so without this, clicking "Try again" could itself hang forever on
+    // "Checking..." with no way out, which is exactly what was happening.
+    const hardTimeout = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        setRetrying(false)
+        setLastErrorMessage('Location request never completed after retrying — this usually means the permission prompt is stuck. Try closing and fully reopening the app.')
+        setStatus('error')
+      }
+    }, 12000)
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        if (settled) return
+        settled = true
+        clearTimeout(hardTimeout)
         setRetrying(false)
         const { error: updateError } = await supabase
           .from('jobs')
@@ -59,6 +75,9 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
         setStatus('sharing')
       },
       () => {
+        if (settled) return
+        settled = true
+        clearTimeout(hardTimeout)
         setStatus('denied')
         setRetrying(false)
       },
