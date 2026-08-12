@@ -1,0 +1,11 @@
+{
+  "appId": "com.carbyclick.drivflo.driver",
+  "appName": "Drivflo Driver",
+  "server": {
+    "url": "https://www.drivflo.ca/driver",
+    "allowNavigation": ["www.drivflo.ca", "drivflo.ca"]
+  },
+  "ios": {
+    "contentInset": "automatic"
+  }
+}
