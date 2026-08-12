@@ -120,7 +120,7 @@ export default function AdminQuoteEditor({
               onChange={(e) => updateAmount(l.key, e.target.value)}
               className="w-20 text-xs border border-gray-300 rounded px-2 py-1 bg-white"
             />
-            <button onClick={() => deleteLine(l.key)} className="text-xs text-red-500 hover:text-red-700 px-1">\u2715</button>
+            <button onClick={() => deleteLine(l.key)} className="text-xs text-red-500 hover:text-red-700 underline px-1">Delete</button>
           </div>
         ))}
       </div>
