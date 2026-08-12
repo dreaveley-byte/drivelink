@@ -460,76 +460,85 @@ export default function DriverJobActions({
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-    if (newStatus === 'picked_up') {
-      // The condition report was auto-expanded for the whole "assigned" phase
-      // so it's front-and-center while the driver documents the vehicle —
-      // once pickup is actually confirmed, collapse it back down.
-      setExpandedId(null)
-    }
-
-    const jobUpdate: Record<string, string | number> = { status: newStatus }
-
-    if (newStatus === 'picked_up' || newStatus === 'delivered') {
-      const pos = await getCurrentPositionSafe()
-      if (pos) {
-        const prefix = newStatus === 'picked_up' ? 'pickup' : 'delivery'
-        jobUpdate[`${prefix}_gps_lat`] = pos.coords.latitude
-        jobUpdate[`${prefix}_gps_lng`] = pos.coords.longitude
-        jobUpdate[`${prefix}_gps_at`] = new Date().toISOString()
+      if (newStatus === 'picked_up') {
+        // The condition report was auto-expanded for the whole "assigned" phase
+        // so it's front-and-center while the driver documents the vehicle —
+        // once pickup is actually confirmed, collapse it back down.
+        setExpandedId(null)
       }
-    }
 
-    // "Delivered" means the vehicle reached the customer — it doesn't mean the
-    // driver's day is done necessarily, so we still capture when/where they
-    // actually wrap up for real hours tracking. This is informational only —
-    // it does NOT block marking the job complete regardless of location.
-    if (newStatus === 'completed') {
-      const pos = await getCurrentPositionSafe()
-      if (pos) {
-        jobUpdate.return_gps_lat = pos.coords.latitude
-        jobUpdate.return_gps_lng = pos.coords.longitude
-        jobUpdate.return_gps_at = new Date().toISOString()
-        if (job.pickup_gps_at) {
-          const actualHours = (Date.now() - new Date(job.pickup_gps_at).getTime()) / (60 * 60 * 1000)
-          jobUpdate.actual_driver_hours = Math.round(actualHours * 100) / 100
+      const jobUpdate: Record<string, string | number> = { status: newStatus }
+
+      if (newStatus === 'picked_up' || newStatus === 'delivered') {
+        const pos = await getCurrentPositionSafe()
+        if (pos) {
+          const prefix = newStatus === 'picked_up' ? 'pickup' : 'delivery'
+          jobUpdate[`${prefix}_gps_lat`] = pos.coords.latitude
+          jobUpdate[`${prefix}_gps_lng`] = pos.coords.longitude
+          jobUpdate[`${prefix}_gps_at`] = new Date().toISOString()
         }
       }
-    }
 
-    const { error: updateError } = await supabase.from('jobs').update(jobUpdate).eq('id', job.id)
-    if (updateError) {
-      console.error('Status update failed:', updateError)
-      alert(`Could not update the job status: ${updateError.message}. Please try again or contact support.`)
+      // "Delivered" means the vehicle reached the customer — it doesn't mean the
+      // driver's day is done necessarily, so we still capture when/where they
+      // actually wrap up for real hours tracking. This is informational only —
+      // it does NOT block marking the job complete regardless of location.
+      if (newStatus === 'completed') {
+        const pos = await getCurrentPositionSafe()
+        if (pos) {
+          jobUpdate.return_gps_lat = pos.coords.latitude
+          jobUpdate.return_gps_lng = pos.coords.longitude
+          jobUpdate.return_gps_at = new Date().toISOString()
+          if (job.pickup_gps_at) {
+            const actualHours = (Date.now() - new Date(job.pickup_gps_at).getTime()) / (60 * 60 * 1000)
+            jobUpdate.actual_driver_hours = Math.round(actualHours * 100) / 100
+          }
+        }
+      }
+
+      const { error: updateError } = await supabase.from('jobs').update(jobUpdate).eq('id', job.id)
+      if (updateError) {
+        console.error('Status update failed:', updateError)
+        alert(`Could not update the job status: ${updateError.message}. Please try again or contact support.`)
+        return
+      }
+      await supabase.from('job_status_events').insert({
+        job_id: job.id,
+        status: newStatus,
+        changed_by: user?.id,
+      })
+
+      if (newStatus === 'in_progress') {
+        fetch('/api/customer-sms/notify-in-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id }),
+        }).catch(() => {})
+      }
+
+      if (newStatus === 'delivered') {
+        fetch('/api/customer-sms/notify-arrived', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id }),
+        }).catch(() => {})
+      }
+
+      router.refresh()
+    } catch (e) {
+      // Without this, any unexpected failure here (e.g. a geolocation/auth
+      // quirk specific to the native app's webview) would leave the button
+      // stuck showing "loading" forever with no update actually applied and
+      // no visible error — exactly what was happening before this fix.
+      console.error('advanceStatus failed:', e)
+      alert(`Something went wrong updating this job: ${e instanceof Error ? e.message : String(e)}. Please try again.`)
+    } finally {
       setLoading(false)
-      return
     }
-    await supabase.from('job_status_events').insert({
-      job_id: job.id,
-      status: newStatus,
-      changed_by: user?.id,
-    })
-
-    if (newStatus === 'in_progress') {
-      fetch('/api/customer-sms/notify-in-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
-      }).catch(() => {})
-    }
-
-    if (newStatus === 'delivered') {
-      fetch('/api/customer-sms/notify-arrived', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
-      }).catch(() => {})
-    }
-
-    router.refresh()
-    setLoading(false)
   }
 
   async function goBackStatus() {
@@ -538,18 +547,24 @@ export default function DriverJobActions({
     if (!confirm(`Go back to "${statusLabels[prevStatus]}"? This won't delete anything you've already filled in.`)) return
 
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-    await supabase.from('jobs').update({ status: prevStatus }).eq('id', job.id)
-    await supabase.from('job_status_events').insert({
-      job_id: job.id,
-      status: prevStatus,
-      changed_by: user?.id,
-    })
+      await supabase.from('jobs').update({ status: prevStatus }).eq('id', job.id)
+      await supabase.from('job_status_events').insert({
+        job_id: job.id,
+        status: prevStatus,
+        changed_by: user?.id,
+      })
 
-    router.refresh()
-    setLoading(false)
+      router.refresh()
+    } catch (e) {
+      console.error('goBackStatus failed:', e)
+      alert(`Something went wrong: ${e instanceof Error ? e.message : String(e)}. Please try again.`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function toggleWaitTimer() {
