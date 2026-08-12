@@ -933,6 +933,12 @@ export default function PostJobPage() {
     }))
     await supabase.from('job_stops').insert(stopRows)
 
+    fetch('/api/notify-admin-new-hold-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: newJob.id }),
+    }).catch(() => {})
+
     // Linking is bidirectional — the job we linked to needs to point back at
     // this new one too, so both drivers/admin see they're paired either way.
     if (linkedJobId) {

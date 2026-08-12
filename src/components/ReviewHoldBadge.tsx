@@ -13,6 +13,7 @@ export default function ReviewHoldBadge({
   createdAt,
   holdMinutes,
   reviewClaimedByName,
+  reviewClaimedAt,
   reviewApproved,
   isClaimedByMe,
 }: {
@@ -20,6 +21,7 @@ export default function ReviewHoldBadge({
   createdAt: string
   holdMinutes: number
   reviewClaimedByName: string | null
+  reviewClaimedAt: string | null
   reviewApproved: boolean
   isClaimedByMe: boolean
 }) {
@@ -30,11 +32,12 @@ export default function ReviewHoldBadge({
   })
 
   useEffect(() => {
+    if (reviewClaimedAt) return // timer is irrelevant once claimed - only approval matters now
     const endsAt = new Date(createdAt).getTime() + holdMinutes * 60000
     const tick = () => setMinutesLeft(Math.max(0, Math.ceil((endsAt - Date.now()) / 60000)))
     const id = setInterval(tick, 15000)
     return () => clearInterval(id)
-  }, [createdAt, holdMinutes])
+  }, [createdAt, holdMinutes, reviewClaimedAt])
 
   if (reviewApproved) return null
 
@@ -61,7 +64,9 @@ export default function ReviewHoldBadge({
   return (
     <div className="mt-1.5 flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
       <span className="text-xs text-amber-800">
-        ⏳ On hold{minutesLeft > 0 ? ` — ${minutesLeft}m left` : ' — hold expired'}, not yet visible to drivers
+        {reviewClaimedAt
+          ? '⏳ Claimed — auto-release stopped, needs manual approval to go live'
+          : `⏳ On hold${minutesLeft > 0 ? ` — ${minutesLeft}m left` : ' — hold expired, now live to drivers'}`}
         {reviewClaimedByName && !isClaimedByMe && <> · claimed by {reviewClaimedByName}</>}
       </span>
       {!reviewClaimedByName && (

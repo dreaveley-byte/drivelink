@@ -24,12 +24,16 @@ export default function EditJobPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [reviewInfo, setReviewInfo] = useState<{
     createdAt: string
+    status: string
     estimatedDistanceKm: number | null
+    oneWayFlightBack: boolean
     reviewApprovedAt: string | null
+    reviewClaimedAt: string | null
     reviewClaimedBy: string | null
     reviewClaimedByName: string | null
     holdMinutes: number
     holdMinDistanceKm: number
+    holdTriggerOnFlight: boolean
   } | null>(null)
 
   const [stops, setStops] = useState<string[]>(['', ''])
@@ -225,17 +229,21 @@ export default function EditJobPage() {
 
       const { data: settingsForHold } = await supabase
         .from('pricing_settings')
-        .select('job_review_hold_minutes, job_review_hold_min_distance_km')
+        .select('job_review_hold_minutes, job_review_hold_min_distance_km, job_review_hold_trigger_on_flight')
         .eq('id', 1)
         .single()
       setReviewInfo({
         createdAt: job.created_at,
+        status: job.status,
         estimatedDistanceKm: job.estimated_distance_km,
+        oneWayFlightBack: job.one_way_flight_back ?? false,
         reviewApprovedAt: job.review_approved_at,
+        reviewClaimedAt: job.review_claimed_at,
         reviewClaimedBy: job.review_claimed_by,
         reviewClaimedByName: job.reviewer?.full_name ?? null,
         holdMinutes: settingsForHold?.job_review_hold_minutes ?? 5,
         holdMinDistanceKm: settingsForHold?.job_review_hold_min_distance_km ?? 400,
+        holdTriggerOnFlight: settingsForHold?.job_review_hold_trigger_on_flight ?? true,
       })
 
       setPageLoading(false)
@@ -1034,14 +1042,22 @@ export default function EditJobPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
-        {isAdmin && reviewInfo && !reviewInfo.reviewApprovedAt
-          && reviewInfo.estimatedDistanceKm != null && reviewInfo.estimatedDistanceKm >= reviewInfo.holdMinDistanceKm && (
+        {isAdmin && reviewInfo && !reviewInfo.reviewApprovedAt && reviewInfo.status === 'awaiting_driver'
+          && (
+            (reviewInfo.estimatedDistanceKm != null && reviewInfo.estimatedDistanceKm >= reviewInfo.holdMinDistanceKm)
+            || (reviewInfo.holdTriggerOnFlight && reviewInfo.oneWayFlightBack)
+          )
+          && (
+            reviewInfo.reviewClaimedAt != null
+            || Date.now() < new Date(reviewInfo.createdAt).getTime() + reviewInfo.holdMinutes * 60000
+          ) && (
           <div className="mb-6">
             <ReviewHoldBadge
               jobId={jobId}
               createdAt={reviewInfo.createdAt}
               holdMinutes={reviewInfo.holdMinutes}
               reviewClaimedByName={reviewInfo.reviewClaimedByName}
+              reviewClaimedAt={reviewInfo.reviewClaimedAt}
               reviewApproved={false}
               isClaimedByMe={reviewInfo.reviewClaimedBy === currentUserId}
             />

@@ -51,20 +51,36 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: reviewSettings } = await supabase
     .from('pricing_settings')
-    .select('job_review_hold_minutes, job_review_hold_min_distance_km')
+    .select('job_review_hold_minutes, job_review_hold_min_distance_km, job_review_hold_trigger_on_flight')
     .eq('id', 1)
     .single()
   const holdMinutes = reviewSettings?.job_review_hold_minutes ?? 5
   const holdMinDistanceKm = reviewSettings?.job_review_hold_min_distance_km ?? 400
+  const holdTriggerOnFlight = reviewSettings?.job_review_hold_trigger_on_flight ?? true
 
-  // Whether this job is subject to the review hold at all — the admin badge
-  // stays visible until explicitly approved, even past the hold's actual
-  // expiry (the job may already be live to drivers by then, but review/
-  // approve is still harmless and lets admin finish the paper trail).
-  function isOnHold(job: { estimated_distance_km: number | null; review_approved_at: string | null }) {
+  // Whether this job should show the review-hold badge right now. Only ever
+  // applies to a job that's still actually awaiting a driver — a completed
+  // or cancelled job has nothing left to review and should never show this.
+  // Once claimed, the badge stays up regardless of the timer (claiming stops
+  // the auto-release clock and requires an explicit approve from here on);
+  // if it was never claimed, the badge disappears once the timer runs out,
+  // since the job has already gone live to drivers on its own by then.
+  function isOnHold(job: {
+    status: string
+    estimated_distance_km: number | null
+    one_way_flight_back: boolean
+    review_approved_at: string | null
+    review_claimed_at: string | null
+    created_at: string
+  }) {
     if (job.review_approved_at) return false
-    if (job.estimated_distance_km == null || job.estimated_distance_km < holdMinDistanceKm) return false
-    return true
+    if (job.status !== 'awaiting_driver') return false
+    const qualifiesByDistance = job.estimated_distance_km != null && job.estimated_distance_km >= holdMinDistanceKm
+    const qualifiesByFlight = holdTriggerOnFlight && job.one_way_flight_back
+    if (!qualifiesByDistance && !qualifiesByFlight) return false
+    if (job.review_claimed_at) return true
+    const holdEndsAt = new Date(job.created_at).getTime() + holdMinutes * 60000
+    return Date.now() < holdEndsAt
   }
 
   const total = jobs?.length ?? 0
@@ -315,6 +331,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   createdAt={job.created_at}
                   holdMinutes={holdMinutes}
                   reviewClaimedByName={job.reviewer?.full_name ?? null}
+                  reviewClaimedAt={job.review_claimed_at}
                   reviewApproved={!!job.review_approved_at}
                   isClaimedByMe={job.review_claimed_by === user.id}
                 />
