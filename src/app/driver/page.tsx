@@ -50,7 +50,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     )
   }
 
-  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
+  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, admin_pay_override_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
 
   const { data: myJobs } = await supabase
     .from('jobs')
@@ -109,7 +109,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
   }
 
   const pendingCount = myJobs?.length ?? 0
-  const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.estimated_driver_pay_cents ?? 0), 0)
+  const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.admin_pay_override_cents ?? j.estimated_driver_pay_cents ?? 0), 0)
   const unreadChatJobs = await getUnreadJobChatSet(supabase, user.id, (myJobs ?? []).map((j) => j.id))
 
   // The reimbursement figure baked into a job at post time (e.g. "Bus back",

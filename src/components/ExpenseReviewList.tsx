@@ -15,6 +15,7 @@ type Expense = {
   created_at: string
   submitted_by_name: string | null
   approved_addition_cents?: number | null
+  added_by_admin?: boolean
 }
 
 type Baselines = { fuel: number; inspection: number; food: number }
@@ -138,6 +139,32 @@ export default function ExpenseReviewList({
     router.refresh()
   }
 
+  // Deletes an expense outright (not just reject) — for admin-added charges
+  // entered in error, or any entry that shouldn't exist on the job at all.
+  async function deleteExpense(expense: Expense) {
+    if (!confirm('Delete this expense entirely? This cannot be undone.')) return
+    setLoadingId(expense.id)
+    const supabase = createClient()
+
+    const addedAmount = expense.approved_addition_cents ?? 0
+    const { error } = await supabase.from('job_expenses').delete().eq('id', expense.id)
+
+    if (!error && addedAmount > 0) {
+      const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
+      await supabase
+        .from('jobs')
+        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - addedAmount) })
+        .eq('id', jobId)
+    }
+
+    setLoadingId(null)
+    if (error) {
+      alert(`Could not delete this expense: ${error.message}`)
+      return
+    }
+    router.refresh()
+  }
+
   if (expenses.length === 0) return null
 
   return (
@@ -169,8 +196,17 @@ export default function ExpenseReviewList({
                       : `Only the amount beyond what's already priced in (${formatCents(baselines[exp.category as 'fuel' | 'inspection'])}) will be added — approving this adds ${formatCents(previewAddAmount ?? 0)}.`}
                   </p>
                 )}
-                <p className="text-xs text-gray-400">
-                  {exp.submitted_by_name || 'Driver'} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                  {exp.added_by_admin ? 'Added by admin' : (exp.submitted_by_name || 'Driver')} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                  {isAdmin && (
+                    <button
+                      onClick={() => deleteExpense(exp)}
+                      disabled={loadingId === exp.id}
+                      className="text-red-500 hover:text-red-700 underline disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </p>
                 {exp.status === 'approved' && isAdmin && (
                   <div className="flex items-center gap-2 mt-1">

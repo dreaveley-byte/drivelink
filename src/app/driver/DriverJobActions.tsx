@@ -22,6 +22,7 @@ type Job = {
   recipient_name: string | null
   customer_full_name: string | null
   estimated_driver_pay_cents: number | null
+  admin_pay_override_cents?: number | null
   estimated_driver_reimbursement_cents?: number | null
   additional_charges?: AdditionalCharge[] | null
   estimated_distance_km: number | null
@@ -862,9 +863,9 @@ export default function DriverJobActions({
             )}
           </p>
         )}
-        {job.estimated_driver_pay_cents != null && (
+        {(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents) != null && (
           <p className="text-xs text-green-700 font-medium mt-0.5">
-            Est. pay: {formatCents(job.estimated_driver_pay_cents)}
+            Est. pay: {formatCents(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents!)}
             {/* The pricing-time reimbursement figure (e.g. "Bus back" estimate) is just a
                 guess — only show it once the driver has submitted a 'return_transport'
                 receipt and admin has approved it, and show the real approved amount

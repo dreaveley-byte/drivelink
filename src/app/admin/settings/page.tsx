@@ -55,6 +55,7 @@ type Settings = {
   max_driving_hours_before_overnight: number
   job_review_hold_minutes: number
   job_review_hold_min_distance_km: number
+  job_review_hold_trigger_on_flight: boolean
 }
 
 function dollars(cents: number) {
@@ -413,11 +414,19 @@ export default function PricingSettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Job review hold distance threshold (km)</label>
-              <p className="text-xs text-gray-400 mb-1">Only jobs at or above this one-way distance get held for review — shorter local jobs go live to drivers instantly</p>
+              <p className="text-xs text-gray-400 mb-1">Jobs at or above this one-way distance get held for review — shorter local jobs go live to drivers instantly</p>
               <input type="number" step="1" value={settings.job_review_hold_min_distance_km}
                 onChange={(e) => updateNumberField('job_review_hold_min_distance_km', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={settings.job_review_hold_trigger_on_flight}
+                onChange={(e) => setSettings({ ...settings, job_review_hold_trigger_on_flight: e.target.checked })} />
+              Also hold any job with a flight-back leg, regardless of distance
+            </label>
+            <p className="text-xs text-gray-400 -mt-1 ml-6">
+              Flight pricing has been the source of the costliest mistakes — this catches those even on jobs under the distance threshold above.
+            </p>
             <div>
               <label className="block text-sm text-gray-700 mb-1">ETA window buffer (%)</label>
               <p className="text-xs text-gray-400 mb-1">Customer ETA text shows a window from the raw arrival time forward by this % of drive time (e.g. 20% on a 30min drive = 6min window, on a 5hr drive = 1hr window)</p>

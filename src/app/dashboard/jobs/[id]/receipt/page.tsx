@@ -9,6 +9,7 @@ import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
 import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
 import ExpenseReviewList from '@/components/ExpenseReviewList'
+import AdminJobAdjustments from '@/components/AdminJobAdjustments'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   const orgInfo = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
   const canViewExpenses = isAdmin || !!orgInfo?.dealer_can_view_expenses
 
+  let hourlyRateCents = 0
+  if (isAdmin) {
+    const { data: rateSettings } = await supabase.from('pricing_settings').select('hourly_rate_cents').eq('id', 1).single()
+    hourlyRateCents = rateSettings?.hourly_rate_cents ?? 0
+  }
+
   const { data: events } = await supabase
     .from('job_status_events')
     .select('status, created_at')
@@ -106,13 +113,15 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: rawExpenses } = await supabase
     .from('job_expenses')
-    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, submitted_by:submitted_by(full_name)')
+    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, added_by_admin, submitted_by:submitted_by(full_name)')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
 
   const expenses = await Promise.all(
     (rawExpenses ?? []).map(async (exp) => {
-      const { data } = await supabase.storage.from('expense-receipts').createSignedUrl(exp.receipt_photo_path, 60 * 15)
+      const signedUrl = exp.receipt_photo_path
+        ? (await supabase.storage.from('expense-receipts').createSignedUrl(exp.receipt_photo_path, 60 * 15)).data?.signedUrl ?? null
+        : null
       const submitter = Array.isArray(exp.submitted_by) ? exp.submitted_by[0] : exp.submitted_by
       return {
         id: exp.id,
@@ -123,7 +132,8 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         status: exp.status,
         created_at: exp.created_at,
         approved_addition_cents: exp.approved_addition_cents,
-        receipt_url: data?.signedUrl ?? null,
+        added_by_admin: exp.added_by_admin,
+        receipt_url: signedUrl,
         submitted_by_name: submitter?.full_name ?? null,
       }
     })
@@ -177,9 +187,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   }
   const submittedReceiptsTotalCents = expenses.reduce((sum, e) => sum + e.amount_cents, 0)
   const approvedAdditionsTotalCents = expenses.reduce((sum, e) => sum + (e.approved_addition_cents ?? 0), 0)
+  const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.estimated_driver_pay_cents ?? 0
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
   const actualCostCents =
-    (job.estimated_driver_pay_cents ?? 0) + (job.estimated_driver_reimbursement_cents ?? 0) + approvedAdditionsTotalCents
+    effectiveDriverPayCents + (job.estimated_driver_reimbursement_cents ?? 0) + approvedAdditionsTotalCents
   const profitCents = revenueCents - actualCostCents
 
   const ACCRUAL_LABELS: [string, string][] = [
@@ -435,10 +446,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents)}</span>
                 </div>
               )}
-              {job.estimated_driver_pay_cents != null && (
+              {(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents) != null && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Driver paid</span>
-                  <span className="text-gray-900 font-medium">{formatCents(job.estimated_driver_pay_cents)}</span>
+                  <span className="text-gray-600">Driver paid{job.admin_pay_override_cents != null && ' (overridden)'}</span>
+                  <span className="text-gray-900 font-medium">{formatCents(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents!)}</span>
+                </div>
+              )}
+              {job.admin_pay_override_cents != null && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Calculated pay (before override)</span>
+                  <span className="text-gray-400">{formatCents(job.estimated_driver_pay_cents ?? 0)}</span>
                 </div>
               )}
               {job.actual_driver_hours != null && (
@@ -529,6 +546,18 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               <ApproveIdVerificationButton jobId={job.id} />
             )}
           </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="max-w-2xl mx-auto px-6 pb-8">
+          <AdminJobAdjustments
+            jobId={job.id}
+            currentHoursOverride={job.admin_hours_override}
+            calculatedDriverPayCents={job.estimated_driver_pay_cents}
+            hourlyRateCents={hourlyRateCents}
+            approvedExpensesCents={job.approved_expenses_cents ?? 0}
+          />
         </div>
       )}
 
