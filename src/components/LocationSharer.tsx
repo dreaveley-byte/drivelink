@@ -22,8 +22,15 @@ function getDeviceInstructions(): string {
 }
 
 export default function LocationSharer({ jobId }: { jobId: string }) {
-  const [status, setStatus] = useState<'idle' | 'sharing' | 'denied' | 'unsupported'>('idle')
+  // 'sharing' now ONLY means a location was actually confirmed saved to the
+  // database — not just that a GPS coordinate was obtained. Getting a
+  // coordinate but failing to save it (RLS issue, network issue, auth issue,
+  // etc.) now shows as 'error' instead of silently claiming success, which
+  // was previously misleading the driver into thinking sharing was working
+  // when nothing was actually reaching the database.
+  const [status, setStatus] = useState<'idle' | 'sharing' | 'denied' | 'unsupported' | 'error'>('idle')
   const [retrying, setRetrying] = useState(false)
+  const [lastErrorMessage, setLastErrorMessage] = useState('')
 
   function attemptShare() {
     if (!('geolocation' in navigator)) {
@@ -33,9 +40,8 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
     const supabase = createClient()
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        setStatus('sharing')
         setRetrying(false)
-        await supabase
+        const { error: updateError } = await supabase
           .from('jobs')
           .update({
             driver_lat: pos.coords.latitude,
@@ -44,7 +50,13 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
           })
           .eq('id', jobId)
         const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat: pos.coords.latitude, lng: pos.coords.longitude })
-        if (pingError) console.error('Location ping insert failed:', pingError)
+        if (updateError || pingError) {
+          console.error('Location save failed:', updateError, pingError)
+          setLastErrorMessage((updateError || pingError)?.message ?? 'Unknown error')
+          setStatus('error')
+          return
+        }
+        setStatus('sharing')
       },
       () => {
         setStatus('denied')
@@ -69,13 +81,20 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
     const supabase = createClient()
 
     async function recordPing(lat: number, lng: number) {
-      setStatus('sharing')
-      await supabase
+      const { error: updateError } = await supabase
         .from('jobs')
         .update({ driver_lat: lat, driver_lng: lng, driver_location_updated_at: new Date().toISOString() })
         .eq('id', jobId)
       const { error: pingError } = await supabase.from('job_location_pings').insert({ job_id: jobId, lat, lng })
-      if (pingError) console.error('Location ping insert failed:', pingError)
+      if (updateError || pingError) {
+        console.error('Location save failed:', updateError, pingError)
+        if (!cancelled) {
+          setLastErrorMessage((updateError || pingError)?.message ?? 'Unknown error')
+          setStatus('error')
+        }
+        return
+      }
+      if (!cancelled) setStatus('sharing')
       fetch('/api/driver-idle-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,7 +107,6 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
     // is locked, which a browser tab fundamentally cannot do. In a regular
     // browser this branch never runs; behavior stays exactly as it was.
     if (isNativeApp()) {
-      setStatus('sharing')
       startBackgroundTracking((loc) => {
         if (!cancelled) recordPing(loc.lat, loc.lng)
       })
@@ -147,6 +165,15 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
         >
           {retrying ? 'Checking…' : "I've enabled it — try again"}
         </button>
+      </div>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <div className="text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2 mt-1">
+        <p className="font-medium">⚠️ Getting your location, but it&apos;s not saving.</p>
+        <p className="mt-0.5">Dealers and customers won&apos;t see your progress until this is fixed. Try closing and reopening the app.</p>
+        {lastErrorMessage && <p className="mt-1 text-amber-600">{lastErrorMessage}</p>}
       </div>
     )
   }
