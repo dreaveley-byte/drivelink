@@ -78,9 +78,24 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
     }
 
     let cancelled = false
+    let resolved = false
     const supabase = createClient()
 
+    // If nothing (native watcher or web geolocation) produces any result at
+    // all within 15s, stop showing an infinite "Getting your location..."
+    // spinner and surface a real, visible error instead — this exact
+    // indefinite-hang pattern is what caused "Mark picked up" to get stuck
+    // earlier, just showing up here in a different spot.
+    const stuckTimeout = setTimeout(() => {
+      if (!resolved && !cancelled) {
+        setLastErrorMessage('Location request never completed — this usually means the permission prompt is stuck or was missed.')
+        setStatus('error')
+      }
+    }, 15000)
+
     async function recordPing(lat: number, lng: number) {
+      resolved = true
+      clearTimeout(stuckTimeout)
       const { error: updateError } = await supabase
         .from('jobs')
         .update({ driver_lat: lat, driver_lng: lng, driver_location_updated_at: new Date().toISOString() })
@@ -112,6 +127,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
       })
       return () => {
         cancelled = true
+        clearTimeout(stuckTimeout)
         stopBackgroundTracking()
       }
     }
@@ -123,7 +139,11 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
           recordPing(pos.coords.latitude, pos.coords.longitude)
         },
         () => {
-          if (!cancelled) setStatus('denied')
+          if (!cancelled) {
+            resolved = true
+            clearTimeout(stuckTimeout)
+            setStatus('denied')
+          }
         },
         { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
       )
@@ -144,6 +164,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
 
     return () => {
       cancelled = true
+      clearTimeout(stuckTimeout)
       clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -171,9 +192,16 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
   if (status === 'error') {
     return (
       <div className="text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2 mt-1">
-        <p className="font-medium">⚠️ Getting your location, but it&apos;s not saving.</p>
-        <p className="mt-0.5">Dealers and customers won&apos;t see your progress until this is fixed. Try closing and reopening the app.</p>
+        <p className="font-medium">⚠️ Location sharing isn&apos;t working right now.</p>
+        <p className="mt-0.5">Dealers and customers won&apos;t see your progress until this is fixed.</p>
         {lastErrorMessage && <p className="mt-1 text-amber-600">{lastErrorMessage}</p>}
+        <button
+          onClick={handleRetry}
+          disabled={retrying}
+          className="mt-2 text-xs bg-amber-700 text-white px-3 py-1.5 rounded-lg hover:bg-amber-800 disabled:opacity-50"
+        >
+          {retrying ? 'Checking…' : 'Try again'}
+        </button>
       </div>
     )
   }
