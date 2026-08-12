@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
+import AdminQuoteEditor from '@/components/AdminQuoteEditor'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
@@ -1066,62 +1067,61 @@ export default function EditJobPage() {
         {savedPricing && (savedPricing.dealerCostCents != null || savedPricing.charges.length > 0) && (
           <div className="mb-6 border-2 border-gray-900 rounded-xl p-4 bg-gray-50">
             <p className="text-sm font-semibold text-gray-900 mb-2">Currently saved pricing (as posted)</p>
-            <div className="space-y-1">
-              {savedPricing.breakdown && (
-                <>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mt-1 mb-1">How this was calculated</p>
-                  {([
-                    ['gasCostCents', 'Fuel'],
-                    ['mealCostCents', 'Meals'],
-                    ['wearAndTearCents', 'Wear & tear'],
-                    ['trailerFeeCents', 'Trailer fee'],
-                    ['hotelCents', 'Hotel'],
-                    ['overnightFeeCents', 'Overnight fee'],
-                    ['inspectionFeeCents', 'Inspection fee'],
-                    ['registryFeeCents', 'Registry fee'],
-                    ['ferryFeeCents', 'Ferry fee'],
-                    ['garageInsuranceFeeCents', 'Drivflo insurance'],
-                    ['hourlyDealerCents', 'Hourly (dealer-billed)'],
-                    ['extrasDealerCents', 'Other extras'],
-                  ] as [string, string][]).map(([key, label]) =>
-                    savedPricing.breakdown && savedPricing.breakdown[key] ? (
-                      <div key={key} className="flex justify-between text-xs pl-2">
-                        <span className="text-gray-500">{label}</span>
-                        <span className="text-gray-600">{formatCents(savedPricing.breakdown[key])}</span>
-                      </div>
-                    ) : null
-                  )}
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mt-2 mb-1">Return method charges</p>
-                </>
-              )}
-              {savedPricing.charges.filter((c) => c.kind).map((c, i) => (
-                <div key={i} className="flex justify-between text-xs pl-2">
-                  <span className="text-gray-500">{c.description}</span>
-                  <span className="text-gray-500">{formatCents(c.dealerAmountCents)}</span>
+
+            {isAdmin ? (
+              <AdminQuoteEditor
+                key={jobId}
+                jobId={jobId}
+                initialBreakdown={savedPricing.breakdown}
+                initialCharges={savedPricing.charges}
+              />
+            ) : (
+              <div className="space-y-1">
+                {savedPricing.breakdown && (
+                  <>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1 mb-1">How this was calculated</p>
+                    {([
+                      ['gasCostCents', 'Fuel'],
+                      ['mealCostCents', 'Meals'],
+                      ['wearAndTearCents', 'Wear & tear'],
+                      ['trailerFeeCents', 'Trailer fee'],
+                      ['hotelCents', 'Hotel'],
+                      ['overnightFeeCents', 'Overnight fee'],
+                      ['inspectionFeeCents', 'Inspection fee'],
+                      ['registryFeeCents', 'Registry fee'],
+                      ['ferryFeeCents', 'Ferry fee'],
+                      ['garageInsuranceFeeCents', 'Drivflo insurance'],
+                      ['hourlyDealerCents', 'Hourly (dealer-billed)'],
+                      ['extrasDealerCents', 'Other extras'],
+                    ] as [string, string][]).map(([key, label]) =>
+                      savedPricing.breakdown && savedPricing.breakdown[key] ? (
+                        <div key={key} className="flex justify-between text-xs pl-2">
+                          <span className="text-gray-500">{label}</span>
+                          <span className="text-gray-600">{formatCents(savedPricing.breakdown[key])}</span>
+                        </div>
+                      ) : null
+                    )}
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-2 mb-1">Return method charges</p>
+                  </>
+                )}
+                {savedPricing.charges.filter((c) => c.kind).map((c, i) => (
+                  <div key={i} className="flex justify-between text-xs pl-2">
+                    <span className="text-gray-500">{c.description}</span>
+                    <span className="text-gray-500">{formatCents(c.dealerAmountCents)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm pt-2 mt-1 border-t border-gray-200">
+                  <span className="text-gray-600">Dealer cost</span>
+                  <span className="text-gray-900 font-medium">{savedPricing.dealerCostCents != null ? formatCents(savedPricing.dealerCostCents) : '—'}</span>
                 </div>
-              ))}
-              <div className="flex justify-between text-sm pt-2 mt-1 border-t border-gray-200">
-                <span className="text-gray-600">Dealer cost</span>
-                <span className="text-gray-900 font-medium">{savedPricing.dealerCostCents != null ? formatCents(savedPricing.dealerCostCents) : '—'}</span>
               </div>
-              {savedPricing.driverPayCents != null && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Driver pay</span>
-                  <span className="text-gray-900 font-medium">{formatCents(savedPricing.driverPayCents)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Return method</span>
-                <span className="text-gray-900 font-medium">
-                  {savedPricing.autoSelectWasOn ? 'Auto-selected' : savedPricing.flyingBack ? 'Flight (manually locked in)' : 'Manually set'}
-                </span>
-              </div>
-            </div>
+            )}
+
             <p className="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-200">
-              Recalculating below re-runs this formula from the current form fields (distance, vehicle mode, options, etc.) — {savedPricing.autoSelectWasOn ? 'and will re-run the auto-comparison' : 'but will respect the manual return method above'}.
+              Recalculating below re-runs this formula from the current form fields (distance, vehicle mode, options, etc.) and will overwrite any manual adjustments above — {savedPricing.autoSelectWasOn ? 'and will re-run the auto-comparison' : 'but will respect the manual return method above'}.
               {isAdmin && (
                 <>
-                  {' '}To directly override the final hours, pay, or add/remove a charge without recalculating the formula, use{' '}
+                  {' '}To adjust driver pay hours instead of the dealer quote, use{' '}
                   <Link href={`/dashboard/jobs/${jobId}/receipt`} className="text-blue-600 underline">Admin adjustments on the receipt page</Link>.
                 </>
               )}
