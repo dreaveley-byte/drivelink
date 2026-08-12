@@ -109,6 +109,13 @@ export default function EditJobPage() {
   const [calculating, setCalculating] = useState(false)
   const [calcError, setCalcError] = useState('')
   const [pricing, setPricing] = useState<PricingResult | null>(null)
+  const [savedPricing, setSavedPricing] = useState<{
+    dealerCostCents: number | null
+    driverPayCents: number | null
+    autoSelectWasOn: boolean
+    flyingBack: boolean
+    charges: AdditionalCharge[]
+  } | null>(null)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -183,6 +190,14 @@ export default function EditJobPage() {
       setTradeInVin(job.trade_in_vin ?? '')
       setIsFirstNationsDelivery(job.is_first_nations_delivery ?? false)
       setFlyingBack(job.one_way_flight_back ?? false)
+      setAutoSelectReturnMethod(job.auto_select_return_method ?? true)
+      setSavedPricing({
+        dealerCostCents: job.estimated_dealer_cost_cents ?? null,
+        driverPayCents: job.estimated_driver_pay_cents ?? null,
+        autoSelectWasOn: job.auto_select_return_method ?? true,
+        flyingBack: job.one_way_flight_back ?? false,
+        charges: job.additional_charges ?? [],
+      })
       setVehicleMode(job.vehicle_mode ?? 'driven')
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
@@ -830,6 +845,7 @@ export default function EditJobPage() {
       is_trade_in_pickup: isTradeIn,
       is_first_nations_delivery: isFirstNationsDelivery,
       one_way_flight_back: flyingBack,
+      auto_select_return_method: autoSelectReturnMethod,
       vehicle_mode: vehicleMode,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
@@ -929,6 +945,7 @@ export default function EditJobPage() {
         is_trade_in_pickup: isTradeIn,
         is_first_nations_delivery: isFirstNationsDelivery,
         one_way_flight_back: flyingBack,
+        auto_select_return_method: autoSelectReturnMethod,
         vehicle_mode: vehicleMode,
         used_own_vehicle: true,
         out_of_province_inspection: outOfProvinceInspection,
@@ -1017,6 +1034,40 @@ export default function EditJobPage() {
               reviewApproved={false}
               isClaimedByMe={reviewInfo.reviewClaimedBy === currentUserId}
             />
+          </div>
+        )}
+        {savedPricing && (savedPricing.dealerCostCents != null || savedPricing.charges.length > 0) && (
+          <div className="mb-6 border-2 border-gray-900 rounded-xl p-4 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-900 mb-2">Currently saved pricing (as posted)</p>
+            <div className="space-y-1">
+              {savedPricing.dealerCostCents != null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Dealer cost</span>
+                  <span className="text-gray-900 font-medium">{formatCents(savedPricing.dealerCostCents)}</span>
+                </div>
+              )}
+              {savedPricing.driverPayCents != null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Driver pay</span>
+                  <span className="text-gray-900 font-medium">{formatCents(savedPricing.driverPayCents)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Return method</span>
+                <span className="text-gray-900 font-medium">
+                  {savedPricing.autoSelectWasOn ? 'Auto-selected' : savedPricing.flyingBack ? 'Flight (manually locked in)' : 'Manually set'}
+                </span>
+              </div>
+              {savedPricing.charges.filter((c) => c.kind).map((c, i) => (
+                <div key={i} className="flex justify-between text-xs pl-2">
+                  <span className="text-gray-500">{c.description}</span>
+                  <span className="text-gray-500">{formatCents(c.dealerAmountCents)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              This is what was actually calculated and saved. Recalculating below will {savedPricing.autoSelectWasOn ? 're-run the auto-comparison' : 'respect the manual choice above'} — check &quot;Auto-select cheapest return method&quot; below if you want to change that first.
+            </p>
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-6">

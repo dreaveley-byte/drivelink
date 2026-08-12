@@ -14,3 +14,9 @@ alter table jobs add column if not exists admin_pay_override_cents int;
 -- (rather than just reject it) if it was added in error.
 alter table job_expenses alter column receipt_photo_path drop not null;
 alter table job_expenses add column if not exists added_by_admin boolean not null default false;
+
+-- DELETE was never granted on this table before (only select/insert/update),
+-- which would silently block the new admin "delete this expense" capability
+-- even though the RLS policy itself permits it — same class of bug as the
+-- missing job_location_pings grant found earlier.
+grant delete on job_expenses to authenticated;
