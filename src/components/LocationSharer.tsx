@@ -136,19 +136,19 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
       }).catch(() => {})
     }
 
-    // Inside the native app shell, real background GPS tracking takes over —
-    // it keeps producing updates even while the app is minimized or the phone
-    // is locked, which a browser tab fundamentally cannot do. In a regular
-    // browser this branch never runs; behavior stays exactly as it was.
+    // Inside the native app shell, try real background GPS tracking — it's
+    // meant to keep producing updates even while the app is minimized, which
+    // a browser tab fundamentally cannot do. This is currently unreliable on
+    // some devices (the native watcher can silently never resolve), so this
+    // ALSO runs the same proven foreground polling used in a regular browser
+    // as a fallback — meaning even if background tracking isn't working yet,
+    // basic tracking-while-the-app-is-open still works exactly like the web
+    // app does today, rather than depending entirely on the flakier path.
     if (isNativeApp()) {
       startBackgroundTracking((loc) => {
         if (!cancelled) recordPing(loc.lat, loc.lng)
       })
-      return () => {
-        cancelled = true
-        clearTimeout(stuckTimeout)
-        stopBackgroundTracking()
-      }
+      // falls through to also run the standard polling below
     }
 
     function pushLocation() {
@@ -173,9 +173,10 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
 
     // The interval above gets throttled/paused by the browser once the tab is
     // backgrounded (this is a browser-level limitation web apps can't bypass —
-    // true background tracking needs a native app). This at least makes sure
-    // location catches up immediately the moment the driver reopens the tab,
-    // rather than waiting up to 20s or staying stale.
+    // true background tracking needs a native app, which is what the
+    // startBackgroundTracking() attempt above is for once it's fully reliable).
+    // This at least makes sure location catches up immediately the moment the
+    // driver reopens the tab/app, rather than waiting up to 20s or staying stale.
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') pushLocation()
     }
@@ -186,6 +187,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
       clearTimeout(stuckTimeout)
       clearInterval(interval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (isNativeApp()) stopBackgroundTracking()
     }
   }, [jobId])
 
