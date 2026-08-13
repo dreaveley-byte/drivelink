@@ -924,7 +924,7 @@ export default function DriverJobActions({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline font-bold text-base"
+            className="text-[#378ADD] hover:underline font-bold text-sm"
           >
             🧭 Pick-up Navigate
           </a>
@@ -937,7 +937,7 @@ export default function DriverJobActions({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline font-bold text-base"
+            className="text-[#378ADD] hover:underline font-bold text-sm"
           >
             🧭 Drop-Off Navigate
           </a>
@@ -1004,7 +1004,7 @@ export default function DriverJobActions({
                 <button
                   type="button"
                   onClick={() => setShowExpenseForm(true)}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-medium bg-[#378ADD] text-white px-4 py-3 rounded-xl hover:bg-[#2d6ead]"
+                  className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead]"
                 >
                   💵 Submit an expense
                 </button>
@@ -1152,7 +1152,7 @@ export default function DriverJobActions({
             <button
               type="button"
               onClick={toggleWaitTimer}
-              className="text-xs text-gray-500 hover:text-gray-700 underline"
+              className="text-xs text-amber-700 hover:text-amber-900 underline font-medium"
             >
               Start wait timer (pick up/drop off not ready)
             </button>
