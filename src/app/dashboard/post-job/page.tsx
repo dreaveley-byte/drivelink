@@ -93,6 +93,7 @@ export default function PostJobPage() {
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
+  const [insuranceVisit, setInsuranceVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
@@ -584,7 +585,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -594,7 +595,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -607,7 +608,7 @@ export default function PostJobPage() {
           const groundHomeCharge = ferryReturnGroundTransport()
           const charges = fc ? [...manualCharges, groundHomeCharge, fc] : [...manualCharges, groundHomeCharge]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Uber back', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -620,7 +621,7 @@ export default function PostJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -697,7 +698,7 @@ export default function PostJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -715,6 +716,7 @@ export default function PostJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
+        insuranceVisit,
           ferryRequired: false,
           useGarageInsurance,
           includeTowDeductibleCoverage,
@@ -751,6 +753,7 @@ export default function PostJobPage() {
         numDrivers: isDealerToDealerMultiVehicle ? Math.max(dealerDropoffCount, dealerPickupCount, 1) : (secondDriver ? 2 : 1),
         outOfProvinceInspection,
         registryVisit,
+        insuranceVisit,
         ferryRequired: false,
         useGarageInsurance,
         includeTowDeductibleCoverage,
@@ -837,6 +840,7 @@ export default function PostJobPage() {
               numDrivers: 1,
               outOfProvinceInspection,
               registryVisit,
+            insuranceVisit,
               ferryRequired: false,
               useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
@@ -887,6 +891,7 @@ export default function PostJobPage() {
       used_own_vehicle: true,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
+      insurance_visit: insuranceVisit,
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
       include_tow_deductible_coverage: includeTowDeductibleCoverage,
@@ -960,6 +965,7 @@ export default function PostJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
+        insuranceVisit,
           ferryRequired: false,
           useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
@@ -1002,6 +1008,7 @@ export default function PostJobPage() {
         used_own_vehicle: true,
         out_of_province_inspection: outOfProvinceInspection,
         registry_visit: registryVisit,
+      insurance_visit: insuranceVisit,
         ferry_required: ferryRequired,
         use_garage_insurance: false,
         is_second_driver_job: true,
@@ -1065,6 +1072,7 @@ export default function PostJobPage() {
             numDrivers: 1,
             outOfProvinceInspection,
             registryVisit,
+            insuranceVisit,
             ferryRequired: false,
             useGarageInsurance: false,
             includeTowDeductibleCoverage: false,
@@ -1106,6 +1114,7 @@ export default function PostJobPage() {
           used_own_vehicle: true,
           out_of_province_inspection: outOfProvinceInspection,
           registry_visit: registryVisit,
+          insurance_visit: insuranceVisit,
           ferry_required: ferryRequired,
           use_garage_insurance: false,
           is_second_driver_job: true,
@@ -1677,6 +1686,10 @@ export default function PostJobPage() {
               Registry visit required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={insuranceVisit} onChange={(e) => setInsuranceVisit(e.target.checked)} />
+              Insurance visit required (for insurance transfer)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
               Force ferry crossing (if not detected automatically)
             </label>
@@ -1838,6 +1851,7 @@ export default function PostJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                    <BreakdownRow label="Insurance visit" cents={pricing.insuranceFeeCents} />
                     <BreakdownRow label="Drivflo insurance" cents={pricing.garageInsuranceFeeCents} />
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
@@ -1914,6 +1928,7 @@ export default function PostJobPage() {
                   destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
                   outOfProvinceInspection={outOfProvinceInspection}
                   registryVisit={registryVisit}
+                  insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
                   onSelectDate={(d) => {
@@ -1932,6 +1947,7 @@ export default function PostJobPage() {
               vehicleMode={vehicleMode}
               outOfProvinceInspection={outOfProvinceInspection}
               registryVisit={registryVisit}
+              insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
               pricingSettings={pricingSettings}
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}

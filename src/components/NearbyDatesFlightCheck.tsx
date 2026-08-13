@@ -24,6 +24,7 @@ export default function NearbyDatesFlightCheck({
   destinationAddress,
   outOfProvinceInspection,
   registryVisit,
+  insuranceVisit,
   ferryRequired,
   manualCharges,
   onSelectDate,
@@ -38,6 +39,7 @@ export default function NearbyDatesFlightCheck({
   destinationAddress: string
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  insuranceVisit: boolean
   ferryRequired: boolean
   manualCharges: AdditionalCharge[]
   onSelectDate: (newScheduledFor: string) => void
@@ -49,7 +51,8 @@ export default function NearbyDatesFlightCheck({
     const oneWayHours = durationMinutes / 60
     const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
     const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
-    const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings.max_driving_hours_before_overnight
+    const insuranceHours = insuranceVisit ? pricingSettings.insurance_visit_min_hours : 0
+    const overnightNeeded = oneWayHours + inspectionHours + registryHours + insuranceHours > pricingSettings.max_driving_hours_before_overnight
     const d = new Date(startDate)
     if (overnightNeeded) d.setDate(d.getDate() + 1)
     return toLocalDateString(d)
@@ -114,6 +117,7 @@ export default function NearbyDatesFlightCheck({
             numDrivers,
             outOfProvinceInspection,
             registryVisit,
+            insuranceVisit,
             ferryRequired,
             useGarageInsurance: false,
             includeTowDeductibleCoverage: false,

@@ -87,6 +87,7 @@ export default function EditJobPage() {
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
+  const [insuranceVisit, setInsuranceVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
@@ -639,7 +640,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -649,7 +650,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -659,7 +660,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -737,7 +738,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -755,6 +756,7 @@ export default function EditJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
+        insuranceVisit,
           ferryRequired: false,
           useGarageInsurance,
           includeTowDeductibleCoverage,
@@ -788,6 +790,7 @@ export default function EditJobPage() {
         numDrivers: secondDriver ? 2 : 1,
         outOfProvinceInspection,
         registryVisit,
+        insuranceVisit,
         ferryRequired: false,
         useGarageInsurance,
         includeTowDeductibleCoverage,
@@ -829,6 +832,7 @@ export default function EditJobPage() {
               numDrivers: 1,
               outOfProvinceInspection,
               registryVisit,
+            insuranceVisit,
               ferryRequired: false,
               useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
@@ -869,6 +873,7 @@ export default function EditJobPage() {
       vehicle_mode: vehicleMode,
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
+      insurance_visit: insuranceVisit,
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
       include_tow_deductible_coverage: includeTowDeductibleCoverage,
@@ -928,6 +933,7 @@ export default function EditJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
+        insuranceVisit,
           ferryRequired: false,
           useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
@@ -970,6 +976,7 @@ export default function EditJobPage() {
         used_own_vehicle: true,
         out_of_province_inspection: outOfProvinceInspection,
         registry_visit: registryVisit,
+      insurance_visit: insuranceVisit,
         ferry_required: ferryRequired,
         use_garage_insurance: false,
         is_second_driver_job: true,
@@ -1435,6 +1442,10 @@ export default function EditJobPage() {
               Registry visit required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={insuranceVisit} onChange={(e) => setInsuranceVisit(e.target.checked)} />
+              Insurance visit required (for insurance transfer)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
               Delivery is to a First Nations reserve
             </label>
@@ -1598,6 +1609,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <BreakdownRow label="Out-of-province inspection" cents={pricing.inspectionFeeCents} />
                     <BreakdownRow label="Registry visit" cents={pricing.registryFeeCents} />
+                    <BreakdownRow label="Insurance visit" cents={pricing.insuranceFeeCents} />
                     <BreakdownRow label="Drivflo insurance" cents={pricing.garageInsuranceFeeCents} />
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
@@ -1674,6 +1686,7 @@ export default function EditJobPage() {
                   destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
                   outOfProvinceInspection={outOfProvinceInspection}
                   registryVisit={registryVisit}
+                  insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
                   onSelectDate={(d) => {
@@ -1692,6 +1705,7 @@ export default function EditJobPage() {
               vehicleMode={vehicleMode}
               outOfProvinceInspection={outOfProvinceInspection}
               registryVisit={registryVisit}
+              insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
               pricingSettings={pricingSettings}
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}

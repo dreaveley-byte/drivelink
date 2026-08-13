@@ -10,6 +10,7 @@ export default function ReturnOptionsComparison({
   vehicleMode,
   outOfProvinceInspection,
   registryVisit,
+  insuranceVisit,
   ferryRequired,
   pricingSettings,
   originAddress,
@@ -21,6 +22,7 @@ export default function ReturnOptionsComparison({
   vehicleMode: 'driven' | 'towed'
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  insuranceVisit: boolean
   ferryRequired: boolean
   pricingSettings: PricingSettings
   originAddress: string
@@ -90,7 +92,7 @@ export default function ReturnOptionsComparison({
     }
   }
 
-  const baseInput = { distanceKm, durationMinutes, vehicleMode, outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance: false, includeTowDeductibleCoverage: false }
+  const baseInput = { distanceKm, durationMinutes, vehicleMode, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance: false, includeTowDeductibleCoverage: false }
 
   const secondDriverResult = calculatePricing(
     { ...baseInput, numDrivers: 2, oneWayFlightBack: false, additionalCharges: [] },

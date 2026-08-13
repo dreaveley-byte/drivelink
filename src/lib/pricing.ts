@@ -19,6 +19,8 @@ export type PricingSettings = {
   out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
   registry_visit_fee_cents: number
+  insurance_visit_min_hours: number
+  insurance_visit_fee_cents: number
   max_driving_hours_before_overnight: number
   return_ground_transport_hours: number
   return_ground_transport_fee_cents: number
@@ -59,6 +61,7 @@ export type PricingInput = {
   numDrivers: number
   outOfProvinceInspection: boolean
   registryVisit: boolean
+  insuranceVisit: boolean
   ferryRequired: boolean
   useGarageInsurance: boolean
   includeTowDeductibleCoverage: boolean
@@ -87,6 +90,7 @@ export type PricingResult = {
   overnightFeeCents: number
   inspectionFeeCents: number
   registryFeeCents: number
+  insuranceFeeCents: number
   ferryFeeCents: number
   garageInsuranceFeeCents: number
   insuranceDays: number
@@ -102,7 +106,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -123,6 +127,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Extra fixed-minimum hours (billed to dealer, not paid to driver — not "real hours worked")
   const inspectionHours = outOfProvinceInspection ? settings.out_of_province_inspection_min_hours : 0
   const registryHours = registryVisit ? settings.registry_visit_min_hours : 0
+  const insuranceHours = insuranceVisit ? settings.insurance_visit_min_hours : 0
   // Ferry wait buffer — BC Ferries recommends arriving well before sailing time,
   // and Google's drive time doesn't reliably account for that wait or the fare.
   // On a round trip (not flying back), the driver crosses the water twice.
@@ -142,7 +147,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // wait, and break time add real hours on the ground too, and together they can
   // push the driver past the point where they can safely finish same-day.
   const overnightRequired =
-    baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours > settings.max_driving_hours_before_overnight
+    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours > settings.max_driving_hours_before_overnight
 
   // Capped per person per day — an overnight trip is treated as 2 days for this
   // purpose (the app's overnight model is a single same-day/next-day threshold,
@@ -168,7 +173,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // job, not just long-haul ones, since it's real time on every single delivery.
   const deliveryHandlingHours = settings.delivery_handling_buffer_hours
 
-  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
+  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
   const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours + deliveryHandlingHours
 
   const hourlyDealerCents = Math.round(dealerBilledHours * settings.hourly_rate_cents * numDrivers)
@@ -204,6 +209,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // dealer-only, not paid to the driver (same treatment as hotel).
   const inspectionFeeCents = outOfProvinceInspection ? settings.out_of_province_inspection_fee_cents : 0
   const registryFeeCents = registryVisit ? settings.registry_visit_fee_cents : 0
+  const insuranceFeeCents = insuranceVisit ? settings.insurance_visit_fee_cents : 0
 
   const extrasDealerCents = additionalCharges.reduce((sum, c) => sum + c.dealerAmountCents, 0)
   // Reimbursements (e.g. Uber/bus the driver paid for out of pocket) are tracked
@@ -242,7 +248,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
-    registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
+    registryFeeCents + insuranceFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
 
@@ -262,6 +268,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     overnightFeeCents,
     inspectionFeeCents,
     registryFeeCents,
+    insuranceFeeCents,
     ferryFeeCents,
     garageInsuranceFeeCents,
     insuranceDays,
