@@ -238,6 +238,18 @@ export default function DriverJobActions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, job.id])
 
+  // Separate, more robust auto-expand: fires whenever the job is in
+  // "assigned" status and the checklist has actually loaded, rather than
+  // only at the single moment the initial fetch completes — this covers
+  // cases like the driver claiming the job while already on this page,
+  // where the original load-time check could be missed.
+  useEffect(() => {
+    if (job.status !== 'assigned' || checklist.length === 0) return
+    const conditionItem = checklist.find((i) => i.item_type === 'condition_report')
+    if (conditionItem) setExpandedId(conditionItem.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.status, checklist.length])
+
   async function toggleChecklistItem(item: ChecklistItem) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -508,6 +520,13 @@ export default function DriverJobActions({
         // so it's front-and-center while the driver documents the vehicle —
         // once pickup is actually confirmed, collapse it back down.
         setExpandedId(null)
+        // Tapping this main button IS confirming pickup — auto-check the
+        // matching checklist item too, so the driver doesn't have to do the
+        // same confirmation twice in two different places.
+        const pickupCheckItem = checklist.find((i) => i.label === 'Pickup: Mark vehicle picked up')
+        if (pickupCheckItem && !pickupCheckItem.completed_at) {
+          toggleChecklistItem(pickupCheckItem)
+        }
       }
 
       const jobUpdate: Record<string, string | number> = { status: newStatus }
@@ -841,7 +860,7 @@ export default function DriverJobActions({
               Leave by {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </p>
           )}
-          <p className="text-xs text-blue-600">To: {extractCity(job.dropoff_address)}</p>
+          <p className="text-xs text-blue-600">To: {job.dropoff_address}</p>
           {job.delivery_deadline && (
             <p className="text-xs text-amber-600 mt-0.5">
               Deliver by {new Date(job.delivery_deadline).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
@@ -861,43 +880,51 @@ export default function DriverJobActions({
       <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">{joinName(job.job_types)}</p>
-        {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.stock_number) && (
+        {job.stock_number && (
+          <p className="text-xs text-gray-600 mt-0.5">Stk# {job.stock_number}</p>
+        )}
+        {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.vin) && (
           <p className="text-xs text-gray-600 mt-0.5">
             {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
-            {job.stock_number && ` · Stock #${job.stock_number}`}
+            {job.vin && ` · VIN ...${job.vin.slice(-8)}`}
           </p>
         )}
         {joinName(job.organizations) && (
           <p className="text-xs text-gray-600 mt-0.5">{joinName(job.organizations)}</p>
         )}
-        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span>Pickup: {job.pickup_address}</span>
+        <p className="text-xs text-gray-500 mt-1.5">
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.pickup_address)}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline"
+            className="text-[#378ADD] hover:underline font-medium"
           >
-            🧭 Navigate
+            🧭 Pick-up Navigate
           </a>
+          <br />
+          <span className="text-gray-500">{job.pickup_address}</span>
         </p>
-        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span>
-            Drop-off: {job.dropoff_address}
-            {job.estimated_distance_km != null && ` · ${Math.round(job.estimated_distance_km)} km round trip`}
-            {job.estimated_duration_minutes != null && ` · ~${Math.round((job.estimated_duration_minutes / 60) * 10) / 10} hrs`}
-          </span>
+        <p className="text-xs text-gray-500 mt-1.5">
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.dropoff_address)}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline"
+            className="text-[#378ADD] hover:underline font-medium"
           >
-            🧭 Navigate
+            🧭 Drop-Off Navigate
           </a>
+          <br />
+          <span className="text-gray-500">{job.dropoff_address}</span>
         </p>
+        {(job.estimated_distance_km != null || job.estimated_duration_minutes != null) && (
+          <p className="text-xs text-gray-400 mt-2">
+            {job.estimated_distance_km != null && `${Math.round(job.estimated_distance_km)} km round trip`}
+            {job.estimated_distance_km != null && job.estimated_duration_minutes != null && ' · '}
+            {job.estimated_duration_minutes != null && `~${Math.round((job.estimated_duration_minutes / 60) * 10) / 10} hrs`}
+          </p>
+        )}
         {(job.customer_full_name || job.recipient_name) && (
           <p className="text-xs text-gray-400 mt-0.5">
             Customer: {job.customer_full_name || job.recipient_name}
@@ -926,28 +953,6 @@ export default function DriverJobActions({
         )}
         {!['completed', 'cancelled', 'awaiting_driver'].includes(job.status) && (
           <div className="mt-1.5">
-            {job.wait_time_started_at ? (
-              <button
-                type="button"
-                onClick={toggleWaitTimer}
-                className="text-xs bg-amber-100 text-amber-800 border border-amber-300 rounded-lg px-2.5 py-1 hover:bg-amber-200"
-              >
-                ⏱ Waiting since {new Date(job.wait_time_started_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })} — tap to stop
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={toggleWaitTimer}
-                className="text-xs text-gray-500 hover:text-gray-700 underline"
-              >
-                Start wait timer (dealer/customer not ready)
-              </button>
-            )}
-            {job.total_wait_minutes > 0 && !job.wait_time_started_at && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                Total wait so far: {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee: ${formatCents(job.idle_fee_cents)}`}
-              </p>
-            )}
             <div className="mt-2">
               {justSubmittedExpense ? (
                 <div className="border border-green-200 bg-green-50 rounded-xl p-4 text-center space-y-2">
@@ -1106,6 +1111,33 @@ export default function DriverJobActions({
         )}
       </div>
       </div>
+
+      {!['completed', 'cancelled', 'awaiting_driver'].includes(job.status) && (
+        <div className="mt-1.5">
+          {job.wait_time_started_at ? (
+            <button
+              type="button"
+              onClick={toggleWaitTimer}
+              className="text-xs bg-amber-100 text-amber-800 border border-amber-300 rounded-lg px-2.5 py-1 hover:bg-amber-200"
+            >
+              ⏱ Waiting since {new Date(job.wait_time_started_at).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })} — tap to stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleWaitTimer}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Start wait timer (pick up/drop off not ready)
+            </button>
+          )}
+          {job.total_wait_minutes > 0 && !job.wait_time_started_at && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Total wait so far: {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee: ${formatCents(job.idle_fee_cents)}`}
+            </p>
+          )}
+        </div>
+      )}
 
       {isActive && checklist.length > 0 && (() => {
         const currentPhase: 'Pickup' | 'Inspection' | 'Delivery' | 'None' =
