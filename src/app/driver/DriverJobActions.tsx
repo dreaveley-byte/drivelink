@@ -431,10 +431,16 @@ export default function DriverJobActions({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    await supabase
-      .from('jobs')
-      .update({ driver_id: user.id, status: 'assigned' })
-      .eq('id', job.id)
+    // Server-enforced, not just a disabled button in the UI - this is the
+    // actual guarantee against claiming two overlapping jobs (e.g. a race
+    // between two tabs/devices, or the UI just not having refreshed yet).
+    const { error: claimError } = await supabase.rpc('claim_job_if_no_conflict', { p_job_id: job.id })
+    if (claimError) {
+      setLoading(false)
+      alert(claimError.message)
+      router.refresh()
+      return
+    }
 
     await supabase.from('job_status_events').insert({
       job_id: job.id,
@@ -918,7 +924,7 @@ export default function DriverJobActions({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline font-medium"
+            className="text-[#378ADD] hover:underline font-bold text-base"
           >
             🧭 Pick-up Navigate
           </a>
@@ -931,7 +937,7 @@ export default function DriverJobActions({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[#378ADD] hover:underline font-medium"
+            className="text-[#378ADD] hover:underline font-bold text-base"
           >
             🧭 Drop-Off Navigate
           </a>

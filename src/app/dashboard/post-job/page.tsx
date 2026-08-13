@@ -961,7 +961,13 @@ export default function PostJobPage() {
         {
           distanceKm,
           durationMinutes,
-          vehicleMode,
+          // A chase driver always uses their own personal vehicle to follow,
+          // regardless of whether the main vehicle is being driven or towed —
+          // forcing 'towed' here is what actually triggers wear & tear
+          // compensation in the formula (it's keyed off "uses own vehicle",
+          // not literally about towing). For a genuine second-vehicle
+          // delivery (not a chase), the real vehicleMode still applies.
+          vehicleMode: chaseVehicle ? 'towed' : vehicleMode,
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
@@ -1028,6 +1034,9 @@ export default function PostJobPage() {
         estimated_dealer_cost_cents: null,
         estimated_driver_pay_cents: soloPricing.estimatedDriverPayCents,
         estimated_driver_reimbursement_cents: soloPricing.reimbursementCents,
+        baseline_fuel_cents: soloPricing.gasCostCents,
+        baseline_inspection_cents: soloPricing.inspectionFeeCents,
+        baseline_food_cents: soloPricing.mealCostCents,
         notes: notes ? `${notes}\n\n(Chase/2nd driver for the linked primary job)` : '(Chase/2nd driver for the linked primary job)',
       }).select('id').single()
 
