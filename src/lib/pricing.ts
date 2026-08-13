@@ -90,7 +90,6 @@ export type PricingResult = {
   overnightFeeCents: number
   inspectionFeeCents: number
   registryFeeCents: number
-  insuranceFeeCents: number
   ferryFeeCents: number
   garageInsuranceFeeCents: number
   insuranceDays: number
@@ -209,7 +208,6 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // dealer-only, not paid to the driver (same treatment as hotel).
   const inspectionFeeCents = outOfProvinceInspection ? settings.out_of_province_inspection_fee_cents : 0
   const registryFeeCents = registryVisit ? settings.registry_visit_fee_cents : 0
-  const insuranceFeeCents = insuranceVisit ? settings.insurance_visit_fee_cents : 0
 
   const extrasDealerCents = additionalCharges.reduce((sum, c) => sum + c.dealerAmountCents, 0)
   // Reimbursements (e.g. Uber/bus the driver paid for out of pocket) are tracked
@@ -248,7 +246,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const costBasisCents =
     hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
-    registryFeeCents + insuranceFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
+    registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
 
@@ -268,7 +266,6 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     overnightFeeCents,
     inspectionFeeCents,
     registryFeeCents,
-    insuranceFeeCents,
     ferryFeeCents,
     garageInsuranceFeeCents,
     insuranceDays,

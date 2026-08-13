@@ -333,14 +333,9 @@ export default function PricingSettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Insurance visit minimum (hrs)</label>
+              <p className="text-xs text-gray-400 mb-1">Time buffer only — no separate fee, just adds to the hours</p>
               <input type="number" step="0.5" value={settings.insurance_visit_min_hours}
                 onChange={(e) => updateNumberField('insurance_visit_min_hours', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Insurance visit fee ($)</label>
-              <input type="number" step="0.01" value={dollars(settings.insurance_visit_fee_cents)}
-                onChange={(e) => updateDollarField('insurance_visit_fee_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
