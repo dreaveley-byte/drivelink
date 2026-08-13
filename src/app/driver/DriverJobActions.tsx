@@ -823,7 +823,13 @@ export default function DriverJobActions({
       start,
       end,
     })
-    if (nativeAdded) return
+    if (nativeAdded) {
+      // createEvent() adds the event silently with no native confirmation UI
+      // of its own (unlike createEventWithPrompt) — without this, a
+      // successful add looks and feels identical to nothing happening at all.
+      alert('✓ Added to your calendar')
+      return
+    }
 
     // Regular browser fallback — Safari blocks top-level navigation to data:
     // URLs as an anti-phishing measure, and window.open() calls are prone to
