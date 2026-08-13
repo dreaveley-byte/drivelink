@@ -33,6 +33,7 @@ type Job = {
   stock_number: string | null
   vin: string | null
   is_trade_in_pickup: boolean | null
+  is_chase_vehicle_job: boolean | null
   is_first_nations_delivery: boolean | null
   out_of_province_inspection: boolean | null
   key_count: number | null
@@ -220,7 +221,7 @@ export default function DriverJobActions({
       hasWheelLock: !!job.has_wheel_lock,
       hasChargingCables: !!job.has_charging_cables,
       otherItems: job.other_included_items,
-    }, !!job.out_of_province_inspection)
+    }, !!job.out_of_province_inspection, !!job.is_chase_vehicle_job)
       const rows = defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
       const { data: created } = await supabase
         .from('job_checklist_items')
@@ -446,7 +447,7 @@ export default function DriverJobActions({
       hasWheelLock: !!job.has_wheel_lock,
       hasChargingCables: !!job.has_charging_cables,
       otherItems: job.other_included_items,
-    }, !!job.out_of_province_inspection)
+    }, !!job.out_of_province_inspection, !!job.is_chase_vehicle_job)
     await supabase.from('job_checklist_items').insert(
       defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
     )

@@ -100,13 +100,25 @@ function includedItemsLabel(items: IncludedItems): string | null {
   return `Pickup: Confirm included items — ${parts.join(', ')}`
 }
 
+// A chase-vehicle driver isn't handling any customer vehicle at all — they're
+// just following in their own car so the lead driver has a ride back. No
+// condition report, no vehicle photos, nothing customer-facing belongs here.
+const CHASE_VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
+  { label: 'Follow the lead driver to the drop-off location', type: 'check' },
+  { label: 'Confirm lead driver has safely dropped off the vehicle', type: 'check' },
+  { label: 'Return trip complete', type: 'check' },
+]
+
 export function getDefaultChecklist(
   jobTypeName: string | null | undefined,
   isTradeIn: boolean,
   isFirstNationsDelivery: boolean = false,
   includedItems?: IncludedItems,
-  needsOutOfProvinceInspection: boolean = false
+  needsOutOfProvinceInspection: boolean = false,
+  isChaseVehicleJob: boolean = false
 ): ChecklistDefinitionItem[] {
+  if (isChaseVehicleJob) return CHASE_VEHICLE_CHECKLIST
+
   if (jobTypeName && VEHICLE_JOB_TYPES.includes(jobTypeName)) {
     let items = [...VEHICLE_CHECKLIST]
 
