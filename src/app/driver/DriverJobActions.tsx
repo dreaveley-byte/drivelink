@@ -10,6 +10,7 @@ import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
 import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
+import { shareIcsFileNative } from '@/lib/nativeCalendarBridge'
 
 type Job = {
   id: string
@@ -810,7 +811,7 @@ export default function DriverJobActions({
     : false
   const canSelfRelease = canReleaseByStatus && !withinReleaseWindow
 
-  function addToCalendar() {
+  async function addToCalendar() {
     if (!job.scheduled_for) return
     const start = new Date(job.scheduled_for)
     const end = new Date(start.getTime() + (job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120) * 60000)
@@ -840,11 +841,14 @@ export default function DriverJobActions({
       'END:VCALENDAR',
     ].join('\r\n')
 
-    // Safari blocks top-level navigation to data: URLs as an anti-phishing
-    // measure, and window.open() calls are prone to mobile popup blockers.
-    // A blob: URL with a direct same-tab navigation is the most reliable
-    // combination across iOS Safari and Android Chrome for handing an .ics
-    // file off to the device's calendar app.
+    const nativeShared = await shareIcsFileNative(ics, `drivflo-pickup-${job.id}.ics`)
+    if (nativeShared) return
+
+    // Regular browser fallback (unchanged) — Safari blocks top-level
+    // navigation to data: URLs as an anti-phishing measure, and window.open()
+    // calls are prone to mobile popup blockers. A blob: URL with a direct
+    // same-tab navigation is the most reliable combination across iOS Safari
+    // and Android Chrome for handing an .ics file off to the calendar app.
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     window.location.href = url
