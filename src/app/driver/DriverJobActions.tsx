@@ -880,13 +880,16 @@ export default function DriverJobActions({
       <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-gray-900">{joinName(job.job_types)}</p>
-        {job.stock_number && (
-          <p className="text-xs text-gray-600 mt-0.5">Stk# {job.stock_number}</p>
+        {(job.stock_number || job.vin) && (
+          <p className="text-xs text-gray-600 mt-0.5">
+            {job.stock_number && `Stk# ${job.stock_number}`}
+            {job.stock_number && job.vin && ' · '}
+            {job.vin && `VIN ...${job.vin.slice(-8)}`}
+          </p>
         )}
-        {(job.vehicle_year || job.vehicle_make || job.vehicle_model || job.vin) && (
+        {(job.vehicle_year || job.vehicle_make || job.vehicle_model) && (
           <p className="text-xs text-gray-600 mt-0.5">
             {[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}
-            {job.vin && ` · VIN ...${job.vin.slice(-8)}`}
           </p>
         )}
         {joinName(job.organizations) && (
