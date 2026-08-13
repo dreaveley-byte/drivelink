@@ -10,7 +10,7 @@ import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
 import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
-import { shareIcsFileNative } from '@/lib/nativeCalendarBridge'
+import { addCalendarEventNative } from '@/lib/nativeCalendarBridge'
 
 type Job = {
   id: string
@@ -815,8 +815,22 @@ export default function DriverJobActions({
     if (!job.scheduled_for) return
     const start = new Date(job.scheduled_for)
     const end = new Date(start.getTime() + (job.estimated_duration_minutes ? job.estimated_duration_minutes * 2 : 120) * 60000)
-    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     const title = `${joinName(job.job_types) ?? 'Drivflo job'} — ${[job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')}`
+
+    const nativeAdded = await addCalendarEventNative({
+      title: `Pick up vehicle — ${title}`,
+      location: job.pickup_address,
+      start,
+      end,
+    })
+    if (nativeAdded) return
+
+    // Regular browser fallback — Safari blocks top-level navigation to data:
+    // URLs as an anti-phishing measure, and window.open() calls are prone to
+    // mobile popup blockers. A blob: URL with a direct same-tab navigation is
+    // the most reliable combination across iOS Safari and Android Chrome for
+    // handing an .ics file off to the calendar app.
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     const deadlineText = job.delivery_deadline
       ? `\\nCustomer needs vehicle by: ${new Date(job.delivery_deadline).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
       : ''
@@ -841,14 +855,6 @@ export default function DriverJobActions({
       'END:VCALENDAR',
     ].join('\r\n')
 
-    const nativeShared = await shareIcsFileNative(ics, `drivflo-pickup-${job.id}.ics`)
-    if (nativeShared) return
-
-    // Regular browser fallback (unchanged) — Safari blocks top-level
-    // navigation to data: URLs as an anti-phishing measure, and window.open()
-    // calls are prone to mobile popup blockers. A blob: URL with a direct
-    // same-tab navigation is the most reliable combination across iOS Safari
-    // and Android Chrome for handing an .ics file off to the calendar app.
     const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     window.location.href = url

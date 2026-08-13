@@ -1,33 +1,37 @@
-// Bridges .ics calendar file handoff for the native app. A blob: URL
-// same-tab navigation (what the regular web app uses) works fine in mobile
-// Safari/Chrome, but doesn't reliably hand off to the Calendar app inside a
-// Capacitor WKWebView - there's no OS-level file-type integration the way
-// there is in a real browser. Writing the file to disk and invoking the
-// native share sheet is the reliable way to do this inside an app shell.
+// Bridges calendar event creation for the native app. The earlier approach
+// (sharing an .ics file via the native share sheet) didn't reliably surface
+// Calendar as an option on this device/iOS version, even though the file was
+// correctly recognized. Directly creating the event through a real calendar
+// plugin is the more reliable approach - it skips the share sheet entirely.
 'use client'
 
 import { isNativeApp } from './nativeLocationBridge'
 
-export async function shareIcsFileNative(icsContent: string, filename: string): Promise<boolean> {
+export async function addCalendarEventNative(event: {
+  title: string
+  location: string
+  start: Date
+  end: Date
+}): Promise<boolean> {
   if (!isNativeApp()) return false
   try {
-    const { Filesystem, Directory } = await import('@capacitor/filesystem')
-    const { Share } = await import('@capacitor/share')
+    const { CapacitorCalendar } = await import('@ebarooni/capacitor-calendar')
 
-    const write = await Filesystem.writeFile({
-      path: filename,
-      data: icsContent,
-      directory: Directory.Cache,
-      encoding: 'utf8' as any,
-    })
+    const permission = await CapacitorCalendar.requestPermission({ alias: 'writeCalendar' as any })
+    if (permission.result !== 'granted') {
+      console.error('Calendar permission not granted:', permission.result)
+      return false
+    }
 
-    await Share.share({
-      title: 'Add to Calendar',
-      url: write.uri,
+    await CapacitorCalendar.createEvent({
+      title: event.title,
+      location: event.location,
+      startDate: event.start.getTime(),
+      endDate: event.end.getTime(),
     })
     return true
   } catch (e) {
-    console.error('Native calendar share failed:', e)
+    console.error('Native calendar event creation failed:', e)
     return false
   }
 }
