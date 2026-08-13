@@ -871,7 +871,7 @@ export default function DriverJobActions({
           <p className="text-xs text-gray-600 mt-0.5">{joinName(job.organizations)}</p>
         )}
         <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span>Pickup: {extractCity(job.pickup_address)}</span>
+          <span>Pickup: {job.pickup_address}</span>
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.pickup_address)}`}
             target="_blank"
@@ -884,7 +884,7 @@ export default function DriverJobActions({
         </p>
         <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
           <span>
-            Drop-off: {extractCity(job.dropoff_address)}
+            Drop-off: {job.dropoff_address}
             {job.estimated_distance_km != null && ` · ${Math.round(job.estimated_distance_km)} km round trip`}
             {job.estimated_duration_minutes != null && ` · ~${Math.round((job.estimated_duration_minutes / 60) * 10) / 10} hrs`}
           </span>
