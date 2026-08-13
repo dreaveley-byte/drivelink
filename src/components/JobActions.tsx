@@ -11,6 +11,8 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [forcingComplete, setForcingComplete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [completedAtValue, setCompletedAtValue] = useState(() => toLocalDatetimeInputValue(new Date()))
 
   const canEdit = status === 'awaiting_driver'
@@ -19,6 +21,9 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
   // Only makes sense once a driver's actually engaged with the job — no point
   // force-completing something nobody's picked up yet.
   const canForceComplete = isAdmin && !['awaiting_driver', 'completed', 'cancelled'].includes(status)
+  // Permanent delete — admin only, and only on jobs that have already run
+  // their course (completed/cancelled), never on anything still active.
+  const canDelete = isAdmin && (status === 'completed' || status === 'cancelled')
 
   async function cancelJob() {
     setLoading(true)
@@ -62,6 +67,19 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
     router.refresh()
   }
 
+  async function deleteJob() {
+    setDeleting(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('jobs').delete().eq('id', jobId)
+    setDeleting(false)
+    if (error) {
+      alert(`Could not delete this job: ${error.message}`)
+      return
+    }
+    setConfirmingDelete(false)
+    router.refresh()
+  }
+
   if (archived) {
     return (
       <button onClick={unarchiveJob} disabled={loading} className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50">
@@ -70,7 +88,7 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
     )
   }
 
-  if (!canEdit && !canCancel && !canArchive && !canForceComplete) return null
+  if (!canEdit && !canCancel && !canArchive && !canForceComplete && !canDelete) return null
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -106,7 +124,27 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
             </button>
           </span>
         )}
+        {canDelete && !confirmingDelete && (
+          <button onClick={() => setConfirmingDelete(true)} className="text-xs text-red-700 hover:text-red-800 underline">
+            Delete
+          </button>
+        )}
       </div>
+      {confirmingDelete && (
+        <div className="border-2 border-red-300 rounded-lg p-2.5 bg-red-50 max-w-xs">
+          <p className="text-xs text-red-700 font-medium mb-1.5">
+            Permanently delete this job? This removes it and everything tied to it (checklist, photos, expenses, chat) — this cannot be undone.
+          </p>
+          <div className="flex items-center gap-2">
+            <button onClick={deleteJob} disabled={deleting} className="text-xs text-white bg-red-700 rounded px-2.5 py-1 hover:bg-red-800 disabled:opacity-50">
+              {deleting ? 'Deleting…' : 'Yes, delete permanently'}
+            </button>
+            <button onClick={() => setConfirmingDelete(false)} className="text-xs text-gray-600 hover:text-gray-800">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {forcingComplete && (
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg p-2 bg-gray-50">
           <div>

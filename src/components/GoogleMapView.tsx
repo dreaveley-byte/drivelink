@@ -186,7 +186,7 @@ export default function GoogleMapView({
         trailPolylineRef.current = new google.maps.Polyline({
           map,
           path: [],
-          strokeColor: '#1D1D1F',
+          strokeColor: '#378ADD',
           strokeOpacity: 0.9,
           strokeWeight: 4,
         })

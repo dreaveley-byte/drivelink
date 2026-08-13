@@ -235,7 +235,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <>
                 {job.scheduled_for && (
                   <p className="text-xs font-semibold text-blue-700">
-                    {new Date(job.scheduled_for).toLocaleString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    {new Date(job.scheduled_for).toLocaleString('en-CA', { timeZone: 'America/Vancouver', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                   </p>
                 )}
                 <p className="text-sm font-medium text-gray-900">

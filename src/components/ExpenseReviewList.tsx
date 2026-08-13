@@ -197,7 +197,7 @@ export default function ExpenseReviewList({
                   </p>
                 )}
                 <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                  {exp.added_by_admin ? 'Added by admin' : (exp.submitted_by_name || 'Driver')} · {new Date(exp.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                  {exp.added_by_admin ? 'Added by admin' : (exp.submitted_by_name || 'Driver')} · {new Date(exp.created_at).toLocaleString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium', timeStyle: 'short' })}
                   {isAdmin && (
                     <button
                       onClick={() => deleteExpense(exp)}

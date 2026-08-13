@@ -119,7 +119,7 @@ export default async function AdminArchivedJobsPage() {
                 <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                   {statusLabels[job.status] ?? job.status}
                 </span>
-                <JobActions jobId={job.id} status={job.status} archived />
+                <JobActions jobId={job.id} status={job.status} archived isAdmin />
               </div>
             </div>
           )})}

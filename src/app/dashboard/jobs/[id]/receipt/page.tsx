@@ -24,7 +24,7 @@ const statusLabels: Record<string, string> = {
 }
 
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const CONDITION_LABEL_MATCH = /condition report|walkaround|photos of any.*damage/i
