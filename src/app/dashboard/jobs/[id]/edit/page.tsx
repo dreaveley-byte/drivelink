@@ -10,6 +10,7 @@ import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import AdminQuoteEditor from '@/components/AdminQuoteEditor'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
+import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
 
 type JobType = { id: string; name: string }
@@ -81,6 +82,7 @@ export default function EditJobPage() {
   const [secondTradeInModel, setSecondTradeInModel] = useState('')
   const [secondTradeInVin, setSecondTradeInVin] = useState('')
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
+  const [showReservePopup, setShowReservePopup] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [autoSelectReturnMethod, setAutoSelectReturnMethod] = useState(true)
   const [uberBackRequested, setUberBackRequested] = useState(false)
@@ -1384,6 +1386,18 @@ export default function EditJobPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2.5 mt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={isFirstNationsDelivery}
+                onChange={(e) => {
+                  setIsFirstNationsDelivery(e.target.checked)
+                  if (e.target.checked) setShowReservePopup(true)
+                }}
+              />
+              Delivery is to a First Nations reserve
+            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1527,10 +1541,6 @@ export default function EditJobPage() {
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={insuranceVisit} onChange={(e) => setInsuranceVisit(e.target.checked)} />
               Insurance visit required (for insurance transfer)
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
-              Delivery is to a First Nations reserve
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
@@ -1812,6 +1822,20 @@ export default function EditJobPage() {
           </div>
         </form>
       </main>
+      {showReservePopup && (
+        <FirstNationsReservePopup
+          customerAddress={customerAddress}
+          onConfirm={(reserveAddress) => {
+            setStops((prev) => {
+              const withoutLast = prev.slice(0, -1)
+              return [...withoutLast, customerAddress, reserveAddress]
+            })
+            setShowReservePopup(false)
+          }}
+          onSkip={() => setShowReservePopup(false)}
+          onClose={() => setShowReservePopup(false)}
+        />
+      )}
     </div>
   )
 }

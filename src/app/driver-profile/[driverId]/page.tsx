@@ -41,6 +41,9 @@ export default async function DriverPublicProfilePage({ params }: { params: Prom
           )}
           <div>
             <p className="text-lg font-semibold text-gray-900">{profile.full_name ?? 'Driver'}</p>
+            {profile.driver_code && (
+              <p className="text-xs text-gray-400 font-mono">{profile.driver_code}</p>
+            )}
             <span className={`text-xs border rounded-full px-2.5 py-0.5 ${profile.is_active ? 'border-green-300 text-green-700 bg-green-50' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
               {profile.is_active ? 'Active Drivflo driver' : 'Not currently active'}
             </span>

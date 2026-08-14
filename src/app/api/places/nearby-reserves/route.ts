@@ -34,16 +34,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Could not locate "${address}" on the map.` }, { status: 404 })
   }
 
-  const searchRes = await fetch(
-    `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent('First Nation reserve')}&location=${location.lat},${location.lng}&radius=150000&key=${apiKey}`
-  )
-  const searchData = await searchRes.json()
-  const results = (searchData?.results ?? []) as Array<{
+  const queries = ['First Nation reserve', 'Indian reserve', 'First Nations band office']
+  const allResults: Array<{
     name: string
     formatted_address: string
     place_id: string
     geometry?: { location?: { lat: number; lng: number } }
-  }>
+  }> = []
+
+  for (const q of queries) {
+    const searchRes = await fetch(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&location=${location.lat},${location.lng}&radius=300000&key=${apiKey}`
+    )
+    const searchData = await searchRes.json()
+    if (Array.isArray(searchData?.results)) allResults.push(...searchData.results)
+  }
+
+  // Dedupe by place_id across the multiple queries
+  const seen = new Set<string>()
+  const results = allResults.filter((r) => {
+    if (seen.has(r.place_id)) return false
+    seen.add(r.place_id)
+    return true
+  })
 
   const withDistance = results
     .filter((r) => r.geometry?.location)

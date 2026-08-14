@@ -151,6 +151,9 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             <div>
               <h1 className="text-lg font-semibold text-gray-900">{driver.full_name || 'Unnamed driver'}</h1>
               <p className="text-sm text-gray-500">{driver.phone || 'No phone on file'}</p>
+              {driver.driver_code && (
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{driver.driver_code}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap justify-end">

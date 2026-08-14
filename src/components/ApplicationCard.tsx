@@ -90,11 +90,15 @@ export default function ApplicationCard({
         // never shows up in the admin drivers list or is able to claim jobs.
         // Also copies name/phone from the application, since the profile itself
         // never collects these anywhere else — without this, every approved
-        // driver would show up as "Unnamed driver, no phone on file".
+        // driver would show up as "Unnamed driver, no phone on file". Also
+        // assigns a unique, human-readable Driver ID (DRV-1001, DRV-1002, etc.)
+        // for identification purposes.
+        const { data: newDriverCode } = await supabase.rpc('generate_driver_code')
         const { error: activateError } = await supabase
           .from('profiles')
           .update({
             role: 'driver',
+            driver_code: newDriverCode,
             ...(driverFullName && { full_name: driverFullName }),
             ...(driverPhone && { phone: driverPhone }),
           })
