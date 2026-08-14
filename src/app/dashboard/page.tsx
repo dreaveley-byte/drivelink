@@ -8,6 +8,7 @@ import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import SettingsGearLink from '@/components/SettingsGearLink'
 import ChatBadgeLink from '@/components/ChatBadgeLink'
+import LiveChecklistViewer from '@/components/LiveChecklistViewer'
 import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
@@ -23,6 +24,16 @@ const statusLabels: Record<string, string> = {
   delivered: 'Delivered',
   completed: 'Completed',
   cancelled: 'Cancelled',
+}
+
+const statusColors: Record<string, string> = {
+  awaiting_driver: 'border-gray-300 text-gray-600 bg-gray-50',
+  assigned: 'border-blue-300 text-blue-700 bg-blue-50',
+  picked_up: 'border-amber-300 text-amber-700 bg-amber-50',
+  in_progress: 'border-purple-300 text-purple-700 bg-purple-50',
+  delivered: 'border-teal-300 text-teal-700 bg-teal-50',
+  completed: 'border-green-300 text-green-700 bg-green-50',
+  cancelled: 'border-red-300 text-red-700 bg-red-50',
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
@@ -120,7 +131,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -262,9 +273,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   <div className="flex-1">{cardBody}</div>
                 )}
                 <div className="flex flex-col items-end gap-2">
-                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1">
+                  <span className={`text-xs border rounded-full px-2.5 py-1 font-medium ${statusColors[job.status] ?? 'border-gray-300 text-gray-700'}`}>
                     {statusLabels[job.status] ?? job.status}
                   </span>
+                  {job.status === 'in_progress' && job.pickup_gps_at && job.estimated_duration_minutes != null && (
+                    <span className="text-[10px] text-purple-600 font-medium whitespace-nowrap">
+                      ETA {new Date(new Date(job.pickup_gps_at).getTime() + job.estimated_duration_minutes * 60000).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
                   <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} />
                   {isTrackable && <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />}
                 </div>
@@ -282,6 +298,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     </a>
                   )}
                 </div>
+              )}
+              {['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status) && (
+                <LiveChecklistViewer jobId={job.id} />
               )}
             </div>
           )})}

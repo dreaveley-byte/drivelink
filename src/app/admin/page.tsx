@@ -8,6 +8,7 @@ import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
+import LiveChecklistViewer from '@/components/LiveChecklistViewer'
 import { formatCents } from '@/lib/pricing'
 import { sortJobsActiveFirst } from '@/lib/sortJobs'
 
@@ -21,6 +22,16 @@ const statusLabels: Record<string, string> = {
   delivered: 'Delivered',
   completed: 'Completed',
   cancelled: 'Cancelled',
+}
+
+const statusColors: Record<string, string> = {
+  awaiting_driver: 'border-gray-300 text-gray-600 bg-gray-50',
+  assigned: 'border-blue-300 text-blue-700 bg-blue-50',
+  picked_up: 'border-amber-300 text-amber-700 bg-amber-50',
+  in_progress: 'border-purple-300 text-purple-700 bg-purple-50',
+  delivered: 'border-teal-300 text-teal-700 bg-teal-50',
+  completed: 'border-green-300 text-green-700 bg-green-50',
+  cancelled: 'border-red-300 text-red-700 bg-red-50',
 }
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
@@ -305,9 +316,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <div className="flex-1">{cardBody}</div>
                 )}
                 <div className="flex flex-col items-end gap-2">
-                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
+                  <span className={`text-xs border rounded-full px-2.5 py-1 whitespace-nowrap font-medium ${statusColors[job.status] ?? 'border-gray-300 text-gray-700'}`}>
                     {statusLabels[job.status] ?? job.status}
                   </span>
+                  {job.status === 'in_progress' && job.pickup_gps_at && job.estimated_duration_minutes != null && (
+                    <span className="text-[10px] text-purple-600 font-medium whitespace-nowrap">
+                      ETA {new Date(new Date(job.pickup_gps_at).getTime() + job.estimated_duration_minutes * 60000).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
                   <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} isAdmin />
                 </div>
               </div>
@@ -349,6 +365,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </a>
                   )}
                 </div>
+              )}
+              {['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status) && (
+                <LiveChecklistViewer jobId={job.id} />
               )}
             </div>
           )})}
