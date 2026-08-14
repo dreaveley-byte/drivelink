@@ -7,6 +7,7 @@ import { calculatePricing, formatCents, type PricingSettings, type AdditionalCha
 import Logo from '@/components/Logo'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
+import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
 
 type JobType = { id: string; name: string }
@@ -90,6 +91,7 @@ export default function PostJobPage() {
     setList(next)
   }
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
+  const [showReservePopup, setShowReservePopup] = useState(false)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
@@ -1612,7 +1614,14 @@ export default function PostJobPage() {
             </div>
             {!useSimplifiedForm && (
               <label className="flex items-center gap-2 text-sm text-gray-700 pt-1">
-                <input type="checkbox" checked={isFirstNationsDelivery} onChange={(e) => setIsFirstNationsDelivery(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={isFirstNationsDelivery}
+                  onChange={(e) => {
+                    setIsFirstNationsDelivery(e.target.checked)
+                    if (e.target.checked) setShowReservePopup(true)
+                  }}
+                />
                 Delivery is to a First Nations reserve
               </label>
             )}
@@ -2027,6 +2036,23 @@ export default function PostJobPage() {
           </div>
         </form>
       </main>
+      {showReservePopup && (
+        <FirstNationsReservePopup
+          customerAddress={customerAddress}
+          onConfirm={(reserveAddress) => {
+            // Route becomes: original stops ... -> customer's own address (to
+            // pick them up) -> the reserve (final delivery), since the
+            // customer needs to be brought along to receive the vehicle there.
+            setStops((prev) => {
+              const withoutLast = prev.slice(0, -1)
+              return [...withoutLast, customerAddress, reserveAddress]
+            })
+            setShowReservePopup(false)
+          }}
+          onSkip={() => setShowReservePopup(false)}
+          onClose={() => setShowReservePopup(false)}
+        />
+      )}
     </div>
   )
 }
