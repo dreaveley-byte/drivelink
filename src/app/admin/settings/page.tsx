@@ -21,6 +21,7 @@ type Settings = {
   meal_allowance_every_hours: number
   meal_allowance_max_count: number
   dealer_markup_percent: number
+  customer_pickup_dropoff_markup_percent: number
   minimum_driver_pay_cents: number
   out_of_province_inspection_min_hours: number
   out_of_province_inspection_fee_cents: number
@@ -522,6 +523,13 @@ export default function PricingSettingsPage() {
             <label className="block text-sm text-gray-700 mb-1">Dealer bill = driver pay × this % </label>
             <input type="number" step="1" value={settings.dealer_markup_percent}
               onChange={(e) => updateNumberField('dealer_markup_percent', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Customer Pick Up / Drop Off markup (%)</label>
+            <p className="text-xs text-gray-400 mb-1">Set independently from the main markup above — these are quick shuttle rides, not vehicle deliveries</p>
+            <input type="number" step="1" value={settings.customer_pickup_dropoff_markup_percent}
+              onChange={(e) => updateNumberField('customer_pickup_dropoff_markup_percent', e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </section>

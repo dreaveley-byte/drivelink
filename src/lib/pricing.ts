@@ -14,6 +14,7 @@ export type PricingSettings = {
   meal_allowance_every_hours: number
   meal_allowance_max_count: number
   dealer_markup_percent: number
+  customer_pickup_dropoff_markup_percent: number
   minimum_driver_pay_cents: number
   out_of_province_inspection_min_hours: number
   out_of_province_inspection_fee_cents: number
@@ -62,6 +63,7 @@ export type PricingInput = {
   outOfProvinceInspection: boolean
   registryVisit: boolean
   insuranceVisit: boolean
+  markupPercentOverride?: number | null
   ferryRequired: boolean
   useGarageInsurance: boolean
   includeTowDeductibleCoverage: boolean
@@ -105,7 +107,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack,
+    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack, markupPercentOverride,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -248,7 +250,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
     registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
-  const estimatedDealerCostCents = Math.round(costBasisCents * (settings.dealer_markup_percent / 100))
+  const effectiveMarkupPercent = markupPercentOverride != null ? markupPercentOverride : settings.dealer_markup_percent
+  const estimatedDealerCostCents = Math.round(costBasisCents * (effectiveMarkupPercent / 100))
 
   return {
     overnightRequired,

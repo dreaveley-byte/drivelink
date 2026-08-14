@@ -26,6 +26,8 @@ export default function PostJobPage() {
   const [vehicleYear, setVehicleYear] = useState('')
   const [packageDescription, setPackageDescription] = useState('')
   const [packageDirection, setPackageDirection] = useState<'pickup' | 'dropoff'>('dropoff')
+  const [pickupDropoffReason, setPickupDropoffReason] = useState<'sales' | 'service' | 'other'>('sales')
+  const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
   const [stockNumber, setStockNumber] = useState('')
@@ -299,6 +301,8 @@ export default function PostJobPage() {
     setDecisionNote('')
     const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
     const isPaperworkSigningJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Paperwork Signing'
+    const jobTypeNameForCalc = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+    const isCustomerRideJob = jobTypeNameForCalc === 'Customer Pick Up' || jobTypeNameForCalc === 'Customer Drop Off'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -559,6 +563,13 @@ export default function PostJobPage() {
         setEffectiveOneWayReturn(true)
         finalCharges = manualCharges
         setDecisionNote('Courier/Package — one-way only, no return-transport charge applies.')
+      } else if (isCustomerRideJob) {
+        // Same idea as Courier — a customer shuttle ride is inherently
+        // one-way, driven directly in the driver's own or a dealer vehicle,
+        // with no vehicle-delivery-style return-transport comparison needed.
+        setEffectiveOneWayReturn(true)
+        finalCharges = manualCharges
+        setDecisionNote('Customer pick-up/drop-off — one-way only, no return-transport charge applies.')
       } else if (forcedRoundTrip) {
         setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
@@ -761,6 +772,7 @@ export default function PostJobPage() {
         oneWayFlightBack: effectiveOneWayReturn,
         outboundVehicleCount,
         returnVehicleCount,
+        markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
       },
       pricingSettings
     )
@@ -867,6 +879,8 @@ export default function PostJobPage() {
       vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
       package_description: useSimplifiedForm ? (packageDescription || null) : null,
       package_direction: isCourier ? packageDirection : null,
+      pickup_dropoff_reason: isCustomerRide ? pickupDropoffReason : null,
+      pickup_dropoff_reason_other: isCustomerRide && pickupDropoffReason === 'other' ? (pickupDropoffReasonOther || null) : null,
       vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
@@ -1178,11 +1192,14 @@ export default function PostJobPage() {
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
   const isCourier = jobTypeName === 'Courier / Package'
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
+  const isCustomerPickup = jobTypeName === 'Customer Pick Up'
+  const isCustomerDropoff = jobTypeName === 'Customer Drop Off'
+  const isCustomerRide = isCustomerPickup || isCustomerDropoff
   // Paperwork Signing uses the same simplified form as Courier/Package (no
   // vehicle section, no insurance, etc.) — the only difference is Paperwork
   // Signing is always a round trip on the driver's own vehicle, never a
   // one-way Uber-back/chase-vehicle scenario like a courier package can be.
-  const useSimplifiedForm = isCourier || isPaperworkSigning
+  const useSimplifiedForm = isCourier || isPaperworkSigning || isCustomerRide
 
   return (
     <div className="min-h-screen bg-white">
@@ -1409,7 +1426,9 @@ export default function PostJobPage() {
 
           {useSimplifiedForm ? (
             <div className="space-y-3 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-900">{isPaperworkSigning ? 'Paperwork' : 'Package'}</p>
+              <p className="text-sm font-medium text-gray-900">
+                {isPaperworkSigning ? 'Paperwork' : isCustomerRide ? (isCustomerPickup ? 'Customer Pick Up' : 'Customer Drop Off') : 'Package'}
+              </p>
               {isCourier && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Pick up or drop off</label>
@@ -1423,17 +1442,40 @@ export default function PostJobPage() {
                   </select>
                 </div>
               )}
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  {isPaperworkSigning ? "What's being signed" : "What's being picked up / dropped off"}
-                </label>
-                <input
-                  value={packageDescription}
-                  onChange={(e) => setPackageDescription(e.target.value)}
-                  placeholder={isPaperworkSigning ? 'e.g. loan documents, bill of sale, trade paperwork' : 'e.g. envelope of signed paperwork, laptop, spare key fob'}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
+              {isCustomerRide ? (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Reason for pick up / drop off</label>
+                  <select
+                    value={pickupDropoffReason}
+                    onChange={(e) => setPickupDropoffReason(e.target.value as 'sales' | 'service' | 'other')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="sales">Sales</option>
+                    <option value="service">Service</option>
+                    <option value="other">Other</option>
+                  </select>
+                  {pickupDropoffReason === 'other' && (
+                    <input
+                      value={pickupDropoffReasonOther}
+                      onChange={(e) => setPickupDropoffReasonOther(e.target.value)}
+                      placeholder="Describe the reason"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-2"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {isPaperworkSigning ? "What's being signed" : "What's being picked up / dropped off"}
+                  </label>
+                  <input
+                    value={packageDescription}
+                    onChange={(e) => setPackageDescription(e.target.value)}
+                    placeholder={isPaperworkSigning ? 'e.g. loan documents, bill of sale, trade paperwork' : 'e.g. envelope of signed paperwork, laptop, spare key fob'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
             </div>
           ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
