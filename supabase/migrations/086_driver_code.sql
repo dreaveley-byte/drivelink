@@ -14,7 +14,9 @@ grant usage on sequence driver_code_seq to authenticated;
 grant execute on function generate_driver_code() to authenticated;
 
 -- Re-define the public profile function (from migration 085) to also
--- include driver_code, now that the column exists.
+-- include driver_code, now that the column exists. Postgres requires an
+-- explicit drop first since the return columns are changing.
+drop function if exists get_driver_public_profile(uuid);
 create or replace function get_driver_public_profile(p_driver_id uuid)
 returns table(full_name text, photo_url text, is_active boolean, driver_code text)
 language sql
