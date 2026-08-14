@@ -1,5 +1,6 @@
 export type PricingSettings = {
   hourly_rate_cents: number
+  simple_job_hourly_rate_cents: number
   fuel_price_cents_per_litre: number
   delivery_handling_buffer_hours: number
   bus_terminal_buffer_hours: number
@@ -16,6 +17,7 @@ export type PricingSettings = {
   dealer_markup_percent: number
   customer_pickup_dropoff_markup_percent: number
   minimum_driver_pay_cents: number
+  simple_job_minimum_pay_cents: number
   out_of_province_inspection_min_hours: number
   out_of_province_inspection_fee_cents: number
   registry_visit_min_hours: number
@@ -64,6 +66,7 @@ export type PricingInput = {
   registryVisit: boolean
   insuranceVisit: boolean
   markupPercentOverride?: number | null
+  useSimpleJobRates?: boolean
   ferryRequired: boolean
   useGarageInsurance: boolean
   includeTowDeductibleCoverage: boolean
@@ -107,7 +110,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack, markupPercentOverride,
+    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack, markupPercentOverride, useSimpleJobRates,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -177,8 +180,9 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
   const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours + deliveryHandlingHours
 
-  const hourlyDealerCents = Math.round(dealerBilledHours * settings.hourly_rate_cents * numDrivers)
-  const hourlyDriverCents = Math.round(driverPaidHours * settings.hourly_rate_cents * numDrivers)
+  const effectiveHourlyRateCents = useSimpleJobRates ? settings.simple_job_hourly_rate_cents : settings.hourly_rate_cents
+  const hourlyDealerCents = Math.round(dealerBilledHours * effectiveHourlyRateCents * numDrivers)
+  const hourlyDriverCents = Math.round(driverPaidHours * effectiveHourlyRateCents * numDrivers)
 
   const fuelEconomy = vehicleMode === 'towed'
     ? settings.fuel_economy_towed_l_per_100km
@@ -222,7 +226,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Reimbursements are intentionally excluded — the floor is about fair pay for
   // time worked, not about the size of an unrelated expense reimbursement.
   const computedDriverPayCents = hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents
-  const estimatedDriverPayCents = Math.max(computedDriverPayCents, settings.minimum_driver_pay_cents)
+  const effectiveMinimumPayCents = useSimpleJobRates ? settings.simple_job_minimum_pay_cents : settings.minimum_driver_pay_cents
+  const estimatedDriverPayCents = Math.max(computedDriverPayCents, effectiveMinimumPayCents)
   // If the floor kicked in, the dealer's cost basis needs to cover that extra amount
   // too, before markup is applied on top.
   const driverPayFloorBumpCents = estimatedDriverPayCents - computedDriverPayCents

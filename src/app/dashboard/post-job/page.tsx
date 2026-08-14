@@ -773,6 +773,7 @@ export default function PostJobPage() {
         outboundVehicleCount,
         returnVehicleCount,
         markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
+        useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
       },
       pricingSettings
     )

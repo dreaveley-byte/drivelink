@@ -10,6 +10,8 @@ import Logo from '@/components/Logo'
 
 type Settings = {
   hourly_rate_cents: number
+  simple_job_hourly_rate_cents: number
+  simple_job_minimum_pay_cents: number
   fuel_price_cents_per_litre: number
   fuel_economy_driven_l_per_100km: number
   fuel_economy_towed_l_per_100km: number
@@ -239,6 +241,20 @@ export default function PricingSettingsPage() {
               <label className="block text-sm text-gray-700 mb-1">Minimum pay per job ($)</label>
               <input type="number" step="0.01" value={dollars(settings.minimum_driver_pay_cents)}
                 onChange={(e) => updateDollarField('minimum_driver_pay_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Simple job hourly rate ($/hr)</label>
+              <p className="text-xs text-gray-400 mb-1">Used instead of the main hourly rate for Courier/Package, Paperwork Signing, and Customer Pick Up/Drop Off — these are quicker jobs than a full vehicle delivery</p>
+              <input type="number" step="0.01" value={dollars(settings.simple_job_hourly_rate_cents)}
+                onChange={(e) => updateDollarField('simple_job_hourly_rate_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Simple job minimum pay ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Minimum pay floor for the same simple job types, instead of the main minimum pay above</p>
+              <input type="number" step="0.01" value={dollars(settings.simple_job_minimum_pay_cents)}
+                onChange={(e) => updateDollarField('simple_job_minimum_pay_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           </div>
