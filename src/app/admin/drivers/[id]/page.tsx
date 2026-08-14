@@ -8,6 +8,7 @@ import ResetPasswordButton from '@/components/ResetPasswordButton'
 import ApplicationCard from '@/components/ApplicationCard'
 import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
+import DriverQRCode from '@/components/DriverQRCode'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -52,6 +53,12 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
     .single()
 
   if (!driver) notFound()
+
+  const { data: publicFeedback } = await supabase
+    .from('driver_public_feedback')
+    .select('type, message, submitter_name, submitter_contact, created_at')
+    .eq('driver_id', driverId)
+    .order('created_at', { ascending: false })
 
   const { data: application } = await supabase
     .from('driver_applications')
@@ -196,6 +203,36 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             </div>
           )}
         </div>
+
+        <DriverQRCode driverId={driver.id} />
+
+        {publicFeedback && publicFeedback.length > 0 && (
+          <div className="border border-gray-200 rounded-xl p-4 mt-4">
+            <p className="text-sm font-medium text-gray-900 mb-3">
+              Public feedback ({publicFeedback.length})
+            </p>
+            <div className="space-y-3">
+              {publicFeedback.map((f, i) => (
+                <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium ${f.type === 'praise' ? 'text-green-700' : 'text-red-600'}`}>
+                      {f.type === 'praise' ? '👍 Praise' : '⚠️ Complaint'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(f.created_at).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 mt-1">{f.message}</p>
+                  {(f.submitter_name || f.submitter_contact) && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {[f.submitter_name, f.submitter_contact].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Driver Info</p>
