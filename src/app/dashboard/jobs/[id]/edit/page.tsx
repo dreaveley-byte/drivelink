@@ -87,6 +87,10 @@ export default function EditJobPage() {
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   const [outOfProvinceInspection, setOutOfProvinceInspection] = useState(false)
   const [registryVisit, setRegistryVisit] = useState(false)
+  const [packageDescription, setPackageDescription] = useState('')
+  const [packageDirection, setPackageDirection] = useState<'pickup' | 'dropoff'>('dropoff')
+  const [pickupDropoffReason, setPickupDropoffReason] = useState<'sales' | 'service' | 'other'>('sales')
+  const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [insuranceVisit, setInsuranceVisit] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
@@ -218,6 +222,10 @@ export default function EditJobPage() {
       setVehicleMode(job.vehicle_mode ?? 'driven')
       setOutOfProvinceInspection(job.out_of_province_inspection ?? false)
       setRegistryVisit(job.registry_visit ?? false)
+      setPackageDescription(job.package_description ?? '')
+      setPackageDirection(job.package_direction === 'pickup' ? 'pickup' : 'dropoff')
+      setPickupDropoffReason(job.pickup_dropoff_reason === 'service' ? 'service' : job.pickup_dropoff_reason === 'other' ? 'other' : 'sales')
+      setPickupDropoffReasonOther(job.pickup_dropoff_reason_other ?? '')
       setFerryRequired(job.ferry_required ?? false)
       setUseGarageInsurance(job.use_garage_insurance ?? false)
       setIncludeTowDeductibleCoverage(job.include_tow_deductible_coverage ?? false)
@@ -378,6 +386,8 @@ export default function EditJobPage() {
     setCalcError('')
     setDecisionNote('')
     const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
+    const jobTypeNameForCalc = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+    const isCustomerRideJob = jobTypeNameForCalc === 'Customer Pick Up' || jobTypeNameForCalc === 'Customer Drop Off'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -624,6 +634,10 @@ export default function EditJobPage() {
         setEffectiveOneWayReturn(true)
         finalCharges = manualCharges
         setDecisionNote('Courier/Package — one-way only, no return-transport charge applies.')
+      } else if (isCustomerRideJob) {
+        setEffectiveOneWayReturn(true)
+        finalCharges = manualCharges
+        setDecisionNote('Customer pick-up/drop-off — one-way only, no return-transport charge applies.')
       } else if (forcedRoundTrip) {
         setEffectiveOneWayReturn(false)
         const fc = ferryCharge('roundtrip-vehicle')
@@ -798,6 +812,7 @@ export default function EditJobPage() {
         oneWayFlightBack: effectiveOneWayReturn,
         outboundVehicleCount,
         returnVehicleCount,
+        markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
       },
       pricingSettings
     )
@@ -850,6 +865,10 @@ export default function EditJobPage() {
       recipient_name: recipientName || null,
       recipient_phone: recipientPhone || null,
       vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+      package_description: useSimplifiedForm ? (packageDescription || null) : null,
+      package_direction: isCourier ? packageDirection : null,
+      pickup_dropoff_reason: isCustomerRide ? pickupDropoffReason : null,
+      pickup_dropoff_reason_other: isCustomerRide && pickupDropoffReason === 'other' ? (pickupDropoffReasonOther || null) : null,
       vehicle_make: vehicleMake || null,
       vehicle_model: vehicleModel || null,
       stock_number: stockNumber || null,
@@ -1040,6 +1059,14 @@ export default function EditJobPage() {
     )
   }
 
+  const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+  const isCourier = jobTypeName === 'Courier / Package'
+  const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
+  const isCustomerPickup = jobTypeName === 'Customer Pick Up'
+  const isCustomerDropoff = jobTypeName === 'Customer Drop Off'
+  const isCustomerRide = isCustomerPickup || isCustomerDropoff
+  const useSimplifiedForm = isCourier || isPaperworkSigning || isCustomerRide
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
@@ -1173,6 +1200,60 @@ export default function EditJobPage() {
             </button>
           </div>
 
+          {useSimplifiedForm ? (
+            <div className="space-y-3 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-900">
+                {isPaperworkSigning ? 'Paperwork' : isCustomerRide ? (isCustomerPickup ? 'Customer Pick Up' : 'Customer Drop Off') : 'Package'}
+              </p>
+              {isCourier && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Pick up or drop off</label>
+                  <select
+                    value={packageDirection}
+                    onChange={(e) => setPackageDirection(e.target.value as 'pickup' | 'dropoff')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="pickup">Pick up</option>
+                    <option value="dropoff">Drop off</option>
+                  </select>
+                </div>
+              )}
+              {isCustomerRide ? (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Reason for pick up / drop off</label>
+                  <select
+                    value={pickupDropoffReason}
+                    onChange={(e) => setPickupDropoffReason(e.target.value as 'sales' | 'service' | 'other')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="sales">Sales</option>
+                    <option value="service">Service</option>
+                    <option value="other">Other</option>
+                  </select>
+                  {pickupDropoffReason === 'other' && (
+                    <input
+                      value={pickupDropoffReasonOther}
+                      onChange={(e) => setPickupDropoffReasonOther(e.target.value)}
+                      placeholder="Describe the reason"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-2"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {isPaperworkSigning ? "What's being signed" : "What's being picked up / dropped off"}
+                  </label>
+                  <input
+                    value={packageDescription}
+                    onChange={(e) => setPackageDescription(e.target.value)}
+                    placeholder={isPaperworkSigning ? 'e.g. loan documents, bill of sale, trade paperwork' : 'e.g. envelope of signed paperwork, laptop, spare key fob'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-900">Vehicle</p>
             <div className="grid grid-cols-3 gap-3">
@@ -1234,6 +1315,7 @@ export default function EditJobPage() {
               </label>
             </div>
           </div>
+          )}
 
           {multiVehicleArrangement !== 'none' && (
             <div className="space-y-4 border border-gray-200 rounded-lg p-4">
