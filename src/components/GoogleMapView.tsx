@@ -188,7 +188,7 @@ export default function GoogleMapView({
           path: [],
           strokeColor: '#378ADD',
           strokeOpacity: 0.9,
-          strokeWeight: 4,
+          strokeWeight: 7,
         })
         if (isTracking) {
           const supabase = createClient()
