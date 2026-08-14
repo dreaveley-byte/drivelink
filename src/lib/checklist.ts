@@ -109,6 +109,10 @@ const CHASE_VEHICLE_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Return trip complete', type: 'check' },
 ]
 
+// A customer pick-up/drop-off is a simple point-to-point ride — no vehicle
+// condition to document, no signature needed, nothing to check off at all.
+const CUSTOMER_RIDE_CHECKLIST: ChecklistDefinitionItem[] = []
+
 export function getDefaultChecklist(
   jobTypeName: string | null | undefined,
   isTradeIn: boolean,
@@ -118,6 +122,7 @@ export function getDefaultChecklist(
   isChaseVehicleJob: boolean = false
 ): ChecklistDefinitionItem[] {
   if (isChaseVehicleJob) return CHASE_VEHICLE_CHECKLIST
+  if (jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off') return CUSTOMER_RIDE_CHECKLIST
 
   if (jobTypeName && VEHICLE_JOB_TYPES.includes(jobTypeName)) {
     let items = [...VEHICLE_CHECKLIST]

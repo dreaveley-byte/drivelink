@@ -173,6 +173,8 @@ export default function DriverJobActions({
   const [submittingExpense, setSubmittingExpense] = useState(false)
   const [expenseError, setExpenseError] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  const jobTypeName = joinName(job.job_types)
+  const isCustomerRideJob = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 15000)
     return () => clearInterval(interval)
@@ -815,10 +817,16 @@ export default function DriverJobActions({
   }
 
   const canReleaseByStatus = job.status === 'assigned' || job.status === 'picked_up'
+  const pickupTimeHasPassed = job.scheduled_for ? new Date(job.scheduled_for).getTime() <= Date.now() : false
   const withinReleaseWindow = job.scheduled_for
     ? new Date(job.scheduled_for).getTime() - Date.now() < 24 * 60 * 60 * 1000
     : false
-  const canSelfRelease = canReleaseByStatus && !withinReleaseWindow
+  // Customer pick-up/drop-off rides are short, simple jobs — a driver should
+  // be able to back out anytime right up until the scheduled pickup time,
+  // without the usual 24-hour cutoff that applies to vehicle deliveries.
+  const canSelfRelease = isCustomerRideJob
+    ? canReleaseByStatus && !pickupTimeHasPassed
+    : canReleaseByStatus && !withinReleaseWindow
 
   async function addToCalendar() {
     if (!job.scheduled_for) return
@@ -979,7 +987,7 @@ export default function DriverJobActions({
             )}
           </p>
         )}
-        {!['completed', 'cancelled', 'awaiting_driver'].includes(job.status) && (
+        {!['completed', 'cancelled', 'awaiting_driver'].includes(job.status) && !isCustomerRideJob && (
           <div className="mt-1.5">
             <div className="mt-2">
               {justSubmittedExpense ? (
