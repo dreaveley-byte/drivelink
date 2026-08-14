@@ -426,6 +426,7 @@ export default function DriverJobActions({
   }
 
   async function claimJob() {
+    if (!confirm('Claim this job? Make sure it doesn\u2019t conflict with anything else you have scheduled.')) return
     setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -501,6 +502,7 @@ export default function DriverJobActions({
   async function advanceStatus() {
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
+    if (!confirm(`Mark this job as "${statusLabels[newStatus] ?? newStatus}"?`)) return
     setLoading(true)
     try {
       await Promise.race([

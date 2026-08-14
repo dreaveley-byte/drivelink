@@ -125,7 +125,24 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
           videoRef.current.play().catch(() => {})
         }
       })
-      .catch(() => setError('Could not access the camera. Check camera permissions and try again.'))
+      .catch((e) => {
+        // Once a browser has denied camera access for this in-page camera
+        // (a different permission gate than the regular photo file picker,
+        // which is why that one can keep working fine), it won't re-prompt
+        // automatically — the user has to fix it in the browser's site
+        // settings. Give a specific reason so that's actually actionable,
+        // and offer a fallback since a driver shouldn't be stuck either way.
+        const name = e?.name as string | undefined
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          setError('Camera access was denied for this site. Open your browser\u2019s site settings for drivflo.ca and allow Camera, or use the fallback below.')
+        } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+          setError('No camera was found on this device.')
+        } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+          setError('The camera is being used by another app right now. Close other camera apps and try again, or use the fallback below.')
+        } else {
+          setError('Could not access the camera. Use the fallback below to take the photo the regular way instead.')
+        }
+      })
 
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -211,8 +228,21 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
       </div>
 
       {error ? (
-        <div className="flex-1 flex items-center justify-center px-6 min-h-0">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 gap-4">
           <p className="text-white text-sm text-center">{error}</p>
+          <label className="bg-[#378ADD] text-white text-sm font-medium px-6 py-3 rounded-full cursor-pointer">
+            {mode === 'walkaround' ? 'Record video the regular way' : 'Take photo the regular way'}
+            <input
+              type="file"
+              accept={mode === 'walkaround' ? 'video/*' : 'image/*'}
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) onCapture(file)
+              }}
+            />
+          </label>
         </div>
       ) : (
         <div className="flex-1 relative min-h-0 overflow-hidden">
