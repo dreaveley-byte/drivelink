@@ -1478,7 +1478,7 @@ export default function EditJobPage() {
 
           <div className="space-y-2 border border-gray-200 rounded-lg p-4">
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={isTradeIn} onChange={(e) => setIsTradeIn(e.target.checked)} />
+              <input type="checkbox" checked={isTradeIn} onChange={(e) => { setIsTradeIn(e.target.checked); if (e.target.checked) setAutoSelectReturnMethod(false) }} />
               This includes a trade-in pickup (same driver, same trip — no extra charge)
             </label>
             {isTradeIn && multiVehicleArrangement === 'none' && (
