@@ -80,7 +80,7 @@ export default async function AdminApplicationsPage() {
                 table="driver_applications"
                 id={app.id}
                 title={app.full_name || 'Unnamed applicant'}
-                subtitle={`${app.email ?? ''} · ${app.cell_phone ?? ''}`}
+                subtitle={`${app.email ?? ''} · ${app.cell_phone ?? ''}${app.vehicle_year || app.vehicle_make || app.vehicle_model ? ` · ${[app.vehicle_year, app.vehicle_make, app.vehicle_model].filter(Boolean).join(' ')}${app.vehicle_mileage ? ` (${app.vehicle_mileage.toLocaleString()} km)` : ''}` : ''}`}
                 status={app.status}
                 bucket="driver-documents"
                 userId={app.user_id}
@@ -99,6 +99,8 @@ export default async function AdminApplicationsPage() {
                   { label: 'Void cheque', path: app.void_cheque_path },
                   { label: 'Vehicle registration', path: app.vehicle_registration_path },
                   { label: 'Vehicle insurance', path: app.vehicle_insurance_path },
+                  { label: 'Walkaround video', path: app.vehicle_walkaround_video_path },
+                  { label: 'Dash/odometer photo', path: app.dash_odometer_photo_path },
                   { label: 'Signed contract', path: app.contract_signature_path },
                 ]}
               />

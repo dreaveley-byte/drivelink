@@ -10,6 +10,7 @@ export default function FileUploadField({
   fileName,
   onUploaded,
   optional = false,
+  accept = 'image/*,.pdf',
 }: {
   label: string
   bucket: 'driver-documents' | 'dealer-documents'
@@ -17,6 +18,7 @@ export default function FileUploadField({
   fileName: string
   onUploaded: (path: string) => void
   optional?: boolean
+  accept?: string
 }) {
   const [uploading, setUploading] = useState(false)
   const [uploadedName, setUploadedName] = useState<string | null>(null)
@@ -55,7 +57,7 @@ export default function FileUploadField({
       <div className="border border-dashed border-gray-300 rounded-lg px-3 py-3 text-sm">
         <input
           type="file"
-          accept="image/*,.pdf"
+          accept={accept}
           capture="environment"
           onChange={handleFile}
           className="text-xs text-gray-600 w-full"

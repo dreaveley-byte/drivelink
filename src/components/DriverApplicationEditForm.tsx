@@ -26,6 +26,12 @@ type DriverApp = {
   void_cheque_path: string | null
   vehicle_registration_path: string | null
   vehicle_insurance_path: string | null
+  vehicle_year: number | null
+  vehicle_make: string | null
+  vehicle_model: string | null
+  vehicle_mileage: number | null
+  vehicle_walkaround_video_path: string | null
+  dash_odometer_photo_path: string | null
 }
 
 export default function DriverApplicationEditForm({ userId, userEmail, application }: { userId: string; userEmail: string; application: DriverApp | null }) {
@@ -37,6 +43,10 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
   const [payoutMethod, setPayoutMethod] = useState<'individual' | 'company'>((application?.payout_method as 'individual' | 'company') ?? 'individual')
   const [companyName, setCompanyName] = useState(application?.company_name ?? '')
   const [gstNumber, setGstNumber] = useState(application?.gst_number ?? '')
+  const [vehicleYear, setVehicleYear] = useState(application?.vehicle_year?.toString() ?? '')
+  const [vehicleMake, setVehicleMake] = useState(application?.vehicle_make ?? '')
+  const [vehicleModel, setVehicleModel] = useState(application?.vehicle_model ?? '')
+  const [vehicleMileage, setVehicleMileage] = useState(application?.vehicle_mileage?.toString() ?? '')
   const [docs, setDocs] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -62,6 +72,10 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
       payout_method: payoutMethod,
       company_name: payoutMethod === 'company' ? companyName : null,
       gst_number: payoutMethod === 'company' ? gstNumber : null,
+      vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+      vehicle_make: vehicleMake || null,
+      vehicle_model: vehicleModel || null,
+      vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
       ...(docs.profile_photo_path && { profile_photo_path: docs.profile_photo_path }),
       ...(docs.drivers_license_path && { drivers_license_path: docs.drivers_license_path }),
       ...(docs.drivers_abstract_path && { drivers_abstract_path: docs.drivers_abstract_path }),
@@ -73,6 +87,8 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
       ...(docs.void_cheque_path && { void_cheque_path: docs.void_cheque_path }),
       ...(docs.vehicle_registration_path && { vehicle_registration_path: docs.vehicle_registration_path }),
       ...(docs.vehicle_insurance_path && { vehicle_insurance_path: docs.vehicle_insurance_path }),
+      ...(docs.vehicle_walkaround_video_path && { vehicle_walkaround_video_path: docs.vehicle_walkaround_video_path }),
+      ...(docs.dash_odometer_photo_path && { dash_odometer_photo_path: docs.dash_odometer_photo_path }),
     }
 
     const { error } = application
@@ -161,6 +177,27 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
         <FileUploadField label="Void cheque" bucket="driver-documents" folder={userId} fileName="void-cheque" onUploaded={setDoc('void_cheque_path')} optional />
         <FileUploadField label="Vehicle registration" bucket="driver-documents" folder={userId} fileName="vehicle-registration" onUploaded={setDoc('vehicle_registration_path')} optional />
         <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance_path')} optional />
+        <FileUploadField label="Walkaround video" bucket="driver-documents" folder={userId} fileName="vehicle-walkaround" onUploaded={setDoc('vehicle_walkaround_video_path')} optional accept="video/*" />
+        <FileUploadField label="Dash/odometer photo" bucket="driver-documents" folder={userId} fileName="dash-odometer" onUploaded={setDoc('dash_odometer_photo_path')} optional />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Vehicle year</label>
+          <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Vehicle make</label>
+          <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Vehicle model</label>
+          <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Vehicle mileage</label>
+          <input value={vehicleMileage} onChange={(e) => setVehicleMileage(e.target.value)} inputMode="numeric" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

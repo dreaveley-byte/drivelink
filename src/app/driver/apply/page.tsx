@@ -23,6 +23,10 @@ export default function DriverApplyPage() {
   const [companyName, setCompanyName] = useState('')
   const [gstNumber, setGstNumber] = useState('')
   const [sinNumber, setSinNumber] = useState('')
+  const [vehicleYear, setVehicleYear] = useState('')
+  const [vehicleMake, setVehicleMake] = useState('')
+  const [vehicleModel, setVehicleModel] = useState('')
+  const [vehicleMileage, setVehicleMileage] = useState('')
 
   // Uploaded document paths
   const [docs, setDocs] = useState<Record<string, string>>({})
@@ -97,6 +101,12 @@ export default function DriverApplyPage() {
       void_cheque_path: docs.void_cheque ?? null,
       vehicle_registration_path: docs.vehicle_registration ?? null,
       vehicle_insurance_path: docs.vehicle_insurance ?? null,
+      vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
+      vehicle_make: vehicleMake || null,
+      vehicle_model: vehicleModel || null,
+      vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+      vehicle_walkaround_video_path: docs.vehicle_walkaround_video ?? null,
+      dash_odometer_photo_path: docs.dash_odometer_photo ?? null,
       profile_photo_path: docs.profile_photo ?? null,
       drivers_license_path: docs.drivers_license ?? null,
       drivers_abstract_path: docs.drivers_abstract ?? null,
@@ -224,6 +234,34 @@ export default function DriverApplyPage() {
             )}
           </section>
 
+          {/* Vehicle */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-900">Your vehicle</h2>
+            <p className="text-xs text-gray-500">Tell us about the vehicle you&apos;ll actually be using for deliveries.</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Year</label>
+                <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Make</label>
+                <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Model</label>
+                <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Current mileage</label>
+              <input value={vehicleMileage} onChange={(e) => setVehicleMileage(e.target.value)} inputMode="numeric"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </section>
+
           {/* Documents */}
           {userId && (
             <section className="space-y-4">
@@ -240,6 +278,21 @@ export default function DriverApplyPage() {
               <FileUploadField label="Optical test assessment" bucket="driver-documents" folder={userId} fileName="optical-test" onUploaded={setDoc('optical_test')} />
               <FileUploadField label="Vehicle registration" bucket="driver-documents" folder={userId} fileName="vehicle-registration" onUploaded={setDoc('vehicle_registration')} />
               <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance')} />
+              <FileUploadField
+                label="Walkaround video of your vehicle"
+                bucket="driver-documents"
+                folder={userId}
+                fileName="vehicle-walkaround"
+                onUploaded={setDoc('vehicle_walkaround_video')}
+                accept="video/*"
+              />
+              <FileUploadField
+                label="Photo of the dash while running, showing the odometer"
+                bucket="driver-documents"
+                folder={userId}
+                fileName="dash-odometer"
+                onUploaded={setDoc('dash_odometer_photo')}
+              />
             </section>
           )}
 
