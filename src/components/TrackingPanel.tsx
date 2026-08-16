@@ -15,6 +15,7 @@ export default function TrackingPanel({
   driverName,
   driverPhotoUrl,
   statusLabel,
+  trackWhilePickedUp,
 }: {
   jobId: string
   pickupAddress: string
@@ -27,6 +28,7 @@ export default function TrackingPanel({
   driverName?: string | null
   driverPhotoUrl?: string | null
   statusLabel: string
+  trackWhilePickedUp?: boolean
 }) {
   const [eta, setEta] = useState('')
 
@@ -57,6 +59,7 @@ export default function TrackingPanel({
           jobStatus={jobStatus}
           publicToken={publicToken}
           onEtaChange={setEta}
+          trackWhilePickedUp={trackWhilePickedUp}
         />
       </div>
     </div>

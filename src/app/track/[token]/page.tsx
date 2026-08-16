@@ -81,6 +81,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             driverName={info.driver_name}
             driverPhotoUrl={info.driver_photo_url}
             statusLabel={(isCustomerRide ? rideStatusLabels : statusLabels)[info.status] ?? info.status}
+            trackWhilePickedUp={isCustomerRide}
           />
           {info.driver_rating_count > 0 && (
             <div className="flex items-center gap-1.5 mt-2 text-sm">

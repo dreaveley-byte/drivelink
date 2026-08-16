@@ -65,6 +65,7 @@ type Props = {
   jobStatus: string
   publicToken?: string
   onEtaChange?: (eta: string) => void
+  trackWhilePickedUp?: boolean
 }
 
 export default function GoogleMapView({
@@ -77,6 +78,7 @@ export default function GoogleMapView({
   jobStatus,
   publicToken,
   onEtaChange,
+  trackWhilePickedUp = false,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -86,10 +88,13 @@ export default function GoogleMapView({
   const [locationUpdatedAt, setLocationUpdatedAt] = useState(initialLocationUpdatedAt)
   const [eta, setEta] = useState<string>('')
   const isTerminal = jobStatus === 'completed' || jobStatus === 'cancelled'
-  // Live GPS tracking only makes sense once the driver has actually started the
-  // delivery drive — before that (assigned/picked up) there's no meaningful
-  // position to show yet, so the map stays a static preview of the planned route.
-  const isTracking = jobStatus === 'in_progress'
+  // Live GPS tracking only makes sense once the driver has actually started
+  // driving. For a vehicle delivery, "picked up" means at the pickup
+  // location filling out paperwork, not yet driving - so tracking only
+  // starts at "in progress". For a customer ride, "picked up" (the driver
+  // tapping "Picking up customer") IS the driver actively en route, so that
+  // one needs to start tracking a full stage earlier.
+  const isTracking = jobStatus === 'in_progress' || (trackWhilePickedUp && jobStatus === 'picked_up')
 
   const updateEta = useCallback(async (lat: number, lng: number) => {
     try {
