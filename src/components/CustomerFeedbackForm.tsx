@@ -8,13 +8,19 @@ export default function CustomerFeedbackForm({ token }: { token: string }) {
   const [feedback, setFeedback] = useState('')
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
 
   async function submit() {
     if (!rating) return
     setSaving(true)
+    setError('')
     const supabase = createClient()
-    await supabase.rpc('submit_customer_feedback', { p_token: token, p_rating: rating, p_feedback: feedback || null })
+    const { error: rpcError } = await supabase.rpc('submit_customer_feedback', { p_token: token, p_rating: rating, p_feedback: feedback || null })
     setSaving(false)
+    if (rpcError) {
+      setError('Could not submit your feedback — please try again.')
+      return
+    }
     setSubmitted(true)
   }
 
@@ -29,6 +35,7 @@ export default function CustomerFeedbackForm({ token }: { token: string }) {
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <p className="text-sm text-gray-700 mb-2">How was your delivery?</p>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
       <div className="flex gap-1 mb-3">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
