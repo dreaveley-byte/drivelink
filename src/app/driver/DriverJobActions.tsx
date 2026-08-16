@@ -592,7 +592,7 @@ export default function DriverJobActions({
         changed_by: user?.id,
       })
 
-      if (newStatus === 'in_progress') {
+      if (newStatus === 'in_progress' && !isCustomerRideJob) {
         fetch('/api/customer-sms/notify-in-progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -603,8 +603,15 @@ export default function DriverJobActions({
       // For a courier/package job, "picked up" is the meaningful moment worth
       // notifying about right away, rather than waiting for a separate
       // "in progress" step that isn't really a distinct milestone for a
-      // simple point-to-point package run.
-      if (newStatus === 'picked_up' && joinName(job.job_types) === 'Courier / Package') {
+      // simple point-to-point package run. Same idea for a customer ride -
+      // "picked up" here means the driver tapped "Picking up customer" and
+      // is now actually en route to get them, which is exactly when "your
+      // driver is on the way" should go out, not after they're already
+      // in the car.
+      if (
+        newStatus === 'picked_up' &&
+        (joinName(job.job_types) === 'Courier / Package' || isCustomerRideJob)
+      ) {
         fetch('/api/customer-sms/notify-in-progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
