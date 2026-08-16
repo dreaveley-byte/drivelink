@@ -127,6 +127,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
             week_earnings_cents: number
             week_job_count: number
             pending_job_count: number
+            pending_amount_cents: number
             outstanding_reimbursements_cents: number
             unsettled_draws_cents: number
             net_owed_cents: number
@@ -173,19 +174,31 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                 <div>
                   <p className="text-gray-400">Advances</p>
                   <p className={`font-medium text-sm mt-0.5 ${r.unsettled_draws_cents > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {r.unsettled_draws_cents > 0 ? `\u2212${formatCents(r.unsettled_draws_cents)}` : formatCents(0)}
+                    {r.unsettled_draws_cents > 0 ? `−${formatCents(r.unsettled_draws_cents)}` : formatCents(0)}
                   </p>
                 </div>
-                <div className="col-span-2 sm:col-span-4 flex items-center justify-between pt-2 border-t border-gray-100">
-                  <span className="text-gray-400">Net owed</span>
-                  <span className="text-gray-900 font-semibold text-sm">{formatCents(r.net_owed_cents)}</span>
+                <div className="col-span-2 sm:col-span-4 flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100">
+                  <div>
+                    {r.pending_job_count > 0 && (
+                      <span className="text-amber-600">
+                        {r.pending_job_count} job{r.pending_job_count === 1 ? '' : 's'} still in progress ({formatCents(r.pending_amount_cents)} pending) — not yet reflected in earnings
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span>
+                      <span className="text-gray-400 mr-1.5">Net owed</span>
+                      <span className="text-gray-900 font-semibold text-sm">{formatCents(r.net_owed_cents)}</span>
+                    </span>
+                    {r.pending_job_count > 0 && (
+                      <span>
+                        <span className="text-amber-600 mr-1.5">Total incl. pending</span>
+                        <span className="text-amber-700 font-semibold text-sm">{formatCents(r.net_owed_cents + r.pending_amount_cents)}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              {r.pending_job_count > 0 && (
-                <p className="text-xs text-amber-600 mt-2">
-                  {r.pending_job_count} job{r.pending_job_count === 1 ? '' : 's'} still in progress \u2014 not yet reflected in earnings above
-                </p>
-              )}
             </div>
           ))}
           {(!rows || rows.length === 0) && (
