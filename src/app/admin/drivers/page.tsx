@@ -73,11 +73,11 @@ export default async function AdminDriversPage() {
           <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
             Dealers
           </Link>
-          <Link href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900">
-            Payroll
-          </Link>
           <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
             Applications
+          </Link>
+          <Link href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900 ml-auto">
+            Payroll
           </Link>
         </div>
       </div>

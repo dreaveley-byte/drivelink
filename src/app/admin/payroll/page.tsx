@@ -41,6 +41,17 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
 
   const { data: rows } = await supabase.rpc('get_driver_payroll_summary', { p_week_start: weekStartStr })
 
+  const weekTotalCents = (rows ?? []).reduce((sum: number, r: { week_earnings_cents: number }) => sum + r.week_earnings_cents, 0)
+  const monthTotalCents = (rows ?? []).reduce((sum: number, r: { month_earnings_cents: number }) => sum + r.month_earnings_cents, 0)
+
+  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString()
+  const { data: ytdJobs } = await supabase
+    .from('jobs')
+    .select('final_driver_pay_cents, estimated_driver_pay_cents')
+    .eq('status', 'completed')
+    .gte('updated_at', yearStart)
+  const yearTotalCents = (ytdJobs ?? []).reduce((sum, j) => sum + (j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0), 0)
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
@@ -61,6 +72,21 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
       </div>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="border border-gray-200 rounded-xl p-4">
+            <p className="text-xs text-gray-400">This week&apos;s payroll</p>
+            <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(weekTotalCents)}</p>
+          </div>
+          <div className="border border-gray-200 rounded-xl p-4">
+            <p className="text-xs text-gray-400">Month-to-date</p>
+            <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(monthTotalCents)}</p>
+          </div>
+          <div className="border border-gray-200 rounded-xl p-4">
+            <p className="text-xs text-gray-400">Year-to-date</p>
+            <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(yearTotalCents)}</p>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Payroll</h1>
