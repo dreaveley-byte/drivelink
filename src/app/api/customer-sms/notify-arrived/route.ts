@@ -56,5 +56,20 @@ export async function POST(req: NextRequest) {
   await supabase.from('customer_messages').insert({ job_id: jobId, direction: 'to_customer', body })
   await supabase.from('jobs').update({ id_verification_sent_at: new Date().toISOString() }).eq('id', jobId)
 
+  // Thank-you + rate-your-driver follow-up, sent right after the arrival
+  // notice. Reuses the same tracking link the customer already has - the
+  // rating form lives right there on that page.
+  const { data: trackingRow } = await supabase.from('jobs').select('tracking_token').eq('id', jobId).single()
+  if (trackingRow?.tracking_token) {
+    const trackingLink = `${protocol}://${host}/track/${trackingRow.tracking_token}`
+    const thankYouBody =
+      `${customerFirstName ? `Thanks ${customerFirstName} f` : 'F'}or using Drivflo! ` +
+      `How did ${driverName} do? Leave a quick rating here: ${trackingLink}`
+    const thankYouResult = await sendSms(job.customer_phone, thankYouBody)
+    if (thankYouResult.ok) {
+      await supabase.from('customer_messages').insert({ job_id: jobId, direction: 'to_customer', body: thankYouBody })
+    }
+  }
+
   return NextResponse.json({ ok: true })
 }

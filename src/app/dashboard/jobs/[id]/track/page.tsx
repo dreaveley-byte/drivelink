@@ -96,6 +96,20 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           <CloseButton />
         </div>
 
+        {driverName && (
+          <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-3 mb-3">
+            {driverPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={driverPhoto} alt="" className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                {driverName[0]}
+              </div>
+            )}
+            <p className="text-sm font-semibold text-gray-900">{driverName}</p>
+          </div>
+        )}
+
         <TrackingPanel
           jobId={job.id}
           pickupAddress={job.pickup_address}

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TrackingPanel from '@/components/TrackingPanel'
 import PublicChatWidget from '@/components/PublicChatWidget'
+import ShareRideButton from '@/components/ShareRideButton'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 import Logo from '@/components/Logo'
 
@@ -69,6 +70,29 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
           </div>
         ) : (
           <>
+          {info.driver_name && (
+            <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-3 mb-3">
+              {info.driver_photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={info.driver_photo_url} alt="" className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                  {info.driver_name[0]}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{info.driver_name}</p>
+                {info.driver_rating_count > 0 ? (
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-amber-500">\u2605</span>
+                    {info.driver_avg_rating} ({info.driver_rating_count} rating{info.driver_rating_count === 1 ? '' : 's'})
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">New driver</p>
+                )}
+              </div>
+            </div>
+          )}
           <TrackingPanel
             jobId=""
             pickupAddress={info.pickup_address}
@@ -83,13 +107,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             statusLabel={(isCustomerRide ? rideStatusLabels : statusLabels)[info.status] ?? info.status}
             trackWhilePickedUp={isCustomerRide}
           />
-          {info.driver_rating_count > 0 && (
-            <div className="flex items-center gap-1.5 mt-2 text-sm">
-              <span className="text-amber-500">\u2605</span>
-              <span className="font-medium text-gray-900">{info.driver_avg_rating}</span>
-              <span className="text-gray-400">({info.driver_rating_count} rating{info.driver_rating_count === 1 ? '' : 's'})</span>
-            </div>
-          )}
+          <ShareRideButton label={isCustomerRide ? 'ride' : isCourier ? 'package' : 'delivery'} />
           <PublicChatWidget token={token} driverName={info.driver_name} />
           </>
         )}

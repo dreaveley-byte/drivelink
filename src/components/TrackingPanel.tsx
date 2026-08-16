@@ -35,14 +35,7 @@ export default function TrackingPanel({
   return (
     <div>
       <div className="flex items-center gap-2 mt-3">
-        {driverPhotoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={driverPhotoUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
-        )}
-        <p className="text-sm text-gray-500">
-          {statusLabel}
-          {driverName && ` · Driver: ${driverName}`}
-        </p>
+        <p className="text-sm text-gray-500">{statusLabel}</p>
       </div>
       {eta && jobStatus === 'in_progress' && (
         <p className="text-base font-bold text-gray-900 mt-1">{eta}</p>
