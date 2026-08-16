@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   // RLS already restricts this to the job's own driver/dealer/admin
   const { data: job } = await supabase
     .from('jobs')
-    .select('customer_phone, customer_full_name, vehicle_year, vehicle_make, vehicle_model, id_verification_token, driver:driver_id(full_name), job_types(name)')
+    .select('customer_phone, customer_full_name, vehicle_year, vehicle_make, vehicle_model, id_verification_token, driver:driver_id(full_name), job_types(name), package_description')
     .eq('id', jobId)
     .single()
 
@@ -36,12 +36,15 @@ export async function POST(req: NextRequest) {
   const driverName = driverInfo?.full_name || 'your driver'
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
+  const isCourier = jobTypeName === 'Courier / Package'
 
   const body = isCustomerRide
     ? `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName} has arrived!`
-    : `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our new ${vehicleDesc || 'vehicle'} has arrived! ` +
-      `Please meet ${driverName} outside to get your keys. Before we hand over the keys we ask that you verify your ` +
-      `identity one more time — please complete these few simple steps. Click the link below now to verify: ${link}`
+    : isCourier
+      ? `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has arrived! Please meet ${driverName} outside.`
+      : `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our new ${vehicleDesc || 'vehicle'} has arrived! ` +
+        `Please meet ${driverName} outside to get your keys. Before we hand over the keys we ask that you verify your ` +
+        `identity one more time — please complete these few simple steps. Click the link below now to verify: ${link}`
 
   const result = await sendSms(job.customer_phone, body)
   if (!result.ok) {

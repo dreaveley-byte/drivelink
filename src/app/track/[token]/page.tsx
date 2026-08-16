@@ -38,6 +38,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
 
   const vehicleDesc = [info.vehicle_year, info.vehicle_make, info.vehicle_model].filter(Boolean).join(' ')
   const isCustomerRide = info.job_type_name === 'Customer Pick Up' || info.job_type_name === 'Customer Drop Off'
+  const isCourier = info.job_type_name === 'Courier / Package'
 
   return (
     <div className="min-h-screen bg-white">
@@ -51,9 +52,10 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             )}
             <div>
               <h1 className="text-lg font-semibold text-gray-900">
-                {info.organization_name ? `${info.organization_name} — ` : ''}{isCustomerRide ? 'Your ride' : 'Your delivery'}
+                {info.organization_name ? `${info.organization_name} — ` : ''}{isCustomerRide ? 'Your ride' : isCourier ? 'Your package' : 'Your delivery'}
               </h1>
-              {vehicleDesc && !isCustomerRide && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
+              {isCourier && info.package_description && <p className="text-sm text-gray-600 mt-0.5">{info.package_description}</p>}
+              {vehicleDesc && !isCustomerRide && !isCourier && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
             </div>
           </div>
         </div>
@@ -61,7 +63,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
         {info.status === 'delivered' || info.status === 'completed' ? (
           <div className="border border-gray-200 rounded-xl p-6 text-center">
             <p className="text-sm text-gray-700 font-medium">
-              {isCustomerRide ? 'Your ride is complete.' : 'Your vehicle has been delivered.'}
+              {isCustomerRide ? 'Your ride is complete.' : isCourier ? 'Your package has been delivered.' : 'Your vehicle has been delivered.'}
             </p>
             <p className="text-xs text-gray-400 mt-1">Live tracking has ended.</p>
           </div>

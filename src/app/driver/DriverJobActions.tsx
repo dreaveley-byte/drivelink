@@ -600,6 +600,18 @@ export default function DriverJobActions({
         }).catch(() => {})
       }
 
+      // For a courier/package job, "picked up" is the meaningful moment worth
+      // notifying about right away, rather than waiting for a separate
+      // "in progress" step that isn't really a distinct milestone for a
+      // simple point-to-point package run.
+      if (newStatus === 'picked_up' && joinName(job.job_types) === 'Courier / Package') {
+        fetch('/api/customer-sms/notify-in-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id }),
+        }).catch(() => {})
+      }
+
       if (newStatus === 'delivered') {
         fetch('/api/customer-sms/notify-arrived', {
           method: 'POST',
