@@ -4,6 +4,7 @@
 -- viewing via their tracking token needs its own narrow, security-definer
 -- path in - never direct table access.
 
+drop function if exists get_tracking_messages(uuid);
 create or replace function get_tracking_messages(p_token uuid)
 returns setof customer_messages
 language sql
@@ -21,6 +22,7 @@ grant execute on function get_tracking_messages(uuid) to anon, authenticated;
 -- Twilio number - it lands in the same thread, visible to the driver via
 -- their existing realtime chat view, without an actual SMS needing to be
 -- sent (the driver's chat is Supabase-realtime-driven off this same table).
+drop function if exists send_tracking_message(uuid, text);
 create or replace function send_tracking_message(p_token uuid, p_body text)
 returns customer_messages
 language plpgsql
