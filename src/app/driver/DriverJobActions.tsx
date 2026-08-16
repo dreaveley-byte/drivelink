@@ -431,12 +431,12 @@ export default function DriverJobActions({
     if (!confirm('Claim this job? Make sure it doesn\u2019t conflict with anything else you have scheduled.')) return
     setLoading(true)
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     // Server-enforced, not just a disabled button in the UI - this is the
     // actual guarantee against claiming two overlapping jobs (e.g. a race
     // between two tabs/devices, or the UI just not having refreshed yet).
+    // The status-event log entry is now also written inside this same RPC
+    // call, cutting out a full extra round-trip that used to run after it.
     const { error: claimError } = await supabase.rpc('claim_job_if_no_conflict', { p_job_id: job.id })
     if (claimError) {
       setLoading(false)
@@ -444,12 +444,6 @@ export default function DriverJobActions({
       router.refresh()
       return
     }
-
-    await supabase.from('job_status_events').insert({
-      job_id: job.id,
-      status: 'assigned',
-      changed_by: user.id,
-    })
 
     const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery, {
       keyCount: job.key_count,

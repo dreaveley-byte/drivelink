@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   // RLS already restricts this to the job's own driver/dealer/admin
   const { data: job } = await supabase
     .from('jobs')
-    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, dropoff_address, driver_lat, driver_lng')
+    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, dropoff_address, driver_lat, driver_lng, job_types(name)')
     .eq('id', jobId)
     .single()
 
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
   const protocol = host?.includes('localhost') ? 'http' : 'https'
   const link = `${protocol}://${host}/track/${job.tracking_token}`
   const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
+  const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
+  const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
 
   // Give a real ETA window based on current traffic-aware drive time from the
   // driver's live position. Window runs from the raw ETA forward by a % buffer
@@ -65,7 +67,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const body = `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our ${vehicleDesc || 'vehicle'} is on its way!${etaText} Track the delivery here: ${link} — reply to this text anytime to reach your driver.`
+  const body = isCustomerRide
+    ? `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our driver is on the way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
+    : `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our ${vehicleDesc || 'vehicle'} is on its way!${etaText} Track the delivery here: ${link} — reply to this text anytime to reach your driver.`
 
   const result = await sendSms(job.customer_phone, body)
   if (!result.ok) {
