@@ -19,8 +19,8 @@ function mostRecentMonday(): Date {
   return d
 }
 
-export default async function AdminPayrollPage({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
-  const { week } = await searchParams
+export default async function AdminPayrollPage({ searchParams }: { searchParams: Promise<{ week?: string; start?: string; end?: string }> }) {
+  const { week, start, end } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,17 +29,23 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'platform_admin') redirect('/dashboard')
 
-  const weekStart = week ? new Date(week + 'T00:00:00') : mostRecentMonday()
+  let weekStart: Date
+  let weekEnd: Date
+  if (start && end) {
+    weekStart = new Date(start + 'T00:00:00')
+    weekEnd = new Date(end + 'T00:00:00')
+  } else {
+    weekStart = week ? new Date(week + 'T00:00:00') : mostRecentMonday()
+    weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 6)
+  }
   const weekStartStr = weekStart.toISOString().slice(0, 10)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekEnd.getDate() + 6)
+  const weekEndStr = weekEnd.toISOString().slice(0, 10)
 
   const prevWeek = new Date(weekStart)
   prevWeek.setDate(prevWeek.getDate() - 7)
-  const nextWeek = new Date(weekStart)
-  nextWeek.setDate(nextWeek.getDate() + 7)
 
-  const { data: rows } = await supabase.rpc('get_driver_payroll_summary', { p_week_start: weekStartStr })
+  const { data: rows } = await supabase.rpc('get_driver_payroll_summary_range', { p_period_start: weekStartStr, p_period_end: weekEndStr })
 
   const weekTotalCents = (rows ?? []).reduce((sum: number, r: { week_earnings_cents: number }) => sum + r.week_earnings_cents, 0)
   const monthTotalCents = (rows ?? []).reduce((sum: number, r: { month_earnings_cents: number }) => sum + r.month_earnings_cents, 0)
@@ -91,20 +97,25 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Payroll</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Week of {weekStart.toLocaleDateString('en-CA', { dateStyle: 'medium' })} \u2013 {weekEnd.toLocaleDateString('en-CA', { dateStyle: 'medium' })}
-              {' '}<span className="text-gray-400">(pays out the following Monday)</span>
+              Period: {weekStart.toLocaleDateString('en-CA', { dateStyle: 'medium' })} – {weekEnd.toLocaleDateString('en-CA', { dateStyle: 'medium' })}
+              {!start && <span className="text-gray-400"> (pays out the following Monday)</span>}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <a href={`/admin/payroll?week=${prevWeek.toISOString().slice(0, 10)}`} className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
-              \u2190 Prev week
+              ← Prev week
             </a>
             <a href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
               This week
             </a>
-            <a href={`/admin/payroll?week=${nextWeek.toISOString().slice(0, 10)}`} className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
-              Next week \u2192
-            </a>
+            <form action="/admin/payroll" method="get" className="flex items-center gap-1.5">
+              <input type="date" name="start" defaultValue={start ?? ''} className="text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
+              <span className="text-gray-400 text-sm">to</span>
+              <input type="date" name="end" defaultValue={end ?? ''} className="text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
+              <button type="submit" className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
+                Custom
+              </button>
+            </form>
           </div>
         </div>
 
