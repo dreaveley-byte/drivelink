@@ -32,9 +32,66 @@ export async function POST(req: NextRequest) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('status, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, driver:driver_id(full_name)')
+    .select('status, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, customer_phone, customer_full_name, pickup_lat, pickup_lng, two_min_away_alert_sent_at, arrived_at_pickup_alert_sent_at, tracking_token, job_types(name), driver:driver_id(full_name)')
     .eq('id', jobId)
     .single()
+
+  const jobTypeName = job ? (Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name) : null
+  const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
+
+  // Proximity-to-pickup alerts for customer rides - "picked up" for these
+  // means the driver is actively en route to get the customer (see the
+  // tracking-map fix), so this is the window where "2 minutes away" and
+  // "driver has arrived" alerts make sense, distinct from the idle-check
+  // logic below which only applies to in_progress.
+  if (job && isCustomerRide && job.status === 'picked_up' && job.customer_phone) {
+    let pickupLat = job.pickup_lat
+    let pickupLng = job.pickup_lng
+
+    if (pickupLat == null || pickupLng == null) {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY
+      if (apiKey) {
+        try {
+          const geoRes = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(job.pickup_address)}&key=${apiKey}`
+          )
+          const geoData = await geoRes.json()
+          const loc = geoData?.results?.[0]?.geometry?.location
+          if (loc) {
+            pickupLat = loc.lat
+            pickupLng = loc.lng
+            await supabase.from('jobs').update({ pickup_lat: pickupLat, pickup_lng: pickupLng }).eq('id', jobId)
+          }
+        } catch {
+          // If geocoding fails here, just skip proximity alerts for this
+          // ping - it'll retry on the next one rather than blocking anything.
+        }
+      }
+    }
+
+    if (pickupLat != null && pickupLng != null) {
+      const distanceKm = haversineKm(lat, lng, pickupLat, pickupLng)
+      // Rough city-driving estimate rather than a full routing call on every
+      // single ping (which would be both slow and expensive) - about 1.2km
+      // is a reasonable stand-in for "2 minutes away" at typical city speeds.
+      const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
+      const driverName = (driverInfo as { full_name: string } | null)?.full_name
+
+      if (distanceKm <= 0.15 && !job.arrived_at_pickup_alert_sent_at) {
+        const body = `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName || ''} has arrived!`
+        const result = await sendSms(job.customer_phone, body)
+        if (result.ok) {
+          await supabase.from('jobs').update({ arrived_at_pickup_alert_sent_at: new Date().toISOString() }).eq('id', jobId)
+        }
+      } else if (distanceKm <= 1.2 && !job.two_min_away_alert_sent_at) {
+        const body = `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName || ''} is about 2 minutes away!`
+        const result = await sendSms(job.customer_phone, body)
+        if (result.ok) {
+          await supabase.from('jobs').update({ two_min_away_alert_sent_at: new Date().toISOString() }).eq('id', jobId)
+        }
+      }
+    }
+  }
 
   if (!job || job.status !== 'in_progress') {
     if (job && (job.idle_since || job.idle_alert_sent_at)) {
