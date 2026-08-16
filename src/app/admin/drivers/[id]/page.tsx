@@ -69,6 +69,30 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
     .maybeSingle()
 
   const { data: stats } = await supabase.rpc('driver_performance_stats')
+
+  // Last 6 months earnings breakdown, excluding reimbursements - matching
+  // the same "not including reimbursements" view used on the payroll page.
+  const { data: earningsJobs } = await supabase
+    .from('jobs')
+    .select('updated_at, final_driver_pay_cents, estimated_driver_pay_cents')
+    .eq('driver_id', driverId)
+    .eq('status', 'completed')
+
+  const nowForDriver = new Date()
+  const monthlyEarnings: { label: string; earningsCents: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const mStart = new Date(nowForDriver.getFullYear(), nowForDriver.getMonth() - i, 1)
+    const mEnd = new Date(nowForDriver.getFullYear(), nowForDriver.getMonth() - i + 1, 1)
+    let earnings = 0
+    for (const job of earningsJobs ?? []) {
+      if (job.updated_at) {
+        const d = new Date(job.updated_at)
+        if (d >= mStart && d < mEnd) earnings += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
+      }
+    }
+    monthlyEarnings.push({ label: mStart.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' }), earningsCents: earnings })
+  }
+
   type DriverStat = {
     driver_id: string
     total_completed: number
@@ -205,6 +229,31 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               </p>
             </div>
           )}
+        </div>
+
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Earnings, last 6 months (excl. reimbursements)</p>
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-1.5 font-medium">Month</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Earnings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyEarnings.map((m) => (
+                  <tr key={m.label} className="border-t border-gray-100">
+                    <td className="px-3 py-1.5 text-gray-700">{m.label}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-900 font-medium">{formatCents(m.earningsCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <a href={`/admin/payroll`} className="text-xs text-blue-600 hover:underline mt-1.5 inline-block">
+            View in Payroll →
+          </a>
         </div>
 
         <DriverQRCode driverId={driver.id} />

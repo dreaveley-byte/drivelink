@@ -83,10 +83,13 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const yearStart = new Date(now.getFullYear(), 0, 1)
 
   let requestedThisMonth = 0
   let completedThisMonth = 0
   let spentThisMonth = 0
+  let completedYtd = 0
+  let spentYtd = 0
   let totalCompleted = 0
   let ratingSum = 0
   let ratingCount = 0
@@ -103,9 +106,32 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
         completedThisMonth += 1
         spentThisMonth += job.estimated_dealer_cost_cents ?? 0
       }
+      if (job.updated_at && new Date(job.updated_at) >= yearStart) {
+        completedYtd += 1
+        spentYtd += job.estimated_dealer_cost_cents ?? 0
+      }
     }
   }
   const avgCustomerRating = ratingCount > 0 ? ratingSum / ratingCount : null
+
+  // Last 6 months breakdown for the financial analytics section
+  const monthlyBreakdown: { label: string; count: number; spentCents: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+    let count = 0
+    let spent = 0
+    for (const job of statsJobs ?? []) {
+      if (job.status === 'completed' && job.updated_at) {
+        const d = new Date(job.updated_at)
+        if (d >= mStart && d < mEnd) {
+          count += 1
+          spent += job.estimated_dealer_cost_cents ?? 0
+        }
+      }
+    }
+    monthlyBreakdown.push({ label: mStart.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' }), count, spentCents: spent })
+  }
 
   const { data: jobs } = await supabase
     .from('jobs')
@@ -174,8 +200,40 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
               {avgCustomerRating != null ? `${avgCustomerRating.toFixed(1)} / 5` : '—'}
             </p>
           </div>
+          <div>
+            <p className="text-gray-400">Completed year-to-date</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{completedYtd}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Spent year-to-date</p>
+            <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(spentYtd)}</p>
+          </div>
           <div className="col-span-2 sm:col-span-4">
             <p className="text-gray-400">{totalCompleted} completed job{totalCompleted === 1 ? '' : 's'} all-time</p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Last 6 months</p>
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-1.5 font-medium">Month</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Jobs</th>
+                  <th className="text-right px-3 py-1.5 font-medium">Spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyBreakdown.map((m) => (
+                  <tr key={m.label} className="border-t border-gray-100">
+                    <td className="px-3 py-1.5 text-gray-700">{m.label}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-700">{m.count}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-900 font-medium">{formatCents(m.spentCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
