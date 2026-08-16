@@ -17,7 +17,7 @@ export default async function DealerSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone, organization_id, role')
+    .select('full_name, phone, organization_id, role, gender')
     .eq('id', user.id)
     .single()
 
@@ -67,6 +67,7 @@ export default async function DealerSettingsPage() {
                 initialEmail={user.email ?? ''}
                 initialSmsOptIn={false}
                 showSmsToggle={false}
+                initialGender={profile?.gender}
                 photoTarget={{
                   kind: 'dealer',
                   currentUrl: logoUrl,
@@ -88,6 +89,7 @@ export default async function DealerSettingsPage() {
             initialEmail={user.email ?? ''}
             initialSmsOptIn={false}
             showSmsToggle={false}
+            initialGender={profile?.gender}
           />
         )}
       </main>

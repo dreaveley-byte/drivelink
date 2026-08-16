@@ -9,6 +9,7 @@ import ApplicationCard from '@/components/ApplicationCard'
 import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import DriverQRCode from '@/components/DriverQRCode'
+import AdminProfileEditForm from '@/components/AdminProfileEditForm'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -255,6 +256,19 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             View in Payroll →
           </a>
         </div>
+
+        <AdminProfileEditForm
+          userId={driver.id}
+          initialFullName={driver.full_name ?? ''}
+          initialPhone={driver.phone ?? ''}
+          initialGender={driver.gender}
+          photoTarget={{
+            currentUrl: driver.photo_url ?? null,
+            bucket: 'driver-photos',
+            folder: driver.id,
+            label: 'Driver photo',
+          }}
+        />
 
         <DriverQRCode driverId={driver.id} />
 

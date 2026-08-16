@@ -17,7 +17,7 @@ export default async function DriverSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, phone, photo_url, sms_notifications_opt_in')
+    .select('full_name, phone, photo_url, sms_notifications_opt_in, gender')
     .eq('id', user.id)
     .single()
 
@@ -53,6 +53,7 @@ export default async function DriverSettingsPage() {
               initialPhone={profile?.phone ?? ''}
               initialEmail={user.email ?? ''}
               initialSmsOptIn={profile?.sms_notifications_opt_in ?? true}
+              initialGender={profile?.gender}
               showSmsToggle
               photoTarget={{
                 kind: 'driver',

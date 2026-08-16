@@ -8,6 +8,7 @@ import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import DealerExpenseVisibilityToggle from '@/components/DealerExpenseVisibilityToggle'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
+import AdminProfileEditToggle from '@/components/AdminProfileEditToggle'
 import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
 import PendingInvitesList from '@/components/PendingInvitesList'
 import Logo from '@/components/Logo'
@@ -305,6 +306,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                   <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                     {m.role === 'org_admin' ? 'Admin' : 'Member'}
                   </span>
+                  <AdminProfileEditToggle userId={m.id} initialFullName={m.full_name ?? ''} initialPhone={m.phone ?? ''} initialGender={m.gender} />
                   <ResetPasswordButton email={m.email} />
                   <RemoveTeamMemberButton memberId={m.id} memberName={m.full_name || 'this person'} />
                 </div>

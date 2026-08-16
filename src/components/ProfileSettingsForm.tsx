@@ -13,6 +13,8 @@ export default function ProfileSettingsForm({
   initialSmsOptIn,
   showSmsToggle,
   photoTarget,
+  initialGender,
+  showGender = true,
 }: {
   userId: string
   initialFullName: string
@@ -20,6 +22,8 @@ export default function ProfileSettingsForm({
   initialEmail: string
   initialSmsOptIn: boolean
   showSmsToggle: boolean
+  initialGender?: string | null
+  showGender?: boolean
   photoTarget?: {
     kind: 'driver' | 'dealer'
     currentUrl: string | null
@@ -31,6 +35,7 @@ export default function ProfileSettingsForm({
   const router = useRouter()
   const [fullName, setFullName] = useState(initialFullName)
   const [phone, setPhone] = useState(initialPhone)
+  const [gender, setGender] = useState(initialGender ?? '')
   const [smsOptIn, setSmsOptIn] = useState(initialSmsOptIn)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
@@ -100,7 +105,7 @@ export default function ProfileSettingsForm({
     const supabase = createClient()
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: fullName, phone, sms_notifications_opt_in: smsOptIn })
+      .update({ full_name: fullName, phone, sms_notifications_opt_in: smsOptIn, gender: gender || null })
       .eq('id', userId)
     setSavingProfile(false)
     if (error) {
@@ -168,6 +173,21 @@ export default function ProfileSettingsForm({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
+        {showGender && (
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Gender</label>
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        )}
         {showSmsToggle && (
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={smsOptIn} onChange={(e) => setSmsOptIn(e.target.checked)} />
