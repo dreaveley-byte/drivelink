@@ -114,6 +114,8 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
             driver_name: string | null
             driver_code: string | null
             week_earnings_cents: number
+            week_job_count: number
+            pending_job_count: number
             outstanding_reimbursements_cents: number
             unsettled_draws_cents: number
             net_owed_cents: number
@@ -122,7 +124,12 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
             <div key={r.driver_id} className="border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{r.driver_name || 'Unnamed driver'}</p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-sm font-medium text-gray-900">{r.driver_name || 'Unnamed driver'}</p>
+                    <span className="text-xs text-gray-500">
+                      Month earnings: <span className="text-gray-900 font-medium">{formatCents(r.month_earnings_cents)}</span>
+                    </span>
+                  </div>
                   {r.driver_code && <p className="text-xs text-gray-400 font-mono">{r.driver_code}</p>}
                 </div>
                 <div className="flex items-center gap-2">
@@ -139,7 +146,11 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs mt-3 pt-3 border-t border-gray-100">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mt-3 pt-3 border-t border-gray-100">
+                <div>
+                  <p className="text-gray-400">Jobs this week</p>
+                  <p className="text-gray-900 font-medium text-sm mt-0.5">{r.week_job_count}</p>
+                </div>
                 <div>
                   <p className="text-gray-400">Week earnings</p>
                   <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(r.week_earnings_cents)}</p>
@@ -149,20 +160,21 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                   <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(r.outstanding_reimbursements_cents)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400">Unsettled draws</p>
+                  <p className="text-gray-400">Advances</p>
                   <p className={`font-medium text-sm mt-0.5 ${r.unsettled_draws_cents > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                     {r.unsettled_draws_cents > 0 ? `\u2212${formatCents(r.unsettled_draws_cents)}` : formatCents(0)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-gray-400">Net owed</p>
-                  <p className="text-gray-900 font-semibold text-sm mt-0.5">{formatCents(r.net_owed_cents)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Month earnings (excl. reimb.)</p>
-                  <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(r.month_earnings_cents)}</p>
+                <div className="col-span-2 sm:col-span-4 flex items-center justify-between pt-2 border-t border-gray-100">
+                  <span className="text-gray-400">Net owed</span>
+                  <span className="text-gray-900 font-semibold text-sm">{formatCents(r.net_owed_cents)}</span>
                 </div>
               </div>
+              {r.pending_job_count > 0 && (
+                <p className="text-xs text-amber-600 mt-2">
+                  {r.pending_job_count} job{r.pending_job_count === 1 ? '' : 's'} still in progress \u2014 not yet reflected in earnings above
+                </p>
+              )}
             </div>
           ))}
           {(!rows || rows.length === 0) && (

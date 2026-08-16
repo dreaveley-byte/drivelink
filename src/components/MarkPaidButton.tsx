@@ -73,7 +73,7 @@ export default function MarkPaidButton({
             <p className="text-sm font-semibold text-gray-900 mb-1">Mark {driverName || 'this driver'} as paid</p>
             <p className="text-xs text-gray-500 mb-3">
               Earnings {formatCents(earningsCents)} + reimbursements {formatCents(reimbursementsCents)}
-              {drawsCents > 0 && ` \u2212 draws ${formatCents(drawsCents)}`}
+              {drawsCents > 0 && ` − advances ${formatCents(drawsCents)}`}
             </p>
             {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
             <label className="block text-xs text-gray-500 mb-1">Amount actually paid ($)</label>
@@ -93,7 +93,7 @@ export default function MarkPaidButton({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4"
             />
             <p className="text-xs text-gray-400 mb-3">
-              This records the payment, settles any outstanding draws, and marks their reimbursements as paid.
+              This records the payment, settles any outstanding advances, and marks their reimbursements as paid.
               You still need to actually send the money yourself \u2014 this doesn&apos;t move funds automatically yet.
             </p>
             <div className="flex gap-2">
