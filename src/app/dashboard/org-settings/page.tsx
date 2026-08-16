@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
+import DiscountCodeRedeemer from '@/components/DiscountCodeRedeemer'
 
 export default function OrgSettingsPage() {
   const router = useRouter()
@@ -84,6 +85,9 @@ export default function OrgSettingsPage() {
         >
           {saving ? 'Saving...' : saved ? 'Saved ✓' : 'Save'}
         </button>
+
+        {orgId && <DiscountCodeRedeemer orgId={orgId} />}
+
         <div>
           <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-gray-900">
             ← Back to dashboard

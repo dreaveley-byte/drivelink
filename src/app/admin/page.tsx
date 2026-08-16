@@ -165,6 +165,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Link href="/admin/archived" className="text-sm text-gray-600 hover:text-gray-900">
             Archived
           </Link>
+          <Link href="/admin/discount-codes" className="text-sm text-gray-600 hover:text-gray-900">
+            Discount codes
+          </Link>
           <Link href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900 ml-auto">
             Payroll
           </Link>

@@ -92,6 +92,8 @@ export default function PostJobPage() {
   }
   const [isFirstNationsDelivery, setIsFirstNationsDelivery] = useState(false)
   const [showReservePopup, setShowReservePopup] = useState(false)
+  const [myOrgId, setMyOrgId] = useState<string | null>(null)
+  const [discountPercent, setDiscountPercent] = useState(0)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
@@ -156,7 +158,7 @@ export default function PostJobPage() {
       if (!user) return
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, organization_id')
         .eq('id', user.id)
         .single()
 
@@ -165,9 +167,26 @@ export default function PostJobPage() {
         const { data: orgs } = await supabase.from('organizations').select('id, name').order('name')
         setOrganizations(orgs ?? [])
         if (orgs?.[0]) setSelectedOrgId(orgs[0].id)
+      } else if (profile?.organization_id) {
+        setMyOrgId(profile.organization_id)
       }
     })
   }, [])
+
+  // Whichever org this job is actually being posted for (admin picks one,
+  // dealer uses their own) - fetch any active discount so it applies to the
+  // live price shown before posting, not just after.
+  useEffect(() => {
+    const effectiveOrgId = isAdmin ? selectedOrgId : myOrgId
+    if (!effectiveOrgId || effectiveOrgId === '__new__') {
+      setDiscountPercent(0)
+      return
+    }
+    const supabase = createClient()
+    supabase.rpc('get_active_discount_percent', { p_org_id: effectiveOrgId }).then(({ data }) => {
+      setDiscountPercent(data ?? 0)
+    })
+  }, [isAdmin, selectedOrgId, myOrgId])
 
   function updateStop(index: number, value: string) {
     setStops((prev) => prev.map((s, i) => (i === index ? value : s)))
@@ -774,14 +793,18 @@ export default function PostJobPage() {
         oneWayFlightBack: effectiveOneWayReturn,
         outboundVehicleCount,
         returnVehicleCount,
-        markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
+        markupPercentOverride: (() => {
+          const baseMarkup = isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : pricingSettings.dealer_markup_percent
+          if (discountPercent > 0) return baseMarkup * (1 - discountPercent / 100)
+          return isCustomerRide ? baseMarkup : null
+        })(),
         useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
       },
       pricingSettings
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, dealerDropoffCount, dealerPickupCount, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, dealerDropoffCount, dealerPickupCount, distanceKm, durationMinutes, discountPercent])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -1185,6 +1208,13 @@ export default function PostJobPage() {
           await supabase.from('jobs').update({ companion_job_id: companionJob.id }).eq('id', previousJobId)
           previousJobId = companionJob.id
         }
+      }
+    }
+
+    if (discountPercent > 0) {
+      const effectiveOrgId = isAdmin ? selectedOrgId : myOrgId
+      if (effectiveOrgId && effectiveOrgId !== '__new__') {
+        await supabase.rpc('increment_discount_usage', { p_org_id: effectiveOrgId })
       }
     }
 
