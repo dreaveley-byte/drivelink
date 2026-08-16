@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import SettingsGearLink from '@/components/SettingsGearLink'
 import DriverActiveToggle from '@/components/DriverActiveToggle'
+import DriverRatingStars from '@/components/DriverRatingStars'
 import Logo from '@/components/Logo'
 
 export const dynamic = 'force-dynamic'
@@ -72,6 +73,9 @@ export default async function AdminDriversPage() {
           <Link href="/admin/dealers" className="text-sm text-gray-600 hover:text-gray-900">
             Dealers
           </Link>
+          <Link href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900">
+            Payroll
+          </Link>
           <Link href="/admin/applications" className="text-sm text-gray-600 hover:text-gray-900">
             Applications
           </Link>
@@ -96,6 +100,9 @@ export default async function AdminDriversPage() {
                   <p className="text-xs text-gray-500 mt-0.5">{driver.phone || 'No phone on file'}</p>
                 </Link>
                 <div className="flex items-center gap-3">
+                  {s?.avg_customer_rating != null && (
+                    <DriverRatingStars driverId={driver.id} avgRating={s.avg_customer_rating} />
+                  )}
                   <span
                     className={`text-xs border rounded-full px-2.5 py-1 ${
                       driver.is_active ? 'border-green-300 text-green-700' : 'border-gray-300 text-gray-500'
@@ -107,14 +114,19 @@ export default async function AdminDriversPage() {
                 </div>
               </div>
 
-              {s && (s.total_completed > 0 || s.total_releases > 0) && (
-                <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              {s && (s.total_completed > 0 || s.total_releases > 0) && (() => {
+                const onTimeRate = s.total_scheduled_pickups > 0 ? s.on_time_pickups / s.total_scheduled_pickups : null
+                const releaseRate = s.total_completed + s.total_releases > 0 ? s.total_releases / (s.total_completed + s.total_releases) : 0
+                const scores = [s.avg_checklist_completion, onTimeRate, 1 - releaseRate].filter((v): v is number => v != null)
+                const effectiveness = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null
+                return (
+                <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                   <div>
                     <p className="text-gray-400">Completed</p>
                     <p className="text-gray-900 font-medium">{s.total_completed}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Checklist completion</p>
+                    <p className="text-gray-400">Document completion</p>
                     <p className="text-gray-900 font-medium">
                       {s.avg_checklist_completion != null ? `${Math.round(s.avg_checklist_completion * 100)}%` : '—'}
                     </p>
@@ -131,8 +143,14 @@ export default async function AdminDriversPage() {
                       {s.avg_customer_rating != null ? s.avg_customer_rating.toFixed(1) : '—'} / {s.avg_dealer_rating != null ? s.avg_dealer_rating.toFixed(1) : '—'}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-gray-400" title="Average of document completion, on-time rate, and (1 - release rate)">Effectiveness</p>
+                    <p className="text-gray-900 font-medium">
+                      {effectiveness != null ? `${Math.round(effectiveness * 100)}%` : '—'}
+                    </p>
+                  </div>
                   {s.total_releases > 0 && (
-                    <div className="col-span-2 sm:col-span-4">
+                    <div className="col-span-2 sm:col-span-5">
                       <p className={s.releases_after_pickup > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
                         {s.total_releases} release{s.total_releases === 1 ? '' : 's'} total
                         {s.releases_after_pickup > 0 && ` — ${s.releases_after_pickup} after pickup ⚠️`}
@@ -140,7 +158,8 @@ export default async function AdminDriversPage() {
                     </div>
                   )}
                 </div>
-              )}
+                )
+              })()}
             </div>
           )
           })}
