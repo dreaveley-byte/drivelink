@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendSms } from '@/lib/sms'
+import { firstNameProperCase } from '@/lib/formatName'
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371
@@ -75,19 +76,35 @@ export async function POST(req: NextRequest) {
       // single ping (which would be both slow and expensive) - about 1.2km
       // is a reasonable stand-in for "2 minutes away" at typical city speeds.
       const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
-      const driverName = (driverInfo as { full_name: string } | null)?.full_name
+      const driverFirstName = firstNameProperCase((driverInfo as { full_name: string } | null)?.full_name)
+      const customerFirstName = firstNameProperCase(job.customer_full_name)
 
       if (distanceKm <= 0.15 && !job.arrived_at_pickup_alert_sent_at) {
-        const body = `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName || ''} has arrived!`
-        const result = await sendSms(job.customer_phone, body)
-        if (result.ok) {
-          await supabase.from('jobs').update({ arrived_at_pickup_alert_sent_at: new Date().toISOString() }).eq('id', jobId)
+        // Atomic claim: only proceed if this request is the one that actually
+        // flips the flag from null - if two pings arrive close together and
+        // both read it as null before either finishes writing, only one of
+        // them gets a non-empty result back here, which is what was causing
+        // the alert to occasionally send twice.
+        const { data: claimed } = await supabase
+          .from('jobs')
+          .update({ arrived_at_pickup_alert_sent_at: new Date().toISOString() })
+          .eq('id', jobId)
+          .is('arrived_at_pickup_alert_sent_at', null)
+          .select('id')
+        if (claimed && claimed.length > 0) {
+          const body = `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverFirstName} has arrived!`
+          await sendSms(job.customer_phone, body)
         }
       } else if (distanceKm <= 1.2 && !job.two_min_away_alert_sent_at) {
-        const body = `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName || ''} is about 2 minutes away!`
-        const result = await sendSms(job.customer_phone, body)
-        if (result.ok) {
-          await supabase.from('jobs').update({ two_min_away_alert_sent_at: new Date().toISOString() }).eq('id', jobId)
+        const { data: claimed } = await supabase
+          .from('jobs')
+          .update({ two_min_away_alert_sent_at: new Date().toISOString() })
+          .eq('id', jobId)
+          .is('two_min_away_alert_sent_at', null)
+          .select('id')
+        if (claimed && claimed.length > 0) {
+          const body = `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverFirstName} is about 2 minutes away!`
+          await sendSms(job.customer_phone, body)
         }
       }
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendSms } from '@/lib/sms'
+import { firstNameProperCase } from '@/lib/formatName'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -68,11 +69,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const customerFirstName = firstNameProperCase(job.customer_full_name)
   const body = isCustomerRide
-    ? `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our driver is on the way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
+    ? `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our driver is on the way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
     : isCourier
-      ? `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has been picked up and is on its way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
-      : `${job.customer_full_name ? `Hi ${job.customer_full_name}, y` : 'Y'}our ${vehicleDesc || 'vehicle'} is on its way!${etaText} Track the delivery here: ${link} — reply to this text anytime to reach your driver.`
+      ? `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has been picked up and is on its way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
+      : `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our ${vehicleDesc || 'vehicle'} is on its way!${etaText} Track the delivery here: ${link} — reply to this text anytime to reach your driver.`
 
   const result = await sendSms(job.customer_phone, body)
   if (!result.ok) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendSms } from '@/lib/sms'
+import { firstNameProperCase } from '@/lib/formatName'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -33,16 +34,17 @@ export async function POST(req: NextRequest) {
   const link = `${protocol}://${host}/verify/${job.id_verification_token}`
   const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
   const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
-  const driverName = driverInfo?.full_name || 'your driver'
+  const driverName = firstNameProperCase(driverInfo?.full_name) || 'your driver'
+  const customerFirstName = firstNameProperCase(job.customer_full_name)
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
   const isCourier = jobTypeName === 'Courier / Package'
 
   const body = isCustomerRide
-    ? `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our driver ${driverName} has arrived!`
+    ? `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverName} has arrived!`
     : isCourier
-      ? `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has arrived! Please meet ${driverName} outside.`
-      : `${job.customer_full_name ? `${job.customer_full_name}, y` : 'Y'}our new ${vehicleDesc || 'vehicle'} has arrived! ` +
+      ? `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has arrived! Please meet ${driverName} outside.`
+      : `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our new ${vehicleDesc || 'vehicle'} has arrived! ` +
         `Please meet ${driverName} outside to get your keys. Before we hand over the keys we ask that you verify your ` +
         `identity one more time — please complete these few simple steps. Click the link below now to verify: ${link}`
 
