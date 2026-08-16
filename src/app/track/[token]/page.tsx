@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TrackingPanel from '@/components/TrackingPanel'
+import PublicChatWidget from '@/components/PublicChatWidget'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 import Logo from '@/components/Logo'
 
@@ -16,6 +17,16 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Delivery cancelled',
 }
 
+const rideStatusLabels: Record<string, string> = {
+  awaiting_driver: 'Preparing your ride',
+  assigned: 'Driver assigned',
+  picked_up: 'Picking you up',
+  in_progress: 'On the way',
+  delivered: 'Ride complete',
+  completed: 'Ride complete',
+  cancelled: 'Ride cancelled',
+}
+
 export default async function PublicTrackPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const supabase = await createClient()
@@ -26,6 +37,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
   if (!info) notFound()
 
   const vehicleDesc = [info.vehicle_year, info.vehicle_make, info.vehicle_model].filter(Boolean).join(' ')
+  const isCustomerRide = info.job_type_name === 'Customer Pick Up' || info.job_type_name === 'Customer Drop Off'
 
   return (
     <div className="min-h-screen bg-white">
@@ -39,19 +51,22 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             )}
             <div>
               <h1 className="text-lg font-semibold text-gray-900">
-                {info.organization_name ? `${info.organization_name} — ` : ''}Your delivery
+                {info.organization_name ? `${info.organization_name} — ` : ''}{isCustomerRide ? 'Your ride' : 'Your delivery'}
               </h1>
-              {vehicleDesc && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
+              {vehicleDesc && !isCustomerRide && <p className="text-sm text-gray-600 mt-0.5">{vehicleDesc}</p>}
             </div>
           </div>
         </div>
 
         {info.status === 'delivered' || info.status === 'completed' ? (
           <div className="border border-gray-200 rounded-xl p-6 text-center">
-            <p className="text-sm text-gray-700 font-medium">Your vehicle has been delivered.</p>
-            <p className="text-xs text-gray-400 mt-1">Live tracking for this delivery has ended.</p>
+            <p className="text-sm text-gray-700 font-medium">
+              {isCustomerRide ? 'Your ride is complete.' : 'Your vehicle has been delivered.'}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Live tracking has ended.</p>
           </div>
         ) : (
+          <>
           <TrackingPanel
             jobId=""
             pickupAddress={info.pickup_address}
@@ -63,8 +78,17 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
             publicToken={token}
             driverName={info.driver_name}
             driverPhotoUrl={info.driver_photo_url}
-            statusLabel={statusLabels[info.status] ?? info.status}
+            statusLabel={(isCustomerRide ? rideStatusLabels : statusLabels)[info.status] ?? info.status}
           />
+          {info.driver_rating_count > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 text-sm">
+              <span className="text-amber-500">\u2605</span>
+              <span className="font-medium text-gray-900">{info.driver_avg_rating}</span>
+              <span className="text-gray-400">({info.driver_rating_count} rating{info.driver_rating_count === 1 ? '' : 's'})</span>
+            </div>
+          )}
+          <PublicChatWidget token={token} driverName={info.driver_name} />
+          </>
         )}
 
         <p className="text-xs text-gray-400 mt-6 text-center">

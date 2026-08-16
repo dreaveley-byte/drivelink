@@ -130,10 +130,26 @@ const nextStatusLabel: Record<string, string> = {
   delivered: 'Mark completed',
 }
 
+const rideNextStatusLabel: Record<string, string> = {
+  assigned: 'Picking up customer',
+  picked_up: 'Customer picked up',
+  in_progress: 'Mark delivered',
+  delivered: 'Mark completed',
+}
+
 const statusLabels: Record<string, string> = {
   awaiting_driver: 'Awaiting Driver',
   assigned: 'Assigned',
   picked_up: 'Picked Up',
+  in_progress: 'In Progress',
+  delivered: 'Delivered',
+  completed: 'Completed',
+}
+
+const rideStatusLabels: Record<string, string> = {
+  awaiting_driver: 'Awaiting Driver',
+  assigned: 'Assigned',
+  picked_up: 'Customer Picked Up',
   in_progress: 'In Progress',
   delivered: 'Delivered',
   completed: 'Completed',
@@ -498,7 +514,7 @@ export default function DriverJobActions({
   async function advanceStatus() {
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
-    if (!confirm(`Mark this job as "${statusLabels[newStatus] ?? newStatus}"?`)) return
+    if (!confirm(`Mark this job as "${(isCustomerRideJob ? rideStatusLabels : statusLabels)[newStatus] ?? newStatus}"?`)) return
     setLoading(true)
     try {
       await Promise.race([
@@ -1122,7 +1138,7 @@ export default function DriverJobActions({
             disabled={loading}
             className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
           >
-            {loading ? '...' : nextStatusLabel[job.status]}
+            {loading ? '...' : (isCustomerRideJob ? rideNextStatusLabel : nextStatusLabel)[job.status]}
           </button>
         )}
 
