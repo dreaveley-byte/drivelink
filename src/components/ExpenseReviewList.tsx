@@ -76,6 +76,31 @@ export default function ExpenseReviewList({
 }) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editCategory, setEditCategory] = useState('')
+  const [editCustomCategory, setEditCustomCategory] = useState('')
+
+  function startEdit(exp: Expense) {
+    setEditingId(exp.id)
+    setEditCategory(exp.category)
+    setEditCustomCategory(exp.custom_category ?? '')
+  }
+
+  async function saveCategory(expenseId: string) {
+    setLoadingId(expenseId)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('job_expenses')
+      .update({ category: editCategory, custom_category: editCategory === 'other' ? (editCustomCategory || null) : null })
+      .eq('id', expenseId)
+    setLoadingId(null)
+    if (error) {
+      alert(`Could not update category: ${error.message}`)
+      return
+    }
+    setEditingId(null)
+    router.refresh()
+  }
 
   async function review(expense: Expense, approve: boolean) {
     setLoadingId(expense.id)
@@ -183,9 +208,49 @@ export default function ExpenseReviewList({
                 </a>
               )}
               <div className="flex-1">
-                <p className="text-sm text-gray-900">
-                  {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
-                </p>
+                {editingId === exp.id ? (
+                  <div className="flex items-center gap-2 mb-1">
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                    >
+                      {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    {editCategory === 'other' && (
+                      <input
+                        value={editCustomCategory}
+                        onChange={(e) => setEditCustomCategory(e.target.value)}
+                        placeholder="Describe category"
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                      />
+                    )}
+                    <button
+                      onClick={() => saveCategory(exp.id)}
+                      disabled={loadingId === exp.id}
+                      className="text-xs bg-gray-900 text-white rounded px-2.5 py-1 hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-900">
+                    {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
+                    {isAdmin && exp.status === 'pending' && (
+                      <button onClick={() => startEdit(exp)} className="text-xs text-blue-600 hover:underline ml-2">
+                        Change category
+                      </button>
+                    )}
+                  </p>
+                )}
                 {exp.description && <p className="text-xs text-gray-500">{exp.description}</p>}
                 {isBaselineCategory && exp.status === 'pending' && isAdmin && (
                   <p className="text-xs text-gray-400">
