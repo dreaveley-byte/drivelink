@@ -65,6 +65,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   const orgInfo = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
   const canViewExpenses = isAdmin || !!orgInfo?.dealer_can_view_expenses
 
+  let expenseComparison: { category: string; accrued_cents: number; actual_cents: number }[] | null = null
+  if (isAdmin && job.status === 'completed') {
+    const { data } = await supabase.rpc('get_job_expense_comparison', { p_job_id: jobId })
+    expenseComparison = data ?? null
+  }
+
   let hourlyRateCents = 0
   if (isAdmin) {
     const { data: rateSettings } = await supabase.from('pricing_settings').select('hourly_rate_cents').eq('id', 1).single()
@@ -187,7 +193,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   }
   const submittedReceiptsTotalCents = expenses.reduce((sum, e) => sum + e.amount_cents, 0)
   const approvedAdditionsTotalCents = expenses.reduce((sum, e) => sum + (e.approved_addition_cents ?? 0), 0)
-  const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.estimated_driver_pay_cents ?? 0
+  const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
   const actualCostCents =
     effectiveDriverPayCents + (job.estimated_driver_reimbursement_cents ?? 0) + approvedAdditionsTotalCents
@@ -446,16 +452,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents)}</span>
                 </div>
               )}
-              {(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents) != null && (
+              {effectiveDriverPayCents != null && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Driver paid{job.admin_pay_override_cents != null && ' (overridden)'}</span>
-                  <span className="text-gray-900 font-medium">{formatCents(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents!)}</span>
+                  <span className="text-gray-900 font-medium">{formatCents(effectiveDriverPayCents)}</span>
                 </div>
               )}
               {job.admin_pay_override_cents != null && (
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Calculated pay (before override)</span>
-                  <span className="text-gray-400">{formatCents(job.estimated_driver_pay_cents ?? 0)}</span>
+                  <span className="text-gray-400">{formatCents(job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0)}</span>
                 </div>
               )}
               {job.actual_driver_hours != null && (
@@ -635,6 +641,37 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               </div>
             </div>
           </div>
+
+          {expenseComparison && (
+            <div className="border border-gray-200 rounded-xl p-4 mt-3">
+              <p className="text-sm font-medium text-gray-900 mb-3">Accrued vs. actual (admin only)</p>
+              <div className="space-y-2 text-sm">
+                {expenseComparison.map((c) => {
+                  const diff = c.accrued_cents - c.actual_cents
+                  return (
+                    <div key={c.category} className="flex items-center justify-between">
+                      <span className="text-gray-600 capitalize">{c.category}</span>
+                      <span className="text-gray-500">
+                        {formatCents(c.accrued_cents)} accrued vs {formatCents(c.actual_cents)} actual
+                        {diff !== 0 && (
+                          <span className={diff > 0 ? 'text-green-700' : 'text-red-600'}> ({diff > 0 ? '+' : ''}{formatCents(diff)})</span>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              {(() => {
+                const foodRow = expenseComparison.find((c) => c.category === 'food')
+                const leftover = foodRow ? Math.max(0, foodRow.accrued_cents - foodRow.actual_cents) : 0
+                return leftover > 0 ? (
+                  <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+                    {formatCents(leftover)} in unused meal budget was added to the driver&apos;s final pay.
+                  </p>
+                ) : null
+              })()}
+            </div>
+          )}
         </div>
       )}
     </div>
