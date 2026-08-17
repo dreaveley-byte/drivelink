@@ -39,6 +39,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   const isAdmin = profile?.role === 'platform_admin'
+  const isDriver = profile?.role === 'driver'
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
@@ -490,6 +491,27 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-600">Dealer rating: </span>
                   <span className="text-gray-900 font-medium">{job.dealer_rating != null ? `${job.dealer_rating}/5` : '—'}</span>
                   {job.dealer_feedback && <p className="text-xs text-gray-500 mt-0.5">{job.dealer_feedback}</p>}
+                </div>
+              )}
+            </div>
+          ) : isDriver ? (
+            <div className="space-y-1">
+              {effectiveDriverPayCents != null && (
+                <div className="flex justify-between">
+                  <span className="text-base text-gray-700">Your pay</span>
+                  <span className="text-lg font-semibold text-gray-900">{formatCents(effectiveDriverPayCents)}</span>
+                </div>
+              )}
+              {(job.estimated_driver_reimbursement_cents ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-base text-gray-700">Reimbursements (Uber/bus, etc.)</span>
+                  <span className="text-base text-gray-700">+{formatCents(job.estimated_driver_reimbursement_cents ?? 0)}</span>
+                </div>
+              )}
+              {job.approved_expenses_cents > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-base text-gray-700">Approved expense reimbursements</span>
+                  <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
                 </div>
               )}
             </div>

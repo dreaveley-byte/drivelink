@@ -52,7 +52,7 @@ export default async function DriverPublicProfilePage({ params }: { params: Prom
 
         {rating?.rating_count > 0 && (
           <div className="flex items-center gap-1.5 mb-6 text-sm">
-            <span className="text-amber-500">\u2605</span>
+            <span className="text-amber-500">★</span>
             <span className="font-medium text-gray-900">{rating.avg_rating}</span>
             <span className="text-gray-400">({rating.rating_count} rating{rating.rating_count === 1 ? '' : 's'})</span>
           </div>

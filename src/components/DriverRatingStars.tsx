@@ -46,7 +46,7 @@ export default function DriverRatingStars({ driverId, avgRating }: { driverId: s
         className="flex items-center gap-0.5 hover:opacity-70"
       >
         {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n} className={n <= rounded ? 'text-amber-500' : 'text-gray-300'}>\u2605</span>
+          <span key={n} className={n <= rounded ? 'text-amber-500' : 'text-gray-300'}>★</span>
         ))}
         {avgRating != null && <span className="text-xs text-gray-500 ml-1">{avgRating.toFixed(1)}</span>}
       </button>
@@ -66,7 +66,7 @@ export default function DriverRatingStars({ driverId, avgRating }: { driverId: s
               <div key={i} className="border-t border-gray-100 pt-2 first:border-t-0 first:pt-0">
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <span key={n} className={`text-xs ${r.rating && n <= r.rating ? 'text-amber-500' : 'text-gray-300'}`}>\u2605</span>
+                    <span key={n} className={`text-xs ${r.rating && n <= r.rating ? 'text-amber-500' : 'text-gray-300'}`}>★</span>
                   ))}
                   <span className="text-[10px] text-gray-400 ml-1">
                     {new Date(r.updated_at).toLocaleDateString('en-CA', { dateStyle: 'medium' })}
