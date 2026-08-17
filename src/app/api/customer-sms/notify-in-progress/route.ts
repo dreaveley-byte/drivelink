@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   // RLS already restricts this to the job's own driver/dealer/admin
   const { data: job } = await supabase
     .from('jobs')
-    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, dropoff_address, driver_lat, driver_lng, package_description, job_types(name)')
+    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, pickup_address, dropoff_address, driver_lat, driver_lng, package_description, job_types(name)')
     .eq('id', jobId)
     .single()
 
@@ -50,7 +50,11 @@ export async function POST(req: NextRequest) {
         fetch(`${protocol}://${host}/api/distance`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ addresses: [`${job.driver_lat},${job.driver_lng}`, job.dropoff_address] }),
+          // A customer ride's "picked up" stage means the driver is en route
+          // to GET the customer, not drop off a vehicle - the ETA has to be
+          // calculated against the pickup address in that case, not dropoff,
+          // or it silently measures the wrong leg of the trip entirely.
+          body: JSON.stringify({ addresses: [`${job.driver_lat},${job.driver_lng}`, isCustomerRide ? job.pickup_address : job.dropoff_address] }),
         }),
         supabase.from('pricing_settings').select('eta_window_buffer_percent').eq('id', 1).single(),
       ])
