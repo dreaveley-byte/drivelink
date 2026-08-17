@@ -30,6 +30,7 @@ export default function AdminJobAdjustments({
   const [expCustomCategory, setExpCustomCategory] = useState('')
   const [expAmount, setExpAmount] = useState('')
   const [expDescription, setExpDescription] = useState('')
+  const [expReceiptFile, setExpReceiptFile] = useState<File | null>(null)
   const [savingExpense, setSavingExpense] = useState(false)
   const [error, setError] = useState('')
 
@@ -86,6 +87,19 @@ export default function AdminJobAdjustments({
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    let receiptPath: string | null = null
+    if (expReceiptFile) {
+      const ext = expReceiptFile.name.split('.').pop() || 'jpg'
+      const path = `${jobId}/${Date.now()}-admin.${ext}`
+      const { error: uploadError } = await supabase.storage.from('expense-receipts').upload(path, expReceiptFile)
+      if (uploadError) {
+        setError(`Could not upload receipt photo: ${uploadError.message}`)
+        setSavingExpense(false)
+        return
+      }
+      receiptPath = path
+    }
+
     const { error: insertError } = await supabase.from('job_expenses').insert({
       job_id: jobId,
       submitted_by: user?.id,
@@ -93,7 +107,7 @@ export default function AdminJobAdjustments({
       custom_category: expCategory === 'other' ? expCustomCategory.trim() : null,
       description: expDescription || null,
       amount_cents: amountCents,
-      receipt_photo_path: null,
+      receipt_photo_path: receiptPath,
       status: 'approved',
       reviewed_by: user?.id,
       reviewed_at: new Date().toISOString(),
@@ -118,6 +132,7 @@ export default function AdminJobAdjustments({
     setExpCustomCategory('')
     setExpAmount('')
     setExpDescription('')
+    setExpReceiptFile(null)
     router.refresh()
   }
 
@@ -205,13 +220,22 @@ export default function AdminJobAdjustments({
               placeholder="Notes (optional)"
               className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
             />
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Receipt photo (optional)</label>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setExpReceiptFile(e.target.files?.[0] ?? null)}
+                className="w-full text-xs"
+              />
+            </div>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={addExpense}
                 disabled={savingExpense}
                 className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 disabled:opacity-50"
               >
-                {savingExpense ? 'Adding\u2026' : 'Add charge'}
+                {savingExpense ? 'Adding…' : 'Add expense'}
               </button>
               <button
                 onClick={() => setShowAddExpense(false)}
