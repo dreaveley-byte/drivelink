@@ -16,6 +16,10 @@ export default function ApplicationCard({
   docs,
   userId,
   profilePhotoPath,
+  vehiclePhotoPath,
+  vehicleYear,
+  vehicleMake,
+  vehicleModel,
   driverFullName,
   driverPhone,
   dealerSubmittedBy,
@@ -31,6 +35,10 @@ export default function ApplicationCard({
   docs: Doc[]
   userId?: string
   profilePhotoPath?: string | null
+  vehiclePhotoPath?: string | null
+  vehicleYear?: number | null
+  vehicleMake?: string | null
+  vehicleModel?: string | null
   driverFullName?: string | null
   driverPhone?: string | null
   dealerSubmittedBy?: string
@@ -85,6 +93,22 @@ export default function ApplicationCard({
             const { data: urlData } = supabase.storage.from('driver-photos').getPublicUrl(publicPath)
             await supabase.from('profiles').update({ photo_url: urlData.publicUrl }).eq('id', userId)
           }
+        }
+        // Same pattern for the vehicle photo - the customer tracking page for
+        // a ride needs to show the actual car showing up, not just the
+        // driver's face, so this needs to be public-bucket accessible too.
+        if (vehiclePhotoPath) {
+          const { data: fileBlob } = await supabase.storage.from('driver-documents').download(vehiclePhotoPath)
+          if (fileBlob) {
+            const ext = vehiclePhotoPath.split('.').pop() || 'jpg'
+            const publicPath = `${userId}/vehicle.${ext}`
+            await supabase.storage.from('driver-photos').upload(publicPath, fileBlob, { upsert: true })
+            const { data: urlData } = supabase.storage.from('driver-photos').getPublicUrl(publicPath)
+            await supabase.from('profiles').update({ vehicle_photo_url: urlData.publicUrl }).eq('id', userId)
+          }
+        }
+        if (vehicleYear || vehicleMake || vehicleModel) {
+          await supabase.from('profiles').update({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }).eq('id', userId)
         }
         // This is the actual activation step — without it, an "approved" driver
         // never shows up in the admin drivers list or is able to claim jobs.

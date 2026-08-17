@@ -93,6 +93,24 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
               </div>
             </div>
           )}
+          {isCustomerRide && (info.driver_vehicle_photo_url || info.driver_vehicle_year || info.driver_vehicle_make || info.driver_vehicle_model) && (
+            <div className="border border-gray-200 rounded-xl p-3 mb-3">
+              <p className="text-xs text-gray-400 mb-2">Look for this car</p>
+              <div className="flex items-center gap-3">
+                {info.driver_vehicle_photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={info.driver_vehicle_photo_url} alt="" className="w-20 h-16 rounded-lg object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-20 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                    No photo
+                  </div>
+                )}
+                <p className="text-sm font-medium text-gray-900">
+                  {[info.driver_vehicle_year, info.driver_vehicle_make, info.driver_vehicle_model].filter(Boolean).join(' ') || 'Vehicle details not on file'}
+                </p>
+              </div>
+            </div>
+          )}
           <TrackingPanel
             jobId=""
             pickupAddress={info.pickup_address}

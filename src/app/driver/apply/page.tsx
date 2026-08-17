@@ -106,6 +106,7 @@ export default function DriverApplyPage() {
       vehicle_model: vehicleModel || null,
       vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
       vehicle_walkaround_video_path: docs.vehicle_walkaround_video ?? null,
+      vehicle_photo_path: docs.vehicle_photo ?? null,
       dash_odometer_photo_path: docs.dash_odometer_photo ?? null,
       profile_photo_path: docs.profile_photo ?? null,
       drivers_license_path: docs.drivers_license ?? null,
@@ -278,6 +279,13 @@ export default function DriverApplyPage() {
               <FileUploadField label="Optical test assessment" bucket="driver-documents" folder={userId} fileName="optical-test" onUploaded={setDoc('optical_test')} />
               <FileUploadField label="Vehicle registration" bucket="driver-documents" folder={userId} fileName="vehicle-registration" onUploaded={setDoc('vehicle_registration')} />
               <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance')} />
+              <FileUploadField
+                label="Clear photo of your vehicle (exterior) - shown to customers so they recognize your car"
+                bucket="driver-documents"
+                folder={userId}
+                fileName="vehicle-photo"
+                onUploaded={setDoc('vehicle_photo')}
+              />
               <FileUploadField
                 label="Walkaround video of your vehicle"
                 bucket="driver-documents"

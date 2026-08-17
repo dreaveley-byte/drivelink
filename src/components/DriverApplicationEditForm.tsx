@@ -179,6 +179,7 @@ export default function DriverApplicationEditForm({ userId, userEmail, applicati
         <FileUploadField label="Vehicle insurance" bucket="driver-documents" folder={userId} fileName="vehicle-insurance" onUploaded={setDoc('vehicle_insurance_path')} optional />
         <FileUploadField label="Walkaround video" bucket="driver-documents" folder={userId} fileName="vehicle-walkaround" onUploaded={setDoc('vehicle_walkaround_video_path')} optional accept="video/*" />
         <FileUploadField label="Dash/odometer photo" bucket="driver-documents" folder={userId} fileName="dash-odometer" onUploaded={setDoc('dash_odometer_photo_path')} optional />
+        <FileUploadField label="Vehicle photo (exterior)" bucket="driver-documents" folder={userId} fileName="vehicle-photo" onUploaded={setDoc('vehicle_photo_path')} optional />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

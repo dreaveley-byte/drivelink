@@ -85,6 +85,10 @@ export default async function AdminApplicationsPage() {
                 bucket="driver-documents"
                 userId={app.user_id}
                 profilePhotoPath={app.profile_photo_path}
+                vehiclePhotoPath={app.vehicle_photo_path}
+                vehicleYear={app.vehicle_year}
+                vehicleMake={app.vehicle_make}
+                vehicleModel={app.vehicle_model}
                 driverFullName={app.full_name}
                 driverPhone={app.cell_phone}
                 docs={[
@@ -99,6 +103,7 @@ export default async function AdminApplicationsPage() {
                   { label: 'Void cheque', path: app.void_cheque_path },
                   { label: 'Vehicle registration', path: app.vehicle_registration_path },
                   { label: 'Vehicle insurance', path: app.vehicle_insurance_path },
+                  { label: 'Vehicle photo', path: app.vehicle_photo_path },
                   { label: 'Walkaround video', path: app.vehicle_walkaround_video_path },
                   { label: 'Dash/odometer photo', path: app.dash_odometer_photo_path },
                   { label: 'Signed contract', path: app.contract_signature_path },
