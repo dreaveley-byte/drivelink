@@ -1,7 +1,8 @@
 // Shared helper for sending a text via Twilio. Returns silently (does nothing)
 // if Twilio isn't configured yet, so callers can fire-and-forget without
-// needing to check configuration themselves.
-export async function sendSms(to: string, body: string): Promise<{ ok: boolean; error?: string }> {
+// needing to check configuration themselves. Optional mediaUrls sends an MMS
+// (photos) alongside the text - each must be a publicly accessible URL.
+export async function sendSms(to: string, body: string, mediaUrls?: string[]): Promise<{ ok: boolean; error?: string }> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
   const fromNumber = process.env.TWILIO_FROM_NUMBER
@@ -22,13 +23,18 @@ export async function sendSms(to: string, body: string): Promise<{ ok: boolean; 
     return { ok: false, error: 'invalid_number' }
   }
 
+  const params = new URLSearchParams({ To: toNumber, From: fromNumber, Body: body })
+  for (const url of (mediaUrls ?? []).slice(0, 10)) {
+    params.append('MediaUrl', url)
+  }
+
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({ To: toNumber, From: fromNumber, Body: body }),
+    body: params,
   })
 
   if (!res.ok) {

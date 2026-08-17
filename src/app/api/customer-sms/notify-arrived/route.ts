@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const isCourier = jobTypeName === 'Courier / Package'
 
   const body = isCustomerRide
-    ? `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverName} has arrived!`
+    ? `${customerFirstName ? `${customerFirstName}, t` : 'T'}hank you for driving with Drivflo! You have arrived at your destination.`
     : isCourier
       ? `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has arrived! Please meet ${driverName} outside.`
       : `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our new ${vehicleDesc || 'vehicle'} has arrived! ` +
@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
   const { data: trackingRow } = await supabase.from('jobs').select('tracking_token').eq('id', jobId).single()
   if (trackingRow?.tracking_token) {
     const trackingLink = `${protocol}://${host}/track/${trackingRow.tracking_token}`
-    const thankYouBody =
-      `${customerFirstName ? `Thanks ${customerFirstName} f` : 'F'}or using Drivflo! ` +
-      `How did ${driverName} do? Leave a quick rating here: ${trackingLink}`
+    const thankYouBody = isCustomerRide
+      ? `Rate ${driverName} — how was your drive today? ${trackingLink}`
+      : `${customerFirstName ? `Thanks ${customerFirstName} f` : 'F'}or using Drivflo! Rate ${driverName} — how did they do? ${trackingLink}`
     const thankYouResult = await sendSms(job.customer_phone, thankYouBody)
     if (thankYouResult.ok) {
       await supabase.from('customer_messages').insert({ job_id: jobId, direction: 'to_customer', body: thankYouBody })

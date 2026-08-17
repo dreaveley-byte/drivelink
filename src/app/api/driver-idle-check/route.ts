@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('status, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, customer_phone, customer_full_name, pickup_lat, pickup_lng, two_min_away_alert_sent_at, arrived_at_pickup_alert_sent_at, tracking_token, job_types(name), driver:driver_id(full_name)')
+    .select('status, driver_id, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, customer_phone, customer_full_name, pickup_lat, pickup_lng, two_min_away_alert_sent_at, arrived_at_pickup_alert_sent_at, tracking_token, job_types(name), driver:driver_id(full_name)')
     .eq('id', jobId)
     .single()
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       const driverFirstName = firstNameProperCase((driverInfo as { full_name: string } | null)?.full_name)
       const customerFirstName = firstNameProperCase(job.customer_full_name)
 
-      if (distanceKm <= 0.15 && !job.arrived_at_pickup_alert_sent_at) {
+      if (distanceKm <= 0.1 && !job.arrived_at_pickup_alert_sent_at) {
         // Atomic claim: only proceed if this request is the one that actually
         // flips the flag from null - if two pings arrive close together and
         // both read it as null before either finishes writing, only one of
@@ -92,8 +92,17 @@ export async function POST(req: NextRequest) {
           .is('arrived_at_pickup_alert_sent_at', null)
           .select('id')
         if (claimed && claimed.length > 0) {
-          const body = `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverFirstName} has arrived!`
-          await sendSms(job.customer_phone, body)
+          const { data: driverProfile } = await supabase
+            .from('profiles')
+            .select('photo_url, vehicle_photo_url')
+            .eq('id', job.driver_id)
+            .single()
+          const pinLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+          const body =
+            `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver ${driverFirstName} has arrived! ` +
+            `Come on out. Here's their exact location: ${pinLink}`
+          const mediaUrls = [driverProfile?.photo_url, driverProfile?.vehicle_photo_url].filter((u): u is string => !!u)
+          await sendSms(job.customer_phone, body, mediaUrls)
         }
       } else if (distanceKm <= 1.2 && !job.two_min_away_alert_sent_at) {
         const { data: claimed } = await supabase

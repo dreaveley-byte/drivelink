@@ -141,7 +141,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
                 Thank you for your feedback!
               </div>
             ) : (
-              <CustomerFeedbackForm token={token} />
+              <CustomerFeedbackForm token={token} driverName={info.driver_name} isRide={isCustomerRide} />
             )}
           </div>
         )}
