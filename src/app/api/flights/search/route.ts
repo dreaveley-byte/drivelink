@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 
 const DUFFEL_BASE = 'https://api.duffel.com'
 
-// Major Canadian airports (plus a few key US border ones) with coordinates,
+// Canadian airports only (US airports deliberately excluded - see note at
+// the end of this list), with coordinates,
 // used to find the nearest real airport to any address — much more reliable
 // than trying to text-match a city name against an airline database, since
 // most people don't live in a city that has its own airport.
@@ -47,9 +48,11 @@ const AIRPORTS: { code: string; name: string; lat: number; lng: number }[] = [
   { code: 'YYT', name: "St. John's", lat: 47.6186, lng: -52.7519 },
   { code: 'YXY', name: 'Whitehorse', lat: 60.7096, lng: -135.0679 },
   { code: 'YZF', name: 'Yellowknife', lat: 62.4628, lng: -114.4403 },
-  { code: 'SEA', name: 'Seattle', lat: 47.4502, lng: -122.3088 },
-  { code: 'BLI', name: 'Bellingham', lat: 48.7928, lng: -122.5375 },
-  { code: 'GEG', name: 'Spokane', lat: 47.6199, lng: -117.5338 },
+  // US airports deliberately excluded - a driver flying back to a Canadian
+  // pickup/dropoff shouldn't be routed through a US airport, since that
+  // means clearing US customs plus a cross-border drive back into Canada.
+  // It also crowds out genuinely useful Canadian airports in the "closest N"
+  // search when a US border airport happens to be geographically nearer.
 ]
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
