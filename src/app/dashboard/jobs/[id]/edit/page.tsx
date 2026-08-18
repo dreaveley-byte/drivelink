@@ -1884,9 +1884,12 @@ export default function EditJobPage() {
         <FirstNationsReservePopup
           dropoffAddress={stops[stops.length - 1] ?? ''}
           onConfirm={(reserveAddress) => {
+            // Uses the actual dropoff stop that was already filled in, not
+            // the separate (often blank) customer contact field.
             setStops((prev) => {
+              const originalDropoff = prev[prev.length - 1]
               const withoutLast = prev.slice(0, -1)
-              return [...withoutLast, customerAddress, reserveAddress]
+              return [...withoutLast, originalDropoff, reserveAddress]
             })
             setShowReservePopup(false)
           }}

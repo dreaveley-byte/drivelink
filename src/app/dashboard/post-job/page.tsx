@@ -2134,12 +2134,15 @@ export default function PostJobPage() {
         <FirstNationsReservePopup
           dropoffAddress={stops[stops.length - 1] ?? ''}
           onConfirm={(reserveAddress) => {
-            // Route becomes: original stops ... -> customer's own address (to
-            // pick them up) -> the reserve (final delivery), since the
-            // customer needs to be brought along to receive the vehicle there.
+            // Route becomes: original stops ... -> original dropoff address (to
+            // pick the customer up there) -> the reserve (final delivery),
+            // since the customer needs to be brought along to receive the
+            // vehicle there. Uses the actual dropoff stop that was already
+            // filled in, not the separate (often blank) customer contact field.
             setStops((prev) => {
+              const originalDropoff = prev[prev.length - 1]
               const withoutLast = prev.slice(0, -1)
-              return [...withoutLast, customerAddress, reserveAddress]
+              return [...withoutLast, originalDropoff, reserveAddress]
             })
             setShowReservePopup(false)
           }}
