@@ -281,12 +281,17 @@ export async function POST(req: NextRequest) {
     // loss) once the extra ground transport to reach it is factored in. Uses
     // the same fare formula the actual pricing engine uses, so this ranking
     // reflects the real cost, not a rough guess.
-    const groundCostEstimate = groundToAirport
+    const groundCostEstimate = (groundToAirport
       ? Math.max(
           Math.round((pricingSettings?.uber_base_fare_cents ?? 0) + groundToAirport.distanceKm * (pricingSettings?.uber_per_km_cents ?? 0)),
           pricingSettings?.uber_minimum_fare_cents ?? 0
         )
-      : 0
+      : 0) + (groundFromAirport
+      ? Math.max(
+          Math.round((pricingSettings?.uber_base_fare_cents ?? 0) + groundFromAirport.distanceKm * (pricingSettings?.uber_per_km_cents ?? 0)),
+          pricingSettings?.uber_minimum_fare_cents ?? 0
+        )
+      : 0)
     const effectiveCostCents = converted.amountCents + groundCostEstimate
 
     return {
@@ -325,6 +330,7 @@ export async function POST(req: NextRequest) {
   }
 
   const cheapest = viable.reduce((best, cur) => (cur.effectiveCostCents < best.effectiveCostCents ? cur : best))
+  const sortedOptions = [...viable].sort((a, b) => a.effectiveCostCents - b.effectiveCostCents)
 
   return NextResponse.json({
     origin: cheapest.flightFrom,
@@ -333,5 +339,17 @@ export async function POST(req: NextRequest) {
     groundToAirport: cheapest.groundToAirport,
     groundFromAirport: cheapest.groundFromAirport,
     comparedAirports: combinations.map(([f, t]) => `${f.name} (${f.code}) → ${t.name} (${t.code})`),
+    // Every viable airport combination that actually returned a flight,
+    // sorted cheapest-first (flight + both ground transport legs combined) -
+    // lets the caller show a choice instead of only ever silently picking
+    // the cheapest one with no visibility into what else was considered.
+    options: sortedOptions.map((r) => ({
+      origin: r.flightFrom,
+      destination: r.flightTo,
+      flight: r.flight,
+      groundToAirport: r.groundToAirport,
+      groundFromAirport: r.groundFromAirport,
+      effectiveCostCents: r.effectiveCostCents,
+    })),
   })
 }

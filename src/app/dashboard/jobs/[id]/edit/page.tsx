@@ -98,6 +98,15 @@ export default function EditJobPage() {
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
   const [flightPriceOverride, setFlightPriceOverride] = useState('')
+  const [flightOptions, setFlightOptions] = useState<Array<{
+    origin: { code: string; name: string }
+    destination: { code: string; name: string }
+    flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number }
+    groundToAirport: { distanceKm: number; durationMinutes: number } | null
+    groundFromAirport: { distanceKm: number; durationMinutes: number } | null
+    effectiveCostCents: number
+  }>>([])
+  const [selectedFlightOptionIdx, setSelectedFlightOptionIdx] = useState(0)
   const [flightHoursOverride, setFlightHoursOverride] = useState('')
   // True whenever the driver does NOT drive the vehicle back themselves — covers
   // both flying back AND the short-trip Uber/walk-on-return case. Gas and driver
@@ -555,24 +564,40 @@ export default function EditJobPage() {
         // Ground transport legs stay auto-calculated either way — the override
         // is specifically for when Duffel's flight price/time itself is wrong
         // (e.g. it's missing a cheaper direct fare from a carrier it doesn't carry).
-        if (!hasOverride && (!flightRes.ok || !flightBody.flight)) return null
+        if (!hasOverride && (!flightRes.ok || !flightBody.flight)) {
+          setFlightOptions([])
+          return null
+        }
 
-        const result: AdditionalCharge[] = [
-          {
-            description: 'Return ground transport',
+        setFlightOptions(flightBody.options ?? [])
+        const chosen = flightBody.options?.[selectedFlightOptionIdx] ?? flightBody.options?.[0] ?? flightBody
+
+        const result: AdditionalCharge[] = []
+        if (chosen.groundFromAirport) {
+          const km = chosen.groundFromAirport.distanceKm
+          result.push({
+            description: `Return ground transport (${km}km)`,
+            kind: 'ground-home' as const,
+            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
+            hoursAdded: Math.round((chosen.groundFromAirport.durationMinutes / 60) * 100) / 100,
+            paidToDriver: true,
+          })
+        } else {
+          result.push({
+            description: 'Return ground transport (flat estimate)',
             kind: 'ground-home' as const,
             dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
             hoursAdded: pricingSettings!.return_ground_transport_hours,
             paidToDriver: true,
-          },
-        ]
-        if (flightBody.groundToAirport) {
-          const km = flightBody.groundToAirport.distanceKm
+          })
+        }
+        if (chosen.groundToAirport) {
+          const km = chosen.groundToAirport.distanceKm
           result.push({
             description: 'Ground transport to airport',
             kind: 'ground-to-airport' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
-            hoursAdded: Math.round((flightBody.groundToAirport.durationMinutes / 60) * 100) / 100,
+            hoursAdded: Math.round((chosen.groundToAirport.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
           })
         } else {
@@ -586,7 +611,7 @@ export default function EditJobPage() {
         }
         if (hasOverride) {
           result.push({
-            description: `Flight back (manual override)${flightBody.origin && flightBody.destination ? `: ${flightBody.origin.code} → ${flightBody.destination.code}` : ''}`,
+            description: `Flight back (manual override)${chosen.origin && chosen.destination ? `: ${chosen.origin.code} → ${chosen.destination.code}` : ''}`,
             kind: 'flight' as const,
             dealerAmountCents: Math.round(parseFloat(flightPriceOverride) * 100),
             hoursAdded: parseFloat(flightHoursOverride),
@@ -594,10 +619,10 @@ export default function EditJobPage() {
           })
         } else {
           result.push({
-            description: `Flight back: ${flightBody.origin.code} → ${flightBody.destination.code} (${flightBody.flight.isDirect ? 'direct' : `${flightBody.flight.stops} stop${flightBody.flight.stops === 1 ? '' : 's'}`})`,
+            description: `Flight back: ${chosen.origin.code} → ${chosen.destination.code} (${chosen.flight.isDirect ? 'direct' : `${chosen.flight.stops} stop${chosen.flight.stops === 1 ? '' : 's'}`})`,
             kind: 'flight' as const,
-            dealerAmountCents: flightBody.flight.priceCents,
-            hoursAdded: flightBody.flight.hoursToAdd,
+            dealerAmountCents: chosen.flight.priceCents,
+            hoursAdded: chosen.flight.hoursToAdd,
             paidToDriver: false,
           })
         }
@@ -754,7 +779,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested, selectedFlightOptionIdx])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -1574,6 +1599,38 @@ export default function EditJobPage() {
                 <p className="ml-6 mt-2 text-xs text-gray-400">
                   Flight price and hours will be looked up and added automatically when you click "Calculate distance & cost" below.
                 </p>
+              )}
+              {flyingBack && flightOptions.length > 1 && (
+                <div className="ml-6 mt-3 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-medium text-gray-700 mb-2">
+                    {flightOptions.length} airport combinations compared — pick one (sorted cheapest first)
+                  </p>
+                  <div className="space-y-1.5">
+                    {flightOptions.map((opt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setSelectedFlightOptionIdx(i)}
+                        className={`w-full text-left border rounded-lg px-3 py-2 text-xs flex items-center justify-between ${
+                          i === selectedFlightOptionIdx ? 'border-[#378ADD] bg-blue-50/60' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span>
+                          <span className="font-medium text-gray-900">
+                            {opt.destination.name} ({opt.destination.code}) → {opt.origin.name} ({opt.origin.code})
+                          </span>
+                          <span className="text-gray-400 ml-2">
+                            {opt.flight.isDirect ? 'direct' : `${opt.flight.stops} stop${opt.flight.stops === 1 ? '' : 's'}`}
+                          </span>
+                        </span>
+                        <span className="font-semibold text-gray-900">{formatCents(opt.effectiveCostCents)} total</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-2">
+                    Total includes flight + ground transport both ends. {selectedFlightOptionIdx === 0 ? 'Currently using the cheapest option.' : ''}
+                  </p>
+                </div>
               )}
               <div className="ml-6 mt-2 grid grid-cols-2 gap-2">
                 <div>
