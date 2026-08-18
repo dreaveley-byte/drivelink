@@ -5,12 +5,12 @@ import { useState } from 'react'
 type Reserve = { name: string; address: string; placeId: string; distanceKm: number }
 
 export default function FirstNationsReservePopup({
-  customerAddress,
+  dropoffAddress,
   onConfirm,
   onSkip,
   onClose,
 }: {
-  customerAddress: string
+  dropoffAddress: string
   onConfirm: (reserveAddress: string) => void
   onSkip: () => void
   onClose: () => void
@@ -22,8 +22,8 @@ export default function FirstNationsReservePopup({
   const [manualAddress, setManualAddress] = useState('')
 
   async function handleYes() {
-    if (!customerAddress.trim()) {
-      setError('Enter the customer/recipient address first, then check this box again \u2014 that\u2019s what nearby reserves get searched around.')
+    if (!dropoffAddress.trim()) {
+      setError('Enter the dropoff address first, then check this box again \u2014 that\u2019s what nearby reserves get searched around.')
       return
     }
     setStep('list')
@@ -33,7 +33,7 @@ export default function FirstNationsReservePopup({
       const res = await fetch('/api/places/nearby-reserves', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: customerAddress }),
+        body: JSON.stringify({ address: dropoffAddress }),
       })
       const data = await res.json()
       if (!res.ok) {

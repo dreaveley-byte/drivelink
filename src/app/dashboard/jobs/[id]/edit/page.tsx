@@ -1825,7 +1825,7 @@ export default function EditJobPage() {
       </main>
       {showReservePopup && (
         <FirstNationsReservePopup
-          customerAddress={customerAddress}
+          dropoffAddress={stops[stops.length - 1] ?? ''}
           onConfirm={(reserveAddress) => {
             setStops((prev) => {
               const withoutLast = prev.slice(0, -1)

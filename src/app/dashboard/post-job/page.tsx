@@ -2082,7 +2082,7 @@ export default function PostJobPage() {
       </main>
       {showReservePopup && (
         <FirstNationsReservePopup
-          customerAddress={customerAddress}
+          dropoffAddress={stops[stops.length - 1] ?? ''}
           onConfirm={(reserveAddress) => {
             // Route becomes: original stops ... -> customer's own address (to
             // pick them up) -> the reserve (final delivery), since the
