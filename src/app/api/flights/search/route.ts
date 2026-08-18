@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
   }
 
   async function searchOneRoute(flightFrom: { code: string; name: string; lat: number; lng: number }, flightTo: { code: string; name: string; lat: number; lng: number }) {
-    const [offerRequestRes, groundToAirport] = await Promise.all([
+    const [offerRequestRes, groundToAirport, groundFromAirport] = await Promise.all([
       duffelFetch('/air/offer_requests?return_offers=true', token!, {
         method: 'POST',
         body: JSON.stringify({
@@ -237,6 +237,11 @@ export async function POST(req: NextRequest) {
         }),
       }),
       drivingLegToAirport(destinationAddress, flightFrom, date),
+      // The return leg: once the driver lands back home, they still need to
+      // get from that arrival airport back to the original pickup address.
+      // This was previously always a flat guessed fee regardless of actual
+      // distance - same real, traffic-aware calculation as the outbound leg.
+      drivingLegToAirport(originAddress, flightTo, date),
     ])
 
     if (!offerRequestRes.ok) {
@@ -247,7 +252,7 @@ export async function POST(req: NextRequest) {
 
     const offerRequestData = await offerRequestRes.json()
     const offers = offerRequestData?.data?.offers ?? []
-    if (offers.length === 0) return { flightFrom, flightTo, flight: null, groundToAirport, effectiveCostCents: Infinity }
+    if (offers.length === 0) return { flightFrom, flightTo, flight: null, groundToAirport, groundFromAirport, effectiveCostCents: Infinity }
 
     const sorted = [...(offers as Offer[])].sort((a, b) => {
       const stopsDiff = stopCount(a) - stopCount(b)
@@ -285,7 +290,7 @@ export async function POST(req: NextRequest) {
     const effectiveCostCents = converted.amountCents + groundCostEstimate
 
     return {
-      flightFrom, flightTo, groundToAirport, effectiveCostCents,
+      flightFrom, flightTo, groundToAirport, groundFromAirport, effectiveCostCents,
       flight: {
         priceCents: converted.amountCents,
         currency: converted.currency,
@@ -316,7 +321,7 @@ export async function POST(req: NextRequest) {
     // the single nearest-airport pair so the caller still gets a real error
     // and the ground-transport estimate, instead of nothing at all.
     const fallback = await searchOneRoute(fromCandidates[0], toCandidates[0])
-    return NextResponse.json({ origin: fromCandidates[0], destination: toCandidates[0], flight: null, groundToAirport: fallback?.groundToAirport ?? null })
+    return NextResponse.json({ origin: fromCandidates[0], destination: toCandidates[0], flight: null, groundToAirport: fallback?.groundToAirport ?? null, groundFromAirport: fallback?.groundFromAirport ?? null })
   }
 
   const cheapest = viable.reduce((best, cur) => (cur.effectiveCostCents < best.effectiveCostCents ? cur : best))
@@ -326,6 +331,7 @@ export async function POST(req: NextRequest) {
     destination: cheapest.flightTo,
     flight: cheapest.flight,
     groundToAirport: cheapest.groundToAirport,
-    comparedAirports: combinations.map(([f, t]) => `${f.name} (${f.code}) \u2192 ${t.name} (${t.code})`),
+    groundFromAirport: cheapest.groundFromAirport,
+    comparedAirports: combinations.map(([f, t]) => `${f.name} (${f.code}) → ${t.name} (${t.code})`),
   })
 }

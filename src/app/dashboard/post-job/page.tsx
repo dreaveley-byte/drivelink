@@ -491,15 +491,28 @@ export default function PostJobPage() {
         // (e.g. it's missing a cheaper direct fare from a carrier it doesn't carry).
         if (!hasOverride && (!flightRes.ok || !flightBody.flight)) return null
 
-        const result: AdditionalCharge[] = [
-          {
-            description: 'Return ground transport',
+        const result: AdditionalCharge[] = []
+        if (flightBody.groundFromAirport) {
+          const km = flightBody.groundFromAirport.distanceKm
+          result.push({
+            description: `Return ground transport (${km}km)`,
+            kind: 'ground-home' as const,
+            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
+            hoursAdded: Math.round((flightBody.groundFromAirport.durationMinutes / 60) * 100) / 100,
+            paidToDriver: true,
+          })
+        } else {
+          // The real distance calculation failed (API error, no route found,
+          // etc.) - fall back to the flat estimate rather than dropping this
+          // charge entirely.
+          result.push({
+            description: 'Return ground transport (flat estimate)',
             kind: 'ground-home' as const,
             dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
             hoursAdded: pricingSettings!.return_ground_transport_hours,
             paidToDriver: true,
-          },
-        ]
+          })
+        }
         if (flightBody.groundToAirport) {
           const km = flightBody.groundToAirport.distanceKm
           result.push({
