@@ -318,7 +318,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  console.log('Flight search candidates:', {
+    origin: originAddress,
+    destination: destinationAddress,
+    fromCandidates: fromCandidates.map((a) => a.code),
+    toCandidates: toCandidates.map((a) => a.code),
+  })
+
   const results = await Promise.all(combinations.map(([from, to]) => searchOneRoute(from, to)))
+  console.log('Flight search results:', results.map((r) =>
+    r ? `${r.flightFrom.code}->${r.flightTo.code}: ${r.flight ? `$${(r.effectiveCostCents / 100).toFixed(2)} total` : 'no flight found'}` : 'null (request failed)'
+  ))
   const viable = results.filter((r): r is NonNullable<typeof r> => r !== null && r.flight !== null)
 
   if (viable.length === 0) {

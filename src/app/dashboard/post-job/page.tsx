@@ -1866,7 +1866,7 @@ export default function PostJobPage() {
                       >
                         <span>
                           <span className="font-medium text-gray-900">
-                            {opt.destination.name} ({opt.destination.code}) → {opt.origin.name} ({opt.origin.code})
+                            {opt.origin.name} ({opt.origin.code}) → {opt.destination.name} ({opt.destination.code})
                           </span>
                           <span className="text-gray-400 ml-2">
                             {opt.flight.isDirect ? 'direct' : `${opt.flight.stops} stop${opt.flight.stops === 1 ? '' : 's'}`}
