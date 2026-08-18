@@ -175,16 +175,18 @@ export async function POST(req: NextRequest) {
 
   // The flight is the RETURN leg — the driver drives from originAddress
   // (pickup) to destinationAddress (dropoff), then flies back. So the flight
-  // itself goes destination airport -> origin airport. Check the top 2
+  // itself goes destination airport -> origin airport. Check the top 3
   // closest airports on each side rather than just the single nearest one —
-  // the geographically closest airport isn't always the cheapest to fly
-  // from/to (small regional airports often cost far more than a slightly
-  // farther major hub with real competition), so this compares the actual
-  // total cost (flight + ground transport to get there) across candidates
-  // instead of assuming "closest" means "best."
+  // the geographically closest airport isn't always the cheapest (or even a
+  // viable) one to fly from/to: a small regional airport can cost more than
+  // a farther major hub with real competition, and near the US border the
+  // "closest" airport can be a US one with no practical/available flight,
+  // which would otherwise crowd out a genuinely useful option like Vancouver.
+  // This compares the actual total cost (flight + ground transport both
+  // ends) across every candidate instead of assuming "closest" means "best."
   const [fromCandidates, toCandidates] = await Promise.all([
-    nearbyAirports(destinationAddress, 2, 100),
-    nearbyAirports(originAddress, 2, 100),
+    nearbyAirports(destinationAddress, 3, 100),
+    nearbyAirports(originAddress, 3, 100),
   ])
 
   if ('error' in fromCandidates) {
