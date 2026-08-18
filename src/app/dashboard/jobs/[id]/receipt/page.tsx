@@ -10,6 +10,7 @@ import Logo from '@/components/Logo'
 import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
 import ExpenseReviewList from '@/components/ExpenseReviewList'
 import AdminJobAdjustments from '@/components/AdminJobAdjustments'
+import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -610,7 +611,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       {isAdmin && (
         <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
           <div className="border border-gray-200 rounded-xl p-6">
-            <p className="text-sm font-medium text-gray-900 mb-3">Cost breakdown & profit (admin only)</p>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <p className="text-sm font-medium text-gray-900">Cost breakdown & profit (admin only)</p>
+              {job.status === 'completed' && (
+                <MarkDealerPaidButton jobId={job.id} isPaid={!!job.dealer_paid_at} paidAt={job.dealer_paid_at} />
+              )}
+            </div>
 
             {pricingBreakdown ? (
               <div className="mb-4">

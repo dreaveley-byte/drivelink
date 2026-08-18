@@ -79,7 +79,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
 
   const { data: statsJobs } = await supabase
     .from('jobs')
-    .select('status, created_at, updated_at, estimated_dealer_cost_cents, customer_rating')
+    .select('id, status, created_at, updated_at, estimated_dealer_cost_cents, approved_expenses_cents, customer_rating, dealer_paid_at')
     .eq('organization_id', dealerId)
 
   const now = new Date()
@@ -94,6 +94,8 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
   let totalCompleted = 0
   let ratingSum = 0
   let ratingCount = 0
+  let outstandingBalanceCents = 0
+  let outstandingJobCount = 0
 
   for (const job of statsJobs ?? []) {
     if (job.created_at && new Date(job.created_at) >= monthStart) requestedThisMonth += 1
@@ -110,6 +112,10 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
       if (job.updated_at && new Date(job.updated_at) >= yearStart) {
         completedYtd += 1
         spentYtd += job.estimated_dealer_cost_cents ?? 0
+      }
+      if (!job.dealer_paid_at) {
+        outstandingBalanceCents += (job.estimated_dealer_cost_cents ?? 0) + (job.approved_expenses_cents ?? 0)
+        outstandingJobCount += 1
       }
     }
   }
@@ -182,6 +188,17 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
           <p className="text-xs text-gray-400 mt-1">Member since {fmtDate(dealer.created_at)}</p>
         </div>
 
+        {outstandingBalanceCents > 0 && (
+          <div className="border border-amber-200 bg-amber-50 rounded-lg px-4 py-3 mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-900">Outstanding balance</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {outstandingJobCount} completed job{outstandingJobCount === 1 ? '' : 's'} not yet marked paid
+              </p>
+            </div>
+            <p className="text-lg font-semibold text-amber-900">{formatCents(outstandingBalanceCents)}</p>
+          </div>
+        )}
         <div className="border-t border-gray-100 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div>
             <p className="text-gray-400">Requested this month</p>
