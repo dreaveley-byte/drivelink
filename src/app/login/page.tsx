@@ -1,11 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -13,7 +21,16 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [resetSent, setResetSent] = useState(false)
+
+  useEffect(() => {
+    const modeParam = searchParams.get('mode')
+    const roleParam = searchParams.get('role')
+    if (modeParam === 'signup') setMode('signup')
+    if (roleParam === 'driver' || roleParam === 'dealer') setIntendedRole(roleParam)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleForgotPassword() {
     if (!email) {
