@@ -54,6 +54,7 @@ export default function FirstNationsReservePopup({
           <>
             <p className="text-sm font-semibold text-gray-900 mb-2">First Nations delivery</p>
             <p className="text-sm text-gray-600 mb-4">Should we be delivering on the nearest reserve?</p>
+            {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
             <div className="flex gap-2">
               <button onClick={handleYes} className="flex-1 bg-[#378ADD] text-white text-sm font-medium py-2.5 rounded-lg hover:bg-[#2d6ead]">
                 Yes
@@ -68,7 +69,7 @@ export default function FirstNationsReservePopup({
             <p className="text-sm font-semibold text-gray-900 mb-1">Nearest reserves</p>
             <p className="text-xs text-gray-500 mb-3">Searched near the customer/recipient address. Pick one to set as the delivery location.</p>
             {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
-            {loading && <p className="text-sm text-gray-400 py-4 text-center">Searching\u2026</p>}
+            {loading && <p className="text-sm text-gray-400 py-4 text-center">Searching…</p>}
             {!loading && !error && reserves.length === 0 && (
               <p className="text-sm text-gray-400 py-4 text-center">No reserves found nearby.</p>
             )}
