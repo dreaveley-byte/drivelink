@@ -5,29 +5,49 @@ import Logo from '@/components/Logo'
 
 const services = [
   {
-    code: 'ROUTE 01',
-    title: 'Vehicle pickup & delivery',
-    body: 'A vehicle picked up from one address and delivered to another — across town or across the province.',
+    code: 'CATEGORY 01',
+    title: 'Vehicle Delivery',
+    items: [
+      'Dealer-to-dealer trades',
+      'Dealership-to-customer delivery',
+      'Customer-to-dealership pickup',
+      'Service vehicle pickup & return',
+      'Auction & fleet repositioning',
+      'Scheduled or on-demand',
+    ],
   },
   {
-    code: 'ROUTE 02',
-    title: 'Dealer trades transport',
-    body: 'Move a traded unit between dealerships, with condition photos and signatures captured at both ends.',
+    code: 'CATEGORY 02',
+    title: 'Customer Shuttle',
+    items: [
+      'Dealership customer shuttle',
+      'Service department shuttle',
+      'Customer pickup & drop-off',
+      'Service appointment transport',
+      'Scheduled or on-demand',
+    ],
   },
   {
-    code: 'ROUTE 03',
-    title: 'New customer deliveries',
-    body: 'The last mile of a sale — a freshly purchased vehicle, driven to the customer’s door.',
+    code: 'CATEGORY 03',
+    title: 'Courier & Parts',
+    items: [
+      'Automotive parts delivery',
+      'Dealer-to-dealer parts transfers',
+      'Same-day & urgent courier',
+      'Keys & small-item delivery',
+      'Returns & reverse deliveries',
+    ],
   },
   {
-    code: 'ROUTE 04',
-    title: 'Customer shuttle',
-    body: 'Pick up or drop off a customer directly, timed around their service appointment or sales visit.',
-  },
-  {
-    code: 'ROUTE 05',
-    title: 'Parts & courier runs',
-    body: 'Small, time-sensitive pickups and drop-offs — parts, paperwork, keys — handled the same way as everything else.',
+    code: 'CATEGORY 04',
+    title: 'Document Delivery & Signing',
+    items: [
+      'Secure document pickup & return',
+      'Signing at the customer’s location',
+      'Purchase & lease paperwork',
+      'Finance, registration & insurance docs',
+      'Proof of delivery & signature',
+    ],
   },
 ]
 
@@ -160,23 +180,26 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Services - route stops */}
+      {/* Services - four core categories */}
       <section className="border-t" style={{ borderColor: '#E4E1D8', background: '#F3F1E9' }}>
         <div className="max-w-6xl mx-auto px-6 py-16">
           <h2 className="display text-2xl font-semibold mb-2">Where the route goes</h2>
-          <p className="mb-12" style={{ color: '#3D4A63' }}>Five kinds of trips, one platform.</p>
-          <div className="relative">
-            <div className="hidden md:block absolute left-0 right-0 top-6 h-px" style={{ background: '#D7D3C4' }} />
-            <div className="grid md:grid-cols-5 gap-8">
-              {services.map((s) => (
-                <div key={s.code} className="relative">
-                  <div className="hidden md:block w-3 h-3 rounded-full mb-6" style={{ background: '#378ADD' }} />
-                  <p className="mono text-[11px] tracking-wider mb-2" style={{ color: '#378ADD' }}>{s.code}</p>
-                  <h3 className="font-semibold mb-2" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>{s.title}</h3>
-                  <p className="text-sm leading-relaxed" style={{ color: '#3D4A63' }}>{s.body}</p>
-                </div>
-              ))}
-            </div>
+          <p className="mb-12" style={{ color: '#3D4A63' }}>Four categories, one platform — every trip a dealership needs to make.</p>
+          <div className="grid md:grid-cols-2 gap-6">
+            {services.map((s) => (
+              <div key={s.code} className="rounded-2xl p-6 border" style={{ borderColor: '#D7D3C4', background: '#FAFAF7' }}>
+                <p className="mono text-[11px] tracking-wider mb-2" style={{ color: '#378ADD' }}>{s.code}</p>
+                <h3 className="text-lg font-semibold mb-4" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>{s.title}</h3>
+                <ul className="space-y-1.5">
+                  {s.items.map((item) => (
+                    <li key={item} className="text-sm flex items-start gap-2" style={{ color: '#3D4A63' }}>
+                      <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: '#F0A83C' }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       </section>
