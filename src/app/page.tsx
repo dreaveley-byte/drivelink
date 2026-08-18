@@ -68,13 +68,18 @@ export default async function Home() {
       <header className="sticky top-0 z-20 backdrop-blur border-b" style={{ background: 'rgba(250,250,247,0.85)', borderColor: '#E4E1D8' }}>
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Logo height={22} />
-          <Link
-            href="/login"
-            className="text-sm font-semibold px-4 py-2 rounded-full border transition-colors"
-            style={{ borderColor: '#14213D', color: '#14213D' }}
-          >
-            Log in
-          </Link>
+          <div className="flex items-center gap-5">
+            <a href="tel:18884993284" className="hidden sm:block text-sm font-semibold" style={{ color: '#14213D' }}>
+              1 888-499-3284
+            </a>
+            <Link
+              href="/login"
+              className="text-sm font-semibold px-4 py-2 rounded-full border transition-colors"
+              style={{ borderColor: '#14213D', color: '#14213D' }}
+            >
+              Log in
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -232,6 +237,7 @@ export default async function Home() {
         <div className="max-w-6xl mx-auto px-6 py-10 flex flex-wrap items-center justify-between gap-4">
           <Logo height={18} />
           <div className="flex items-center gap-6 text-sm" style={{ color: '#3D4A63' }}>
+            <a href="tel:18884993284" className="hover:underline">1 888-499-3284</a>
             <Link href="/login" className="hover:underline">Log in</Link>
             <span className="mono text-xs" style={{ color: '#8C8C7E' }}>&copy; {new Date().getFullYear()} Drivflo</span>
           </div>
