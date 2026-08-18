@@ -825,6 +825,7 @@ export default function EditJobPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return // guards against a double-click/double-submit race that could otherwise duplicate stops (delete+insert running twice concurrently)
     setError('')
 
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
