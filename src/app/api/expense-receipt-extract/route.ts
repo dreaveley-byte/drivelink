@@ -21,15 +21,17 @@ export async function POST(req: NextRequest) {
 
   const prompt =
     'This is a photo of a receipt for a work-related expense a delivery driver is submitting for reimbursement. ' +
-    'Extract the total amount paid and figure out which category it belongs to. ' +
+    'Extract the total amount paid, the date on the receipt, and figure out which category it belongs to. ' +
     `Valid categories are exactly: ${VALID_CATEGORIES.join(', ')}. ` +
     'Use "additional_mileage" only for mileage reimbursement receipts, "fuel" for gas station receipts, "food" for meals, ' +
     '"tolls" for toll roads/bridges, "parking" for parking fees, "repairs" for vehicle repair/service, "storage" for vehicle storage fees, ' +
     '"inspection" for vehicle inspection fees, "hotel" for hotel/motel stays, "return_transport" for Uber/bus/taxi getting the driver back home, ' +
     'and "other" if nothing else clearly fits. ' +
+    'Also judge whether this genuinely looks like a real, legible receipt matching its category (not a random photo, a duplicate/reused image, something clearly unrelated to a work delivery expense, or an amount that looks implausible for the category) - set "looksLegitimate" to true only if you have no real doubts. ' +
     'Reply with ONLY raw JSON, no markdown formatting, no code fences, in exactly this shape: ' +
-    '{"amount": 12.34, "category": "fuel", "vendor": "Shell", "description": "short description under 8 words"}. ' +
-    'If you cannot read an amount at all, set "amount" to null. If the image is not a receipt, set "category" to "other" and "description" to "Could not read receipt".'
+    '{"amount": 12.34, "category": "fuel", "vendor": "Shell", "description": "short description under 8 words", "date": "2026-08-18", "looksLegitimate": true}. ' +
+    'For "date", use the date printed on the receipt in YYYY-MM-DD format, or null if you cannot read one. ' +
+    'If you cannot read an amount at all, set "amount" to null. If the image is not a receipt, set "category" to "other", "looksLegitimate" to false, and "description" to "Could not read receipt".'
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -60,12 +62,16 @@ export async function POST(req: NextRequest) {
 
     const category = VALID_CATEGORIES.includes(parsed.category) ? parsed.category : 'other'
     const amount = typeof parsed.amount === 'number' && parsed.amount > 0 ? parsed.amount : null
+    const date = typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? parsed.date : null
+    const looksLegitimate = parsed.looksLegitimate !== false // default to true unless explicitly flagged
 
     return NextResponse.json({
       amount,
       category,
       vendor: typeof parsed.vendor === 'string' ? parsed.vendor : null,
       description: typeof parsed.description === 'string' ? parsed.description : null,
+      date,
+      looksLegitimate,
     })
   } catch (e) {
     console.error('Receipt extraction failed:', e)

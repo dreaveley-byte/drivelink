@@ -121,7 +121,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: rawExpenses } = await supabase
     .from('job_expenses')
-    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, added_by_admin, submitted_by:submitted_by(full_name)')
+    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, added_by_admin, auto_approved, submitted_by:submitted_by(full_name)')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
 
@@ -141,6 +141,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         created_at: exp.created_at,
         approved_addition_cents: exp.approved_addition_cents,
         added_by_admin: exp.added_by_admin,
+        auto_approved: exp.auto_approved,
         receipt_url: signedUrl,
         submitted_by_name: submitter?.full_name ?? null,
       }

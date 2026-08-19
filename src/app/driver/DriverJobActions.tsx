@@ -180,6 +180,8 @@ export default function DriverJobActions({
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [justSubmittedExpense, setJustSubmittedExpense] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState('wait_time')
+  const [expenseReceiptDate, setExpenseReceiptDate] = useState<string | null>(null)
+  const [expenseLooksLegitimate, setExpenseLooksLegitimate] = useState(true)
   const [expenseCustomCategory, setExpenseCustomCategory] = useState('')
   const [expenseDescription, setExpenseDescription] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
@@ -722,8 +724,12 @@ export default function DriverJobActions({
         if (data.description || data.vendor) {
           setExpenseDescription([data.vendor, data.description].filter(Boolean).join(' — '))
         }
+        setExpenseReceiptDate(data.date ?? null)
+        setExpenseLooksLegitimate(data.looksLegitimate !== false)
         setReceiptScanNote('Filled in from the receipt — double check before submitting.')
       } else {
+        setExpenseReceiptDate(null)
+        setExpenseLooksLegitimate(true) // unknown, not flagged - let a human decide either way
         setReceiptScanNote('Could not read the receipt automatically — enter the details yourself.')
       }
     } catch {
@@ -774,6 +780,8 @@ export default function DriverJobActions({
       description: expenseDescription || null,
       amount_cents: amountCents,
       receipt_photo_path: path,
+      receipt_date: expenseReceiptDate,
+      looks_legitimate: expenseLooksLegitimate,
     })
 
     setSubmittingExpense(false)
@@ -789,6 +797,8 @@ export default function DriverJobActions({
     setExpenseDescription('')
     setExpenseAmount('')
     setExpenseReceiptFile(null)
+    setExpenseReceiptDate(null)
+    setExpenseLooksLegitimate(true)
     setReceiptScanNote('')
     router.refresh()
   }

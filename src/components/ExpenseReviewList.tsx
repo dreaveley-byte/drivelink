@@ -17,6 +17,7 @@ type Expense = {
   submitted_by_name: string | null
   approved_addition_cents?: number | null
   added_by_admin?: boolean
+  auto_approved?: boolean
 }
 
 type Baselines = ExpenseBaselines
@@ -273,7 +274,8 @@ export default function ExpenseReviewList({
                 {exp.status === 'approved' && isAdmin && (
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-xs text-green-600">
-                      ✓ Approved{!!exp.approved_addition_cents && exp.approved_addition_cents !== exp.amount_cents && ` (added ${formatCents(exp.approved_addition_cents)})`}
+                      {exp.auto_approved ? '✓ Auto-approved (within accrual)' : '✓ Approved'}
+                      {!!exp.approved_addition_cents && exp.approved_addition_cents !== exp.amount_cents && ` (added ${formatCents(exp.approved_addition_cents)})`}
                       {exp.approved_addition_cents === 0 && ' (no charge added — covered by base price)'}
                     </p>
                     <button
