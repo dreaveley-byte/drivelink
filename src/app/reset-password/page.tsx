@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
       return
     }
     if (password !== confirm) {
-      setError('Passwords don\u2019t match.')
+      setError('Passwords don’t match.')
       return
     }
     setLoading(true)

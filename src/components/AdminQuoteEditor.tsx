@@ -136,7 +136,7 @@ export default function AdminQuoteEditor({
         disabled={saving}
         className="mt-2 text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
       >
-        {saving ? 'Saving\u2026' : 'Save adjusted quote'}
+        {saving ? 'Saving…' : 'Save adjusted quote'}
       </button>
     </div>
   )

@@ -18,7 +18,7 @@ function getDeviceInstructions(): string {
   if (isAndroid) {
     return 'Tap the lock/info icon next to the address bar → Permissions → Location → Allow. Or: Chrome menu (⋮) → Settings → Site settings → Location → find drivflo.ca → Allow.'
   }
-  return 'Check your browser\u2019s site settings for drivflo.ca and allow Location access.'
+  return 'Check your browser’s site settings for drivflo.ca and allow Location access.'
 }
 
 export default function LocationSharer({ jobId }: { jobId: string }) {

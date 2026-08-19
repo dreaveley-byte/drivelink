@@ -1,4 +1,4 @@
-export type ExpenseBaselines = { fuel: number; inspection: number; food: number }
+export type ExpenseBaselines = { fuel: number; inspection: number; food: number; hotel: number }
 
 // How much approving/adding this specific expense would actually add to the
 // job's dealer-billed total, given everything already approved in the same
@@ -12,9 +12,9 @@ export function computeExpenseAddAmount(
   baselines: ExpenseBaselines
 ): number {
   if (category === 'food') return 0
-  if (category !== 'fuel' && category !== 'inspection') return amountCents
+  if (category !== 'fuel' && category !== 'inspection' && category !== 'hotel') return amountCents
 
-  const baseline = baselines[category as 'fuel' | 'inspection']
+  const baseline = baselines[category as 'fuel' | 'inspection' | 'hotel']
   const newSum = priorApprovedSameCategoryCents + amountCents
   return Math.max(0, newSum - baseline) - Math.max(0, priorApprovedSameCategoryCents - baseline)
 }

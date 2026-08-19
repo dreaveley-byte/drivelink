@@ -23,7 +23,7 @@ export default function DeactivateDiscountCodeButton({ codeId }: { codeId: strin
       disabled={saving}
       className="text-xs text-red-500 hover:text-red-700 underline disabled:opacity-50"
     >
-      {saving ? 'Saving\u2026' : 'Deactivate'}
+      {saving ? 'Saving…' : 'Deactivate'}
     </button>
   )
 }

@@ -125,7 +125,7 @@ export default function ProfileSettingsForm({
       return
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords don\u2019t match.')
+      setPasswordError('Passwords don’t match.')
       return
     }
     setSavingPassword(true)

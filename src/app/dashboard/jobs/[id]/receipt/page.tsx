@@ -587,7 +587,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             calculatedDriverPayCents={job.estimated_driver_pay_cents}
             hourlyRateCents={hourlyRateCents}
             approvedExpensesCents={job.approved_expenses_cents ?? 0}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0 }}
             existingExpenses={(rawExpenses ?? []).map((e) => ({ category: e.category, status: e.status, amount_cents: e.amount_cents }))}
           />
         </div>
@@ -599,7 +599,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
             jobId={job.id}
             expenses={expenses}
             isAdmin={isAdmin}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0 }}
           />
         </div>
       )}

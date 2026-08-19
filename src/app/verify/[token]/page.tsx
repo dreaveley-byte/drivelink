@@ -224,7 +224,7 @@ export default function VerifyPage() {
           <p className="text-xs text-gray-500 text-center mb-3">
             {step === 'face'
               ? 'Line your face up inside the oval, in good lighting, then tap when ready.'
-              : 'Line your driver\u2019s license or photo ID up inside the frame, then tap when ready.'}
+              : 'Line your driver’s license or photo ID up inside the frame, then tap when ready.'}
           </p>
           {identityMismatch && (
             <p className="text-base font-bold text-red-600 text-center mb-1">Cannot verify ID</p>

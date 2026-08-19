@@ -69,7 +69,7 @@ export default function CustomerSmsThread({ jobId, hasCustomerPhone }: { jobId: 
     if (res.ok) {
       setDraft('')
     } else if (res.status === 501) {
-      setError('Texting isn\u2019t turned on yet.')
+      setError('Texting isn’t turned on yet.')
     } else {
       setError(resBody.error || 'Could not send the text.')
     }

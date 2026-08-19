@@ -31,7 +31,7 @@ export default function ShareRideButton({ label }: { label: string }) {
       onClick={share}
       className="w-full flex items-center justify-center gap-2 text-sm font-medium border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 mt-3"
     >
-      {copied ? '\u2713 Link copied' : `\ud83d\udcce Share this ${label} with a friend`}
+      {copied ? '✓ Link copied' : `📎 Share this ${label} with a friend`}
     </button>
   )
 }

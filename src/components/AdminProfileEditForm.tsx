@@ -99,7 +99,7 @@ export default function AdminProfileEditForm({
         disabled={saving}
         className="bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
       >
-        {saving ? 'Saving\u2026' : saved ? 'Saved \u2713' : 'Save'}
+        {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}
       </button>
     </div>
   )

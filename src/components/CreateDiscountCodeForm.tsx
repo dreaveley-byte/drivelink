@@ -106,7 +106,7 @@ export default function CreateDiscountCodeForm() {
         disabled={saving}
         className="mt-2 bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
       >
-        {saving ? 'Creating\u2026' : 'Create code'}
+        {saving ? 'Creating…' : 'Create code'}
       </button>
     </div>
   )

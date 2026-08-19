@@ -84,7 +84,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
                 <p className="text-sm font-semibold text-gray-900">{info.driver_name}</p>
                 {info.driver_rating_count > 0 ? (
                   <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="text-amber-500">\u2605</span>
+                    <span className="text-amber-500">★</span>
                     {info.driver_avg_rating} ({info.driver_rating_count} rating{info.driver_rating_count === 1 ? '' : 's'})
                   </p>
                 ) : (

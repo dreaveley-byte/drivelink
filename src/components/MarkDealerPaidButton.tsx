@@ -78,7 +78,7 @@ export default function MarkDealerPaidButton({
                 disabled={saving}
                 className="flex-1 bg-green-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {saving ? 'Saving\u2026' : 'Confirm paid'}
+                {saving ? 'Saving…' : 'Confirm paid'}
               </button>
               <button
                 onClick={() => setOpen(false)}

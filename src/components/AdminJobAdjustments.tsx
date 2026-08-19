@@ -167,7 +167,7 @@ export default function AdminJobAdjustments({
         <p className="text-xs text-gray-400 mb-1.5">
           {currentHoursOverride != null
             ? `Currently overridden to ${currentHoursOverride} hrs (${formatCents(Math.round(currentHoursOverride * hourlyRateCents))} at ${formatCents(hourlyRateCents)}/hr). Clear the field and save to go back to the calculated hours.`
-            : `Not overridden — using the calculated hours (${calculatedDriverPayCents != null ? formatCents(calculatedDriverPayCents) : '\u2014'} driver pay).`}
+            : `Not overridden — using the calculated hours (${calculatedDriverPayCents != null ? formatCents(calculatedDriverPayCents) : '—'} driver pay).`}
         </p>
         <div className="flex gap-2">
           <input
@@ -184,7 +184,7 @@ export default function AdminJobAdjustments({
             disabled={savingHours}
             className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
           >
-            {savingHours ? 'Saving\u2026' : 'Save'}
+            {savingHours ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

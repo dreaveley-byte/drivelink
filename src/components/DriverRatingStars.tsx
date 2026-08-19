@@ -57,7 +57,7 @@ export default function DriverRatingStars({ driverId, avgRating }: { driverId: s
           className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-3"
         >
           <p className="text-xs font-semibold text-gray-900 mb-2">Customer reviews</p>
-          {loading && <p className="text-xs text-gray-400">Loading\u2026</p>}
+          {loading && <p className="text-xs text-gray-400">Loading…</p>}
           {!loading && reviews && reviews.length === 0 && (
             <p className="text-xs text-gray-400">No reviews yet.</p>
           )}
@@ -70,7 +70,7 @@ export default function DriverRatingStars({ driverId, avgRating }: { driverId: s
                   ))}
                   <span className="text-[10px] text-gray-400 ml-1">
                     {new Date(r.updated_at).toLocaleDateString('en-CA', { dateStyle: 'medium' })}
-                    {r.dealer_name && ` \u00b7 ${r.dealer_name}`}
+                    {r.dealer_name && ` · ${r.dealer_name}`}
                   </span>
                 </div>
                 {r.feedback && <p className="text-xs text-gray-600 mt-0.5">{r.feedback}</p>}

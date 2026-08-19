@@ -168,7 +168,7 @@ async function convertToCad(amountCents: number, fromCurrency: string): Promise<
 export async function POST(req: NextRequest) {
   const token = process.env.DUFFEL_ACCESS_TOKEN
   if (!token) {
-    return NextResponse.json({ error: 'Flight search isn\u2019t set up yet.' }, { status: 501 })
+    return NextResponse.json({ error: 'Flight search isn’t set up yet.' }, { status: 501 })
   }
 
   const { originAddress, destinationAddress, departureDate } = await req.json()

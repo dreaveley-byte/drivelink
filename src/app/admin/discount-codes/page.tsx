@@ -37,7 +37,7 @@ export default async function AdminDiscountCodesPage() {
       <div className="border-b border-gray-100 px-6 py-3">
         <div className="max-w-3xl mx-auto">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">
-            \u2190 Back to admin
+            ← Back to admin
           </Link>
         </div>
       </div>
@@ -61,8 +61,8 @@ export default async function AdminDiscountCodesPage() {
                     <p className="text-sm font-mono font-semibold text-gray-900">{c.code}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {c.discount_percent}% off markup
-                      {c.expires_days != null && ` \u00b7 expires ${c.expires_days} days after redeeming`}
-                      {c.max_jobs != null && ` \u00b7 first ${c.max_jobs} jobs`}
+                      {c.expires_days != null && ` · expires ${c.expires_days} days after redeeming`}
+                      {c.max_jobs != null && ` · first ${c.max_jobs} jobs`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

@@ -77,7 +77,7 @@ export default function AddDrawButton({ driverId, driverName }: { driverId: stri
                 disabled={saving}
                 className="flex-1 bg-[#378ADD] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
               >
-                {saving ? 'Saving\u2026' : 'Record draw'}
+                {saving ? 'Saving…' : 'Record draw'}
               </button>
               <button
                 onClick={() => setOpen(false)}

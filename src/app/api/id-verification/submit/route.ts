@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     if ((failureCount ?? 0) >= 2) {
       return NextResponse.json(
         {
-          error: 'We\u2019re having trouble verifying this automatically. Your driver will confirm your ID in person instead.',
+          error: 'We’re having trouble verifying this automatically. Your driver will confirm your ID in person instead.',
           manualOverrideRequired: true,
         },
         { status: 422 }

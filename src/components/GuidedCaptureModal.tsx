@@ -134,7 +134,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
         // and offer a fallback since a driver shouldn't be stuck either way.
         const name = e?.name as string | undefined
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-          setError('Camera access was denied for this site. Open your browser\u2019s site settings for drivflo.ca and allow Camera, or use the fallback below.')
+          setError('Camera access was denied for this site. Open your browser’s site settings for drivflo.ca and allow Camera, or use the fallback below.')
         } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
           setError('No camera was found on this device.')
         } else if (name === 'NotReadableError' || name === 'TrackStartError') {

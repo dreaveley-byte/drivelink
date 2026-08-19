@@ -938,6 +938,7 @@ export default function EditJobPage() {
       baseline_fuel_cents: pricing?.gasCostCents ?? 0,
       baseline_inspection_cents: pricing?.inspectionFeeCents ?? 0,
       baseline_food_cents: pricing?.mealCostCents ?? 0,
+      baseline_hotel_cents: pricing?.hotelCents ?? 0,
       pricing_breakdown: pricing ? JSON.stringify(pricing) : null,
       trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
       trade_in_make: isTradeIn ? tradeInMake || null : null,
@@ -1780,7 +1781,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <p className="text-[11px] text-gray-400">
                       Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
-                      {secondDriver && ' This breakdown is the combined total for both drivers — each driver\u2019s own job post shows their individual full pay separately, not half of this.'}
+                      {secondDriver && ' This breakdown is the combined total for both drivers — each driver’s own job post shows their individual full pay separately, not half of this.'}
                     </p>
                     <div className="flex items-center justify-between pt-1 text-xs font-medium text-gray-700">
                       <span>{secondDriver ? 'Total driver pay (both drivers combined)' : 'Total driver pay'}</span>

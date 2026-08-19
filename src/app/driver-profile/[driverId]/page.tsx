@@ -68,14 +68,14 @@ export default async function DriverPublicProfilePage({ params }: { params: Prom
                 <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-medium ${f.type === 'praise' ? 'text-green-700' : 'text-red-600'}`}>
-                      {f.type === 'praise' ? '\ud83d\udc4d Praise' : '\u26a0\ufe0f Complaint'}
+                      {f.type === 'praise' ? '👍 Praise' : '⚠️ Complaint'}
                     </span>
                     <span className="text-xs text-gray-400">
                       {new Date(f.created_at).toLocaleDateString('en-CA', { dateStyle: 'medium' })}
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 mt-1">{f.message}</p>
-                  {f.submitter_name && <p className="text-xs text-gray-400 mt-0.5">\u2014 {f.submitter_name}</p>}
+                  {f.submitter_name && <p className="text-xs text-gray-400 mt-0.5">— {f.submitter_name}</p>}
                 </div>
               ))}
             </div>

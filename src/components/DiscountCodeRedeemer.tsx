@@ -48,7 +48,7 @@ export default function DiscountCodeRedeemer({ orgId }: { orgId: string }) {
     return (
       <div className="border border-green-200 bg-green-50 rounded-lg p-3 mt-4">
         <p className="text-sm text-green-700">
-          Discount code applied{existing && ` (${existing.code})`} \u2014 {existing?.percent ?? ''}% off your delivery pricing.
+          Discount code applied{existing && ` (${existing.code})`} — {existing?.percent ?? ''}% off your delivery pricing.
         </p>
       </div>
     )
@@ -70,7 +70,7 @@ export default function DiscountCodeRedeemer({ orgId }: { orgId: string }) {
           disabled={saving || !code.trim()}
           className="bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
         >
-          {saving ? 'Applying\u2026' : 'Apply'}
+          {saving ? 'Applying…' : 'Apply'}
         </button>
       </div>
     </div>

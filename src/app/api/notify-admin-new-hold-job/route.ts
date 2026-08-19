@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
   const holdMinutes = settings.job_review_hold_minutes ?? 5
 
   const body =
-    `\ud83c\udd95 New job on hold for review (${reason}): ${vehicleDesc || 'delivery'} for ${orgInfo?.name ?? 'a dealer'}, ` +
-    `${job.pickup_address} \u2192 ${job.dropoff_address}. Goes live to drivers in ${holdMinutes} min unless claimed and reviewed.`
+    `🆕 New job on hold for review (${reason}): ${vehicleDesc || 'delivery'} for ${orgInfo?.name ?? 'a dealer'}, ` +
+    `${job.pickup_address} → ${job.dropoff_address}. Goes live to drivers in ${holdMinutes} min unless claimed and reviewed.`
 
   const result = await sendSms(settings.admin_alert_phone, body)
 

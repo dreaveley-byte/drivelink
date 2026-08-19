@@ -31,7 +31,7 @@ type PlaceResult = {
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'Places search isn\u2019t configured.' }, { status: 501 })
+    return NextResponse.json({ error: 'Places search isn’t configured.' }, { status: 501 })
   }
 
   const { address } = await req.json()

@@ -444,7 +444,7 @@ export default function DriverJobActions({
   }
 
   async function claimJob() {
-    if (!confirm('Claim this job? Make sure it doesn\u2019t conflict with anything else you have scheduled.')) return
+    if (!confirm('Claim this job? Make sure it doesn’t conflict with anything else you have scheduled.')) return
     setLoading(true)
     const supabase = createClient()
 

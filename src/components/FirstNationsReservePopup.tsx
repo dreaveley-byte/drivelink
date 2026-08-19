@@ -23,7 +23,7 @@ export default function FirstNationsReservePopup({
 
   async function handleYes() {
     if (!dropoffAddress.trim()) {
-      setError('Enter the dropoff address first, then check this box again \u2014 that\u2019s what nearby reserves get searched around.')
+      setError('Enter the dropoff address first, then check this box again — that’s what nearby reserves get searched around.')
       return
     }
     setStep('list')

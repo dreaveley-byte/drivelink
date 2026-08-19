@@ -94,7 +94,7 @@ export default function MarkPaidButton({
             />
             <p className="text-xs text-gray-400 mb-3">
               This records the payment, settles any outstanding advances, and marks their reimbursements as paid.
-              You still need to actually send the money yourself \u2014 this doesn&apos;t move funds automatically yet.
+              You still need to actually send the money yourself — this doesn&apos;t move funds automatically yet.
             </p>
             <div className="flex gap-2">
               <button
@@ -102,7 +102,7 @@ export default function MarkPaidButton({
                 disabled={saving}
                 className="flex-1 bg-green-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                {saving ? 'Saving\u2026' : 'Confirm paid'}
+                {saving ? 'Saving…' : 'Confirm paid'}
               </button>
               <button
                 onClick={() => setOpen(false)}
