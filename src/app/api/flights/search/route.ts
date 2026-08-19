@@ -334,7 +334,20 @@ export async function POST(req: NextRequest) {
   console.log('Flight search results:', results.map((r) =>
     r ? `${r.flightFrom.code}->${r.flightTo.code}: ${r.flight ? `$${(r.effectiveCostCents / 100).toFixed(2)} total` : 'no flight found'}` : 'null (request failed)'
   ))
-  const viable = results.filter((r): r is NonNullable<typeof r> => r !== null && r.flight !== null)
+  const viable = results.filter((r): r is NonNullable<typeof r> => {
+    if (r === null || r.flight === null) return false
+    // A candidate airport can be geographically close in a straight line
+    // (e.g. across water to Vancouver Island) while actually requiring a
+    // ferry crossing to reach by road - Google's driving directions then
+    // return a huge real distance trying to route around it. An Uber can't
+    // drive across open water, so treat an unrealistically long ground leg
+    // as this airport simply not being a practical option, not a valid
+    // (if expensive) one to offer.
+    const MAX_REASONABLE_GROUND_KM = 150
+    if (r.groundToAirport && r.groundToAirport.distanceKm > MAX_REASONABLE_GROUND_KM) return false
+    if (r.groundFromAirport && r.groundFromAirport.distanceKm > MAX_REASONABLE_GROUND_KM) return false
+    return true
+  })
 
   if (viable.length === 0) {
     // Every combination failed outright (not just "no offers") — fall back to
