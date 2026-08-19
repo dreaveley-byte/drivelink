@@ -783,9 +783,23 @@ export default function EditJobPage() {
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
             setDecisionNote('Short trip, flying back (manually selected).')
           } else {
-            setCalcError('Could not find a flight price — add one manually below if needed.')
+            // Live flight search is flaky enough that a re-search (e.g. from
+            // just clicking "Calculate distance & cost" again) can come back
+            // empty even when a flight was found moments ago for this same
+            // trip. Rather than silently dropping the whole return-transport
+            // cost (and with it the overnight/hotel charges that depended on
+            // those extra hours), keep whatever flight/ground-transport
+            // charges were already on the quote — a stale-but-real price beats
+            // a quote that's suddenly missing hundreds of dollars in costs.
+            const existingFlyCharges = additionalCharges.filter((c) => c.kind === 'flight' || c.kind === 'ground-home' || c.kind === 'ground-to-airport')
             const fc = ferryCharge('oneway-vehicle')
-            finalCharges = fc ? [...manualCharges, fc] : manualCharges
+            if (existingFlyCharges.length > 0) {
+              finalCharges = fc ? [...manualCharges, ...existingFlyCharges, fc] : [...manualCharges, ...existingFlyCharges]
+              setCalcError('Could not find a fresh flight price — kept the previously found flight below instead.')
+            } else {
+              setCalcError('Could not find a flight price — add one manually below if needed.')
+              finalCharges = fc ? [...manualCharges, fc] : manualCharges
+            }
           }
         } else {
           // No trade-in, no chase+2nd driver, not flying, and Uber back wasn't
