@@ -258,8 +258,8 @@ export default function AdminJobAdjustments({
                 className="mt-0.5"
               />
               <span>
-                Admin paid this directly \u2014 don&apos;t reimburse the driver
-                {paidByAdminDirectly && <span className="block text-gray-400 mt-0.5">Still added to the dealer&apos;s bill, just not to the driver&apos;s pay.</span>}
+                Admin paid this directly — don't reimburse the driver
+                {paidByAdminDirectly && <span className="block text-gray-400 mt-0.5">Still added to the dealer's bill, just not to the driver's pay.</span>}
               </span>
             </label>
             <div className="flex gap-2 pt-1">
