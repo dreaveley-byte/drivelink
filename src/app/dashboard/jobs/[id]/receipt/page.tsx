@@ -48,6 +48,26 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
     .eq('id', jobId)
     .single()
 
+  const { data: deliveryAcceptance } = await supabase
+    .from('legal_acceptances')
+    .select('document_version, accepted_at, media_consent')
+    .eq('job_id', jobId)
+    .eq('document_slug', 'vehicle_delivery_acknowledgement')
+    .order('accepted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let deliveryAcceptanceBody: string | null = null
+  if (deliveryAcceptance) {
+    const { data: deliveryDoc } = await supabase
+      .from('legal_documents')
+      .select('body')
+      .eq('slug', 'vehicle_delivery_acknowledgement')
+      .eq('version', deliveryAcceptance.document_version)
+      .maybeSingle()
+    deliveryAcceptanceBody = deliveryDoc?.body ?? null
+  }
+
   if (jobError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
@@ -380,8 +400,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           return (
             <div className="mb-6">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
+              {deliveryAcceptance && (
+                <p className="text-xs text-gray-400 mb-1">
+                  Vehicle Delivery Acknowledgement v{deliveryAcceptance.document_version} accepted{' '}
+                  {fmtDateTime(deliveryAcceptance.accepted_at)}
+                  {deliveryAcceptance.media_consent != null &&
+                    (deliveryAcceptance.media_consent ? ' · media consent given' : ' · media consent declined')}
+                </p>
+              )}
               <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
-                {disclosureText}
+                {deliveryAcceptanceBody ?? disclosureText}
               </p>
               {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
                 <div className="mb-2">

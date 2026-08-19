@@ -13,6 +13,7 @@ import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 import { sortJobsActiveFirst } from '@/lib/sortJobs'
+import { getOutstandingLegalDocs } from '@/lib/legalGate'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,6 +122,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
     )
+  }
+
+  const outstandingDocs = await getOutstandingLegalDocs(user.id, 'dealer')
+  if (outstandingDocs.length > 0) {
+    redirect('/dashboard/resign')
   }
 
   const { data: org } = await supabase

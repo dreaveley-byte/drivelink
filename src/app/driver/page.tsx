@@ -12,6 +12,7 @@ import ChatBadgeLink from '@/components/ChatBadgeLink'
 import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
+import { getOutstandingLegalDocs } from '@/lib/legalGate'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,11 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
 
   if (profile?.role !== 'driver') {
     redirect('/dashboard')
+  }
+
+  const outstandingDocs = await getOutstandingLegalDocs(user.id, 'driver')
+  if (outstandingDocs.length > 0) {
+    redirect('/driver/resign')
   }
 
   if (!profile.is_active) {

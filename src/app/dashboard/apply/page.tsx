@@ -5,6 +5,16 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploadField from '@/components/FileUploadField'
 import SignaturePad from '@/components/SignaturePad'
 import Logo from '@/components/Logo'
+import LegalDocumentChecklist from '@/components/LegalDocumentChecklist'
+import { DEALER_REQUIRED_DOCS } from '@/lib/legalDocuments'
+
+const DEALER_DOC_LABELS: Record<string, string> = {
+  dealer_master_services_agreement: 'Dealer Master Services Agreement',
+  fee_waiting_cancellation_policy: 'Fee, Waiting and Cancellation Policy',
+  privacy_policy: 'Privacy Policy',
+  platform_terms_of_service: 'Platform Terms of Service',
+}
+const DEALER_DOC_LIST = DEALER_REQUIRED_DOCS.map((slug) => ({ slug, label: DEALER_DOC_LABELS[slug] }))
 
 export default function DealerApplyPage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -24,7 +34,7 @@ export default function DealerApplyPage() {
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'pre_authorized_debit'>('credit_card')
   const [padPath, setPadPath] = useState<string | null>(null)
 
-  const [liabilityRelease, setLiabilityRelease] = useState(false)
+  const [acceptedDocs, setAcceptedDocs] = useState<Record<string, number>>({})
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
 
   const [error, setError] = useState('')
@@ -57,8 +67,9 @@ export default function DealerApplyPage() {
       setError('Please upload your completed pre-authorized debit form.')
       return
     }
-    if (!liabilityRelease) {
-      setError('Please agree to the release of liability before submitting.')
+    const missingDocs = DEALER_REQUIRED_DOCS.filter((slug) => acceptedDocs[slug] == null)
+    if (missingDocs.length > 0) {
+      setError('Please review and agree to all agreements/policies before submitting.')
       return
     }
     if (!signatureDataUrl) {
@@ -97,7 +108,10 @@ export default function DealerApplyPage() {
       pre_authorized_debit_form_path: padPath,
       contract_signed_at: new Date().toISOString(),
       contract_signature_path: signaturePath,
-      liability_release_signed: liabilityRelease,
+      // Legacy lightweight flag — kept in sync for backwards compatibility, but the
+      // real source of truth for agreement is the legal_acceptances rows recorded
+      // above via LegalDocumentChecklist.
+      liability_release_signed: true,
     })
 
     if (insertError) {
@@ -222,25 +236,21 @@ export default function DealerApplyPage() {
           </section>
 
           <section className="space-y-4 border-t border-gray-200 pt-6">
-            <h2 className="text-sm font-semibold text-gray-900">Dealer Agreement</h2>
-            <div className="border border-gray-200 rounded-lg p-4 text-xs text-gray-600 max-h-40 overflow-y-auto">
-              <p className="mb-2">
-                This agreement is between the dealer, Drivflo, and any drivers assigned to jobs posted by the
-                dealer. By signing, the dealer releases Drivflo and its drivers from liability for matters
-                outside Drivflo&apos;s reasonable control, and agrees to Drivflo&apos;s standard job posting,
-                payment, and cancellation terms.
-              </p>
-              <p>
-                Full legal text will be finalized and attached here before this goes live for real applicants.
-              </p>
-            </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" className="mt-0.5" checked={liabilityRelease} onChange={(e) => setLiabilityRelease(e.target.checked)} />
-              I have read and agree to the release of liability and dealer terms above.
-            </label>
+            <h2 className="text-sm font-semibold text-gray-900">Agreements & Policies</h2>
+            <p className="text-xs text-gray-500">
+              Review and agree to each document below. You must scroll to the bottom of each one before you can agree.
+            </p>
+            <LegalDocumentChecklist
+              applicationType="dealer"
+              docs={DEALER_DOC_LIST}
+              accepted={acceptedDocs}
+              onChange={(slug, version) => setAcceptedDocs((prev) => ({ ...prev, [slug]: version }))}
+            />
 
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Sign below to confirm your agreement</label>
+              <label className="block text-sm text-gray-700 mb-1">
+                Sign below to confirm your agreement to the Dealer Master Services Agreement
+              </label>
               <SignaturePad onChange={setSignatureDataUrl} />
             </div>
           </section>
@@ -249,7 +259,7 @@ export default function DealerApplyPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || DEALER_REQUIRED_DOCS.some((slug) => acceptedDocs[slug] == null) || !signatureDataUrl}
             className="w-full bg-[#378ADD] text-white text-sm font-medium px-5 py-3 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Application'}
