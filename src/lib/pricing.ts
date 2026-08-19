@@ -147,11 +147,27 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   )
   const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
 
+  // Hours always represent real time the driver spent working (driving, flying,
+  // waiting at the airport, etc.) so they're always paid — separate from whether
+  // the dealerAmountCents dollar figure also gets reimbursed to the driver.
+  // (e.g. a flight ticket: the driver is paid for the hours spent traveling,
+  // but the ticket cost itself is billed to the dealer only, not added to pay.)
+  const extraDriverPaidHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
+  const extraDealerOnlyHours = additionalCharges
+    .reduce((sum, c) => sum + c.hoursAdded, 0)
+
   // Overnight isn't just about drive time — the inspection/registry stops, ferry
-  // wait, and break time add real hours on the ground too, and together they can
-  // push the driver past the point where they can safely finish same-day.
+  // wait, break time, and (crucially, for a fly-back job) the flight itself plus
+  // its ground-transport/check-in-buffer hours all add real time to the driver's
+  // day, and together they can push the driver past the point where they can
+  // safely finish same-day. This must include extraDealerOnlyHours (the flight/
+  // ground-transport/ferry charge hours already computed above) — a job that's
+  // only long because of a late flight and a multi-hour buffer, not the drive
+  // itself, still needs a hotel and the overnight fee just as much as one that's
+  // long from driving alone. Previously this was computed before those extra
+  // hours existed, so a long fly-back day silently never triggered overnight.
   const overnightRequired =
-    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours > settings.max_driving_hours_before_overnight
+    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours > settings.max_driving_hours_before_overnight
 
   // Capped per person per day — an overnight trip is treated as 2 days for this
   // purpose (the app's overnight model is a single same-day/next-day threshold,
@@ -161,15 +177,6 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const mealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
     ? Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
     : rawMealCostCents
-
-  // Hours always represent real time the driver spent working (driving, flying,
-  // waiting at the airport, etc.) so they're always paid — separate from whether
-  // the dealerAmountCents dollar figure also gets reimbursed to the driver.
-  // (e.g. a flight ticket: the driver is paid for the hours spent traveling,
-  // but the ticket cost itself is billed to the dealer only, not added to pay.)
-  const extraDriverPaidHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
-  const extraDealerOnlyHours = additionalCharges
-    .reduce((sum, c) => sum + c.hoursAdded, 0)
 
   // Every delivery involves real time at the destination beyond pure driving —
   // paperwork, the walkaround, signatures, handing over keys. This wasn't
