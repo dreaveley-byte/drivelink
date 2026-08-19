@@ -399,8 +399,10 @@ export default function EditJobPage() {
   // `scheduledFor` state update to land and this callback to be re-created on
   // the next render would mean the very first invocation still reads the OLD
   // date, silently recalculating the wrong quote.
-  const runCalculation = useCallback(async (scheduledForOverride?: string) => {
+  const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean) => {
     const effectiveScheduledFor = scheduledForOverride ?? scheduledFor
+    const effectiveAutoSelect = forceFlying ? false : autoSelectReturnMethod
+    const effectiveFlyingBack = forceFlying ? true : flyingBack
     setCalcError('')
     setDecisionNote('')
     const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
@@ -703,7 +705,7 @@ export default function EditJobPage() {
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
         if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
-      } else if (autoSelectReturnMethod && longHaul) {
+      } else if (effectiveAutoSelect && longHaul) {
         // Compare all three ways to get the driver home, pick the cheapest.
         const [flyCharges, busCharges] = await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
 
@@ -767,7 +769,7 @@ export default function EditJobPage() {
         // Short trip, or a long trip with auto-select manually turned off —
         // either way, respect the manual checkboxes exactly as set rather than
         // re-running the comparison and silently overwriting the choice.
-        if (flyingBack) {
+        if (effectiveFlyingBack) {
           setEffectiveOneWayReturn(true)
           const flyCharges = await buildFlyCharges()
           if (flyCharges) {
@@ -1863,6 +1865,14 @@ export default function EditJobPage() {
               <p className="text-xs text-gray-400 pt-1">
                 Estimated price. Additional charges may apply for wait time, repairs, tolls, parking, storage, additional mileage, or other job-related expenses. Final pricing may vary.
               </p>
+              {/* `flyingBack` is a loose "one-way, solo return" flag — it's also
+                  true when Uber back or Bus won the auto-select comparison, not
+                  only an actual flight. This panel is still useful to show in
+                  that case (comparing what flying on a nearby date would cost,
+                  even if Uber-back currently wins) — but picking a date here is
+                  now treated as a deliberate choice to fly, which locks in
+                  flyingBack + turns off auto-select for the recalculation below,
+                  so it can't silently revert back to Uber-back/Bus afterward. */}
               {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
                 <NearbyDatesFlightCheck
                   scheduledFor={scheduledFor}
@@ -1894,11 +1904,19 @@ export default function EditJobPage() {
                       setDeliveryDeadline(toLocalDatetimeInputValue(shifted))
                     }
                     setScheduledFor(d)
-                    // Pass the new date straight into runCalculation rather than
-                    // relying on the `scheduledFor` state update to land first —
-                    // state updates are async, so runCalculation's own closure
-                    // would otherwise still see the OLD date on this first call.
-                    await runCalculation(d)
+                    // Selecting a specific flight date here is a deliberate choice
+                    // to fly back on that date — lock that in (same pairing as the
+                    // manual "Flying back" checkbox above) so auto-select can't
+                    // silently re-run its own comparison for the new date and land
+                    // back on Uber-back/Bus instead of the flight just chosen.
+                    setFlyingBack(true)
+                    setAutoSelectReturnMethod(false)
+                    // Pass the new date and the forced-flying override straight
+                    // into runCalculation rather than relying on those state
+                    // updates landing first — they're async, so runCalculation's
+                    // own closure would otherwise still see the OLD values on
+                    // this same call.
+                    await runCalculation(d, true)
                   }}
                 />
               )}
