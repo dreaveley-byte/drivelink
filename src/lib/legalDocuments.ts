@@ -49,3 +49,15 @@ export const DEALER_REQUIRED_DOCS: LegalDocSlug[] = [
 export function requiredDocsForApplicationType(applicationType: 'driver' | 'dealer'): LegalDocSlug[] {
   return applicationType === 'driver' ? DRIVER_REQUIRED_DOCS : DEALER_REQUIRED_DOCS
 }
+
+// The two main contract documents require a real pen signature (not just a
+// click-through checkbox) — everything else is satisfied by scrolling to the
+// bottom and checking an acknowledgement box.
+export const SIGNATURE_REQUIRED_DOC_SLUGS: LegalDocSlug[] = [
+  'driver_contractor_agreement',
+  'dealer_master_services_agreement',
+]
+
+export function documentRequiresSignature(slug: string): boolean {
+  return (SIGNATURE_REQUIRED_DOC_SLUGS as string[]).includes(slug)
+}

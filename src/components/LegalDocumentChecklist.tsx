@@ -58,6 +58,10 @@ export default function LegalDocumentChecklist({
         onAccepted={(version) => {
           if (openSlug) onChange(openSlug, version)
         }}
+        // The apply forms that use this checklist already capture the applicant's
+        // signature for the main contract once, at the bottom of the form — don't
+        // also ask for it inside this per-document review modal.
+        captureSignature={false}
       />
     </div>
   )
