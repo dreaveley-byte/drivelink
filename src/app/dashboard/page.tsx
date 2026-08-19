@@ -14,6 +14,7 @@ import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 import { sortJobsActiveFirst } from '@/lib/sortJobs'
 import { getOutstandingLegalDocs } from '@/lib/legalGate'
+import LegalGateModal from '@/components/LegalGateModal'
 
 export const dynamic = 'force-dynamic'
 
@@ -124,9 +125,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     )
   }
 
+  // A newly-published/updated required document blocks posting/managing jobs
+  // until the dealer re-signs. Instead of silently redirecting to
+  // /dashboard/resign, stay on this page and show a blocking warning pop-up
+  // with a "Click to review" action — and don't fetch or render the job list
+  // or the "Post a new job" action behind it.
   const outstandingDocs = await getOutstandingLegalDocs(user.id, 'dealer')
   if (outstandingDocs.length > 0) {
-    redirect('/dashboard/resign')
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <Logo height={24} />
+          </div>
+          <SignOutButton />
+        </header>
+        <main className="max-w-3xl mx-auto px-6 py-16 text-center">
+          <p className="text-sm text-gray-400">
+            You&apos;ll be able to see and post jobs again once you&apos;ve reviewed the agreement below.
+          </p>
+        </main>
+        <LegalGateModal applicationType="dealer" resignHref="/dashboard/resign" documentCount={outstandingDocs.length} />
+      </div>
+    )
   }
 
   const { data: org } = await supabase

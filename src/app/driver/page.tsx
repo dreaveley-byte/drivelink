@@ -13,6 +13,7 @@ import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 import { getOutstandingLegalDocs } from '@/lib/legalGate'
+import LegalGateModal from '@/components/LegalGateModal'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,9 +35,31 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     redirect('/dashboard')
   }
 
+  // A newly-published/updated required document blocks getting jobs until the
+  // driver re-signs. Rather than silently redirecting to /driver/resign, stay
+  // on this page and show a blocking warning pop-up with a "Click to review"
+  // action — and, crucially, don't fetch or render any job data (active or
+  // available) behind it, so there's genuinely nothing to accept until it's
+  // resolved.
   const outstandingDocs = await getOutstandingLegalDocs(user.id, 'driver')
   if (outstandingDocs.length > 0) {
-    redirect('/driver/resign')
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Driver</span>
+          </div>
+          <SignOutButton />
+        </header>
+        <main className="max-w-2xl mx-auto px-6 py-16 text-center">
+          <p className="text-sm text-gray-400">
+            You&apos;ll be able to see and claim jobs again once you&apos;ve reviewed the agreement below.
+          </p>
+        </main>
+        <LegalGateModal applicationType="driver" resignHref="/driver/resign" documentCount={outstandingDocs.length} />
+      </div>
+    )
   }
 
   if (!profile.is_active) {
