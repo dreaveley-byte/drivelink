@@ -152,15 +152,36 @@ export default function NearbyDatesFlightCheck({
         // return shape) so the caller can combine them the same way it
         // combines buildFlyCharges' result — this array is what actually
         // gets passed back up on selection.
-        const flyCharges: AdditionalCharge[] = [
-          {
-            description: 'Return ground transport',
-            kind: 'ground-home' as const,
-            dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
-            hoursAdded: pricingSettings.return_ground_transport_hours,
-            paidToDriver: true,
-          },
-        ]
+        //
+        // Return-home leg: price it off the real drive distance
+        // (body.groundFromAirport), same as buildFlyCharges() does — falling
+        // back to the flat estimate only when the real distance couldn't be
+        // calculated. Previously this always used the flat rate regardless,
+        // which is why a date picked here could show a real, correct
+        // distance-based Uber fare on the main calculate screen but a flat
+        // $30 once applied (and later saved) through this panel.
+        const flyCharges: AdditionalCharge[] = body.groundFromAirport
+          ? [
+              {
+                description: `Return ground transport (${body.groundFromAirport.distanceKm}km)`,
+                kind: 'ground-home' as const,
+                dealerAmountCents: Math.max(
+                  Math.round(pricingSettings.uber_base_fare_cents + body.groundFromAirport.distanceKm * pricingSettings.uber_per_km_cents),
+                  pricingSettings.uber_minimum_fare_cents
+                ),
+                hoursAdded: Math.round((body.groundFromAirport.durationMinutes / 60) * 100) / 100,
+                paidToDriver: true,
+              },
+            ]
+          : [
+              {
+                description: 'Return ground transport (flat estimate)',
+                kind: 'ground-home' as const,
+                dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
+                hoursAdded: pricingSettings.return_ground_transport_hours,
+                paidToDriver: true,
+              },
+            ]
         if (body.groundToAirport) {
           const km = body.groundToAirport.distanceKm
           flyCharges.push({
