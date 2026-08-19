@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { computeExpenseAddAmount, type ExpenseBaselines } from '@/lib/expenses'
 
 function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
@@ -10,16 +11,22 @@ function formatCents(cents: number) {
 
 export default function AdminJobAdjustments({
   jobId,
+  driverId,
   currentHoursOverride,
   calculatedDriverPayCents,
   hourlyRateCents,
   approvedExpensesCents,
+  baselines,
+  existingExpenses,
 }: {
   jobId: string
+  driverId: string | null
   currentHoursOverride: number | null
   calculatedDriverPayCents: number | null
   hourlyRateCents: number
   approvedExpensesCents: number
+  baselines: ExpenseBaselines
+  existingExpenses: { category: string; status: string; amount_cents: number }[]
 }) {
   const router = useRouter()
   const [hoursInput, setHoursInput] = useState(currentHoursOverride != null ? String(currentHoursOverride) : '')
@@ -31,6 +38,7 @@ export default function AdminJobAdjustments({
   const [expAmount, setExpAmount] = useState('')
   const [expDescription, setExpDescription] = useState('')
   const [expReceiptFile, setExpReceiptFile] = useState<File | null>(null)
+  const [paidByAdminDirectly, setPaidByAdminDirectly] = useState(false)
   const [savingExpense, setSavingExpense] = useState(false)
   const [error, setError] = useState('')
 
@@ -100,9 +108,20 @@ export default function AdminJobAdjustments({
       receiptPath = path
     }
 
+    const priorApprovedSameCategoryCents = existingExpenses
+      .filter((e) => e.category === expCategory && e.status === 'approved')
+      .reduce((sum, e) => sum + e.amount_cents, 0)
+    const addAmountCents = computeExpenseAddAmount(expCategory, amountCents, priorApprovedSameCategoryCents, baselines)
+
     const { error: insertError } = await supabase.from('job_expenses').insert({
       job_id: jobId,
-      submitted_by: user?.id,
+      // If admin paid this directly, it shouldn't flow into the driver's
+      // reimbursement (payroll sums expenses by who submitted them) - keep
+      // submitted_by as the admin themselves in that case. Otherwise, this
+      // is standing in for a receipt the driver forgot to submit, so it
+      // needs to be attributed to the actual driver on the job to correctly
+      // show up in their reimbursement total.
+      submitted_by: paidByAdminDirectly ? user?.id : (driverId ?? user?.id),
       category: expCategory,
       custom_category: expCategory === 'other' ? expCustomCategory.trim() : null,
       description: expDescription || null,
@@ -111,14 +130,15 @@ export default function AdminJobAdjustments({
       status: 'approved',
       reviewed_by: user?.id,
       reviewed_at: new Date().toISOString(),
-      approved_addition_cents: amountCents,
+      approved_addition_cents: addAmountCents,
       added_by_admin: true,
+      paid_by_admin_directly: paidByAdminDirectly,
     })
 
     if (!insertError) {
       await supabase
         .from('jobs')
-        .update({ approved_expenses_cents: approvedExpensesCents + amountCents })
+        .update({ approved_expenses_cents: approvedExpensesCents + addAmountCents })
         .eq('id', jobId)
     }
 
@@ -229,6 +249,18 @@ export default function AdminJobAdjustments({
                 className="w-full text-xs"
               />
             </div>
+            <label className="flex items-start gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={paidByAdminDirectly}
+                onChange={(e) => setPaidByAdminDirectly(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Admin paid this directly \u2014 don&apos;t reimburse the driver
+                {paidByAdminDirectly && <span className="block text-gray-400 mt-0.5">Still added to the dealer&apos;s bill, just not to the driver&apos;s pay.</span>}
+              </span>
+            </label>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={addExpense}

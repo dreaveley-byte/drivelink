@@ -579,13 +579,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       )}
 
       {isAdmin && (
-        <div className="max-w-2xl mx-auto px-6 pb-8">
+        <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
           <AdminJobAdjustments
             jobId={job.id}
+            driverId={job.driver_id}
             currentHoursOverride={job.admin_hours_override}
             calculatedDriverPayCents={job.estimated_driver_pay_cents}
             hourlyRateCents={hourlyRateCents}
             approvedExpensesCents={job.approved_expenses_cents ?? 0}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0 }}
+            existingExpenses={(rawExpenses ?? []).map((e) => ({ category: e.category, status: e.status, amount_cents: e.amount_cents }))}
           />
         </div>
       )}
@@ -609,12 +612,14 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       )}
 
       {isAdmin && (
-        <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
+        <div className="max-w-2xl mx-auto px-6 pb-8">
           <div className="border border-gray-200 rounded-xl p-6">
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <p className="text-sm font-medium text-gray-900">Cost breakdown & profit (admin only)</p>
               {job.status === 'completed' && (
-                <MarkDealerPaidButton jobId={job.id} isPaid={!!job.dealer_paid_at} paidAt={job.dealer_paid_at} />
+                <div className="print:hidden">
+                  <MarkDealerPaidButton jobId={job.id} isPaid={!!job.dealer_paid_at} paidAt={job.dealer_paid_at} />
+                </div>
               )}
             </div>
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { computeExpenseAddAmount, type ExpenseBaselines } from '@/lib/expenses'
 
 type Expense = {
   id: string
@@ -18,7 +19,7 @@ type Expense = {
   added_by_admin?: boolean
 }
 
-type Baselines = { fuel: number; inspection: number; food: number }
+type Baselines = ExpenseBaselines
 
 const CATEGORY_LABELS: Record<string, string> = {
   wait_time: 'Wait time',
@@ -52,15 +53,10 @@ function formatCents(cents: number) {
 // How much approving this specific expense would actually add to the job's
 // total, given everything already approved in the same category so far.
 function computeAddAmount(expense: Expense, allExpenses: Expense[], baselines: Baselines): number {
-  if (expense.category === 'food') return 0
-  if (expense.category !== 'fuel' && expense.category !== 'inspection') return expense.amount_cents
-
-  const baseline = baselines[expense.category as 'fuel' | 'inspection']
   const priorApprovedSum = allExpenses
     .filter((e) => e.category === expense.category && e.status === 'approved' && e.id !== expense.id)
     .reduce((sum, e) => sum + e.amount_cents, 0)
-  const newSum = priorApprovedSum + expense.amount_cents
-  return Math.max(0, newSum - baseline) - Math.max(0, priorApprovedSum - baseline)
+  return computeExpenseAddAmount(expense.category, expense.amount_cents, priorApprovedSum, baselines)
 }
 
 export default function ExpenseReviewList({
