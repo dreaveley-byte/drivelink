@@ -4,6 +4,20 @@ import { useState } from 'react'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
 import { toLocalDateString, toLocalDatetimeInputValue, zonedLocalInputToUtcIso, localInputToUtcIso } from '@/lib/localDatetime'
 
+// Mirrors the `options` shape returned by /api/flights/search and consumed
+// by the caller's own `flightOptions` state (the "N airport combinations
+// compared" picker) — passed through untouched so that picker still gets
+// populated when a date is selected from this panel instead of being
+// re-searched.
+export type FlightOption = {
+  origin: { code: string; name: string }
+  destination: { code: string; name: string }
+  flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number }
+  groundToAirport: { distanceKm: number; durationMinutes: number } | null
+  groundFromAirport: { distanceKm: number; durationMinutes: number } | null
+  effectiveCostCents: number
+}
+
 type DayResult = {
   offset: number
   startDate: Date
@@ -19,6 +33,12 @@ type DayResult = {
   // could show a price here but then blow up into "no flight found" once
   // the parent recalculated from scratch.
   charges: AdditionalCharge[] | null
+  // Every airport combination considered for this day, so the caller's own
+  // "N airport combinations compared" picker still gets populated when a
+  // date is selected here — without this, that picker either goes stale
+  // (still showing combos from an earlier date) or empty, since selecting a
+  // date from this panel skips the caller's own flight search entirely.
+  options: FlightOption[] | null
 }
 
 export default function NearbyDatesFlightCheck({
@@ -58,8 +78,9 @@ export default function NearbyDatesFlightCheck({
   // charges is the exact priced flight (plus ground transport legs) found for
   // this day at search time — the caller should apply it directly rather than
   // re-searching, since live flight inventory/pricing can change between the
-  // two calls.
-  onSelectDate: (newScheduledFor: string, offsetDays: number, charges: AdditionalCharge[] | null) => void | Promise<void>
+  // two calls. options is every airport combination considered for this day,
+  // for the caller to populate its own "airport combinations compared" picker.
+  onSelectDate: (newScheduledFor: string, offsetDays: number, charges: AdditionalCharge[] | null, options: FlightOption[] | null) => void | Promise<void>
   originTimeZone?: string | null
 }) {
   const [results, setResults] = useState<DayResult[] | null>(null)
@@ -117,7 +138,7 @@ export default function NearbyDatesFlightCheck({
         })
         const body = await res.json().catch(() => ({}))
 
-        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null, charges: null }
+        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null, charges: null, options: null }
 
         if (!res.ok || !body.flight) {
           result.error = body.error || 'No flight found'
@@ -161,6 +182,7 @@ export default function NearbyDatesFlightCheck({
           paidToDriver: false,
         })
         result.charges = flyCharges
+        result.options = body.options ?? null
 
         const pricing = calculatePricing(
           {
@@ -210,10 +232,12 @@ export default function NearbyDatesFlightCheck({
     const newDate = new Date(scheduledFor)
     newDate.setDate(newDate.getDate() + offset)
     const newValue = toLocalDatetimeInputValue(newDate)
-    const charges = results?.find((r) => r.offset === offset)?.charges ?? null
+    const dayResult = results?.find((r) => r.offset === offset)
+    const charges = dayResult?.charges ?? null
+    const options = dayResult?.options ?? null
     setRecalculatingOffset(offset)
     try {
-      await onSelectDate(newValue, offset, charges)
+      await onSelectDate(newValue, offset, charges, options)
     } finally {
       setRecalculatingOffset(null)
       setResults(null)

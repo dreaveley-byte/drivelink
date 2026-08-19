@@ -2155,7 +2155,7 @@ export default function PostJobPage() {
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
                   originTimeZone={originTimeZone}
-                  onSelectDate={async (d, offsetDays, charges) => {
+                  onSelectDate={async (d, offsetDays, charges, options) => {
                     // The top "Delivery Date & Time" field (deliveryDeadline) is
                     // what's actually saved as the job's delivery_deadline and is
                     // what originally drove this pickup time's calculation — if it
@@ -2179,6 +2179,15 @@ export default function PostJobPage() {
                     // back on Uber-back/Bus instead of the flight just chosen.
                     setFlyingBack(true)
                     setAutoSelectReturnMethod(false)
+                    // Also refresh the "N airport combinations compared" picker
+                    // with the options found for THIS date — without this it
+                    // either goes stale (still showing combos from whatever
+                    // date was last searched via the "Search flight price"
+                    // button) or stays empty, since selecting a date here skips
+                    // buildFlyCharges() (and its own setFlightOptions call)
+                    // entirely.
+                    setFlightOptions(options ?? [])
+                    setSelectedFlightOptionIdx(0)
                     // Pass the new date and the forced-flying override straight
                     // into runCalculation rather than relying on those state
                     // updates landing first — they're async, so runCalculation's
