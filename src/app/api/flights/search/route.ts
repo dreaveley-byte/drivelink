@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Flight search isn’t set up yet.' }, { status: 501 })
   }
 
-  const { originAddress, destinationAddress, departureDate } = await req.json()
+  const { originAddress, destinationAddress, departureDate, earliestViableDepartureAt } = await req.json()
   if (!originAddress || !destinationAddress) {
     return NextResponse.json({ error: 'Missing origin or destination address.' }, { status: 400 })
   }
@@ -205,6 +205,20 @@ export async function POST(req: NextRequest) {
   const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours, uber_base_fare_cents, uber_per_km_cents, uber_minimum_fare_cents').eq('id', 1).single()
   const AIRPORT_BUFFER_MINUTES = (pricingSettings?.flight_airport_buffer_hours ?? 3) * 60
 
+  // Minimum time the driver needs to be at the airport BEFORE a flight departs
+  // (check-in, security, boarding) in order to realistically catch it — used
+  // below to filter out flights the driver couldn't actually make it to. This
+  // is a distinct concept from `flight_airport_buffer_hours`/AIRPORT_BUFFER_MINUTES
+  // above: that one pads the job's BILLED hours to account for general dead time
+  // around the flight (already-priced-in operational buffer), while this one
+  // answers "is this specific flight even catchable." We reuse the same configured
+  // value as a sensible baseline (so ops only has to think about one "airport
+  // buffer" number), but this catchability check has a hard floor of 2 hours no
+  // matter how low that setting is configured — a driver can't clear check-in and
+  // security in less than that at a real airport, regardless of billing policy.
+  const MIN_CHECKIN_BUFFER_HOURS = 2
+  const CHECKIN_BUFFER_MINUTES = Math.max(pricingSettings?.flight_airport_buffer_hours ?? MIN_CHECKIN_BUFFER_HOURS, MIN_CHECKIN_BUFFER_HOURS) * 60
+
   type Segment = {
     marketing_carrier?: { name?: string; iata_code?: string }
     marketing_carrier_flight_number?: string
@@ -220,6 +234,21 @@ export async function POST(req: NextRequest) {
   }
   const stopCount = (offer: Offer) =>
     offer.slices.reduce((sum, slice) => sum + Math.max(slice.segments.length - 1, 0), 0)
+
+  function sortByStopsThenPrice(list: Offer[]): Offer[] {
+    return [...list].sort((a, b) => {
+      const stopsDiff = stopCount(a) - stopCount(b)
+      if (stopsDiff !== 0) return stopsDiff
+      return parseFloat(a.total_amount) - parseFloat(b.total_amount)
+    })
+  }
+
+  function firstSegmentDepartureMs(offer: Offer): number | null {
+    const dep = offer.slices[0]?.segments?.[0]?.departing_at
+    if (!dep) return null
+    const ms = new Date(dep).getTime()
+    return isNaN(ms) ? null : ms
+  }
 
   function parseIsoDurationMinutes(iso: string | undefined): number {
     if (!iso) return 0
@@ -241,7 +270,11 @@ export async function POST(req: NextRequest) {
           },
         }),
       }),
-      drivingLegToAirport(destinationAddress, flightFrom, date),
+      // Use the real earliest-viable-departure instant (when known) for the
+      // traffic-aware drive-time estimate to the airport, since that's roughly
+      // when this leg would actually happen — falls back to the bare departure
+      // date if the caller didn't provide a timestamp.
+      drivingLegToAirport(destinationAddress, flightFrom, earliestViableDepartureAt || date),
       // The return leg: once the driver lands back home, they still need to
       // get from that arrival airport back to the original pickup address.
       // This was previously always a flat guessed fee regardless of actual
@@ -259,11 +292,53 @@ export async function POST(req: NextRequest) {
     const offers = offerRequestData?.data?.offers ?? []
     if (offers.length === 0) return { flightFrom, flightTo, flight: null, groundToAirport, groundFromAirport, effectiveCostCents: Infinity }
 
-    const sorted = [...(offers as Offer[])].sort((a, b) => {
-      const stopsDiff = stopCount(a) - stopCount(b)
-      if (stopsDiff !== 0) return stopsDiff
-      return parseFloat(a.total_amount) - parseFloat(b.total_amount)
-    })
+    // The earliest instant this driver could plausibly be standing at THIS
+    // candidate airport's departure gate: estimated drop-off completion time
+    // + drive time to this specific airport (varies per candidate) + the
+    // check-in buffer above. Falls back to a flat 60-minute drive-time
+    // estimate if the real drive-time lookup failed for this candidate.
+    const DEFAULT_GROUND_TO_AIRPORT_MINUTES = 60
+    let earliestCatchableDepartAt: number | null = null
+    if (earliestViableDepartureAt) {
+      const baseMs = new Date(earliestViableDepartureAt).getTime()
+      if (!isNaN(baseMs)) {
+        const groundMinutes = groundToAirport?.durationMinutes ?? DEFAULT_GROUND_TO_AIRPORT_MINUTES
+        earliestCatchableDepartAt = baseMs + groundMinutes * 60_000 + CHECKIN_BUFFER_MINUTES * 60_000
+      }
+    }
+
+    let metCheckInBuffer = true
+    let sorted: Offer[]
+    if (earliestCatchableDepartAt != null) {
+      const catchable = (offers as Offer[]).filter((o) => {
+        const t = firstSegmentDepartureMs(o)
+        return t != null && t >= earliestCatchableDepartAt!
+      })
+      if (catchable.length > 0) {
+        const sortedByDeparture = [...catchable].sort(
+          (a, b) => firstSegmentDepartureMs(a)! - firstSegmentDepartureMs(b)!
+        )
+        const earliestDepartMs = firstSegmentDepartureMs(sortedByDeparture[0])!
+        // Prefer flights departing reasonably soon after the earliest catchable
+        // one, rather than always grabbing the cheapest flight of the whole day
+        // (which could depart many hours later than necessary) — "near that
+        // time" per product, not "cheapest at any hour."
+        const REASONABLE_WINDOW_MS = 4 * 60 * 60 * 1000
+        const nearEarliest = sortedByDeparture.filter(
+          (o) => firstSegmentDepartureMs(o)! <= earliestDepartMs + REASONABLE_WINDOW_MS
+        )
+        sorted = sortByStopsThenPrice(nearEarliest)
+      } else {
+        // Nothing on this date departs late enough for the driver to actually
+        // catch it — fall back to the day's best offer anyway (better than no
+        // result at all) but flag it so the caller can warn the user / try the
+        // next day instead of silently handing back an uncatchable flight.
+        metCheckInBuffer = false
+        sorted = sortByStopsThenPrice(offers as Offer[])
+      }
+    } else {
+      sorted = sortByStopsThenPrice(offers as Offer[])
+    }
     const best = sorted[0]
     const flightDurationMinutes = parseIsoDurationMinutes(best.slices[0]?.duration)
     const priceCentsRaw = Math.round(parseFloat(best.total_amount) * 100)
@@ -312,6 +387,13 @@ export async function POST(req: NextRequest) {
         hoursToAdd: Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * 100) / 100,
         airportBufferHours: AIRPORT_BUFFER_MINUTES / 60,
         segments,
+        departingAt: best.slices[0]?.segments?.[0]?.departing_at ?? null,
+        arrivingAt: best.slices[0]?.segments?.[best.slices[0].segments.length - 1]?.arriving_at ?? null,
+        // False when no flight on this date departed late enough for the driver
+        // to realistically make it (drive time to this airport + check-in
+        // buffer past the estimated drop-off completion time) — this is then
+        // the best available fallback for the day, not a confirmed-catchable pick.
+        meetsCheckInBuffer: metCheckInBuffer,
       },
     }
   }
@@ -357,13 +439,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ origin: fromCandidates[0], destination: toCandidates[0], flight: null, groundToAirport: fallback?.groundToAirport ?? null, groundFromAirport: fallback?.groundFromAirport ?? null })
   }
 
-  const cheapest = viable.reduce((best, cur) => (cur.effectiveCostCents < best.effectiveCostCents ? cur : best))
-  const sortedOptions = [...viable].sort((a, b) => a.effectiveCostCents - b.effectiveCostCents)
+  // Prefer candidates whose chosen flight the driver could actually catch
+  // (drive-to-airport + check-in buffer) over ones that couldn't, even if an
+  // uncatchable option looks cheaper on paper — only fall back to considering
+  // every viable candidate if literally none of them cleared the bar.
+  const catchableViable = viable.filter((r) => r.flight!.meetsCheckInBuffer)
+  const pool = catchableViable.length > 0 ? catchableViable : viable
+
+  const cheapest = pool.reduce((best, cur) => (cur.effectiveCostCents < best.effectiveCostCents ? cur : best))
+  const sortedOptions = [...pool].sort((a, b) => a.effectiveCostCents - b.effectiveCostCents)
 
   return NextResponse.json({
     origin: cheapest.flightFrom,
     destination: cheapest.flightTo,
     flight: cheapest.flight,
+    // True when no candidate airport had a flight departing late enough for the
+    // driver to realistically catch it that day (drive time + check-in buffer
+    // past the estimated drop-off completion time) — the flight returned above
+    // is the best available fallback, not a confirmed-catchable pick. Callers
+    // should surface this clearly and consider searching the next day instead.
+    noFlightMetCheckInBuffer: catchableViable.length === 0,
     groundToAirport: cheapest.groundToAirport,
     groundFromAirport: cheapest.groundFromAirport,
     comparedAirports: combinations.map(([f, t]) => `${f.name} (${f.code}) → ${t.name} (${t.code})`),

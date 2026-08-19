@@ -326,7 +326,14 @@ export default function PostJobPage() {
     setComputingPickupTime(false)
   }
 
-  const runCalculation = useCallback(async () => {
+  // Accepts an optional date override so a caller (e.g. selecting a nearby
+  // date from NearbyDatesFlightCheck) can trigger a full recalculation for a
+  // NEW scheduled date immediately, in the same tick — waiting for the
+  // `scheduledFor` state update to land and this callback to be re-created on
+  // the next render would mean the very first invocation still reads the OLD
+  // date, silently recalculating the wrong quote.
+  const runCalculation = useCallback(async (scheduledForOverride?: string) => {
+    const effectiveScheduledFor = scheduledForOverride ?? scheduledFor
     setCalcError('')
     setDecisionNote('')
     const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
@@ -350,7 +357,7 @@ export default function PostJobPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           addresses: filledStops,
-          departureTime: originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor),
+          departureTime: originTimeZone ? zonedLocalInputToUtcIso(effectiveScheduledFor, originTimeZone) : localInputToUtcIso(effectiveScheduledFor),
         }),
       })
       const data = await res.json()
@@ -477,12 +484,28 @@ export default function PostJobPage() {
       async function buildFlyCharges(): Promise<AdditionalCharge[] | null> {
         const hasOverride = flightPriceOverride.trim() !== '' && flightHoursOverride.trim() !== ''
 
-        const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings!.max_driving_hours_before_overnight
+        const insuranceHours = insuranceVisit ? pricingSettings!.insurance_visit_min_hours : 0
+        const totalOnGroundHours = oneWayHours + inspectionHours + registryHours + insuranceHours
+        const overnightNeeded = totalOnGroundHours > pricingSettings!.max_driving_hours_before_overnight
         let flightDepartureDate: string | undefined
-        if (scheduledFor) {
-          const d = new Date(scheduledFor)
+        // Real timestamp for when the driver is estimated to actually finish
+        // the drop-off (and any inspection/registry/insurance stops) and be
+        // free to head to the airport — used by the flight search API to only
+        // consider flights the driver could realistically catch, not just any
+        // flight on the right calendar date.
+        let earliestViableDepartureAt: string | undefined
+        if (effectiveScheduledFor) {
+          const d = new Date(effectiveScheduledFor)
           if (overnightNeeded) d.setDate(d.getDate() + 1)
           flightDepartureDate = toLocalDateString(d)
+
+          const startUtcIso = originTimeZone
+            ? zonedLocalInputToUtcIso(effectiveScheduledFor, originTimeZone)
+            : localInputToUtcIso(effectiveScheduledFor)
+          if (startUtcIso) {
+            const completionMs = new Date(startUtcIso).getTime() + totalOnGroundHours * 60 * 60 * 1000
+            earliestViableDepartureAt = new Date(completionMs).toISOString()
+          }
         }
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
@@ -491,6 +514,7 @@ export default function PostJobPage() {
             originAddress: filledStops[0],
             destinationAddress: filledStops[filledStops.length - 1],
             departureDate: flightDepartureDate,
+            earliestViableDepartureAt,
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
@@ -1981,7 +2005,7 @@ export default function PostJobPage() {
 
           <button
             type="button"
-            onClick={runCalculation}
+            onClick={() => runCalculation()}
             disabled={calculating}
             className="w-full border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
@@ -2093,9 +2117,14 @@ export default function PostJobPage() {
                   insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
-                  onSelectDate={(d) => {
+                  originTimeZone={originTimeZone}
+                  onSelectDate={async (d) => {
                     setScheduledFor(d)
-                    setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')
+                    // Pass the new date straight into runCalculation rather than
+                    // relying on the `scheduledFor` state update to land first —
+                    // state updates are async, so runCalculation's own closure
+                    // would otherwise still see the OLD date on this first call.
+                    await runCalculation(d)
                   }}
                 />
               )}
@@ -2115,6 +2144,7 @@ export default function PostJobPage() {
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
               destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
               scheduledFor={scheduledFor}
+              originTimeZone={originTimeZone}
             />
           )}
 
