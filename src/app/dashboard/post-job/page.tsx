@@ -340,7 +340,7 @@ export default function PostJobPage() {
   // + setFlyingBack(true) called right before this won't have landed yet —
   // and if auto-select were still effectively on, it could silently re-pick
   // Uber back/Bus for the new date instead of honoring the flight just chosen.
-  const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean) => {
+  const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean, precomputedFlyCharges?: AdditionalCharge[] | null) => {
     const effectiveScheduledFor = scheduledForOverride ?? scheduledFor
     const effectiveAutoSelect = forceFlying ? false : autoSelectReturnMethod
     const effectiveFlyingBack = forceFlying ? true : flyingBack
@@ -760,7 +760,13 @@ export default function PostJobPage() {
         // Auto-select is off — respect the manual checkboxes exactly as set.
         if (effectiveFlyingBack) {
           setEffectiveOneWayReturn(true)
-          const flyCharges = await buildFlyCharges()
+          // If the caller already has a freshly-priced flight for this exact
+          // date (e.g. from the nearby-dates comparison panel), use it as-is
+          // instead of re-searching — live flight inventory/pricing can shift
+          // between two separate searches seconds apart, which is how a date
+          // that priced fine in the comparison panel could come back with "no
+          // flight found" on this second, independent search.
+          const flyCharges = precomputedFlyCharges !== undefined ? precomputedFlyCharges : await buildFlyCharges()
           if (flyCharges) {
             const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
@@ -2149,7 +2155,7 @@ export default function PostJobPage() {
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
                   originTimeZone={originTimeZone}
-                  onSelectDate={async (d, offsetDays) => {
+                  onSelectDate={async (d, offsetDays, charges) => {
                     // The top "Delivery Date & Time" field (deliveryDeadline) is
                     // what's actually saved as the job's delivery_deadline and is
                     // what originally drove this pickup time's calculation — if it
@@ -2177,8 +2183,12 @@ export default function PostJobPage() {
                     // into runCalculation rather than relying on those state
                     // updates landing first — they're async, so runCalculation's
                     // own closure would otherwise still see the OLD values on
-                    // this same call.
-                    await runCalculation(d, true)
+                    // this same call. `charges` is the exact flight the panel
+                    // already priced for this date — pass it straight through
+                    // so runCalculation applies it as-is instead of re-searching
+                    // live flight inventory a second time (which can come back
+                    // with a different price, or nothing at all).
+                    await runCalculation(d, true, charges)
                   }}
                 />
               )}

@@ -11,6 +11,14 @@ type DayResult = {
   totalHours: number | null
   flightSummary: string | null
   error: string | null
+  // The exact charges used to price this day's flight option, captured at
+  // search time — passed back up on selection so the caller can apply the
+  // SAME priced flight instead of re-searching live inventory a second time.
+  // A second live search seconds later can return a different (or no)
+  // result — different price, sold out, etc. — which is how "Use this day"
+  // could show a price here but then blow up into "no flight found" once
+  // the parent recalculated from scratch.
+  charges: AdditionalCharge[] | null
 }
 
 export default function NearbyDatesFlightCheck({
@@ -47,7 +55,11 @@ export default function NearbyDatesFlightCheck({
   // the same calendar day (e.g. the top-level "Delivery Date & Time" field) by
   // the same amount, instead of only the pickup time moving while everything
   // else silently stays on the old day.
-  onSelectDate: (newScheduledFor: string, offsetDays: number) => void | Promise<void>
+  // charges is the exact priced flight (plus ground transport legs) found for
+  // this day at search time — the caller should apply it directly rather than
+  // re-searching, since live flight inventory/pricing can change between the
+  // two calls.
+  onSelectDate: (newScheduledFor: string, offsetDays: number, charges: AdditionalCharge[] | null) => void | Promise<void>
   originTimeZone?: string | null
 }) {
   const [results, setResults] = useState<DayResult[] | null>(null)
@@ -105,17 +117,24 @@ export default function NearbyDatesFlightCheck({
         })
         const body = await res.json().catch(() => ({}))
 
-        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null }
+        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null, charges: null }
 
         if (!res.ok || !body.flight) {
           result.error = body.error || 'No flight found'
           return result
         }
 
-        const charges: AdditionalCharge[] = [
-          ...manualCharges,
+        // `kind` tags match what the caller's own buildFlyCharges() produces,
+        // so downstream display/gating logic that looks for `kind === 'flight'`
+        // etc. still works when these charges are applied directly. Kept
+        // separate from `manualCharges` (mirroring buildFlyCharges' own
+        // return shape) so the caller can combine them the same way it
+        // combines buildFlyCharges' result — this array is what actually
+        // gets passed back up on selection.
+        const flyCharges: AdditionalCharge[] = [
           {
             description: 'Return ground transport',
+            kind: 'ground-home' as const,
             dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
             hoursAdded: pricingSettings.return_ground_transport_hours,
             paidToDriver: true,
@@ -123,19 +142,25 @@ export default function NearbyDatesFlightCheck({
         ]
         if (body.groundToAirport) {
           const km = body.groundToAirport.distanceKm
-          charges.push({
+          flyCharges.push({
             description: 'Ground transport to airport',
+            kind: 'ground-to-airport' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents),
             hoursAdded: Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
           })
         }
-        charges.push({
-          description: `Flight back: ${body.origin.code} → ${body.destination.code}`,
+        const departsTextForCharge = body.flight.departingAt
+          ? ` — departs ${new Date(body.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+          : ''
+        flyCharges.push({
+          description: `Flight back: ${body.origin.code} → ${body.destination.code} (${body.flight.isDirect ? 'direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`})${departsTextForCharge}`,
+          kind: 'flight' as const,
           dealerAmountCents: body.flight.priceCents,
           hoursAdded: body.flight.hoursToAdd,
           paidToDriver: false,
         })
+        result.charges = flyCharges
 
         const pricing = calculatePricing(
           {
@@ -149,7 +174,7 @@ export default function NearbyDatesFlightCheck({
             ferryRequired,
             useGarageInsurance: false,
             includeTowDeductibleCoverage: false,
-            additionalCharges: charges,
+            additionalCharges: [...manualCharges, ...flyCharges],
             oneWayFlightBack: true,
           },
           pricingSettings
@@ -185,9 +210,10 @@ export default function NearbyDatesFlightCheck({
     const newDate = new Date(scheduledFor)
     newDate.setDate(newDate.getDate() + offset)
     const newValue = toLocalDatetimeInputValue(newDate)
+    const charges = results?.find((r) => r.offset === offset)?.charges ?? null
     setRecalculatingOffset(offset)
     try {
-      await onSelectDate(newValue, offset)
+      await onSelectDate(newValue, offset, charges)
     } finally {
       setRecalculatingOffset(null)
       setResults(null)
