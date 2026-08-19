@@ -32,6 +32,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   storage: 'Storage',
   additional_mileage: 'Additional mileage',
   return_transport: 'Return transport (Uber/bus back)',
+  hotel: 'Hotel',
   other: 'Other',
 }
 

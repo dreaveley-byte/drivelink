@@ -215,6 +215,7 @@ export default function AdminJobAdjustments({
               <option value="parking">Parking</option>
               <option value="storage">Storage</option>
               <option value="additional_mileage">Additional mileage</option>
+              <option value="hotel">Hotel</option>
               <option value="other">Other</option>
             </select>
             {expCategory === 'other' && (

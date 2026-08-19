@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const VALID_CATEGORIES = ['wait_time', 'repairs', 'tolls', 'parking', 'storage', 'additional_mileage', 'fuel', 'food', 'inspection', 'other']
+const VALID_CATEGORIES = ['wait_time', 'repairs', 'tolls', 'parking', 'storage', 'additional_mileage', 'fuel', 'food', 'inspection', 'return_transport', 'hotel', 'other']
 
 export async function POST(req: NextRequest) {
   const { photo } = await req.json()
@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     `Valid categories are exactly: ${VALID_CATEGORIES.join(', ')}. ` +
     'Use "additional_mileage" only for mileage reimbursement receipts, "fuel" for gas station receipts, "food" for meals, ' +
     '"tolls" for toll roads/bridges, "parking" for parking fees, "repairs" for vehicle repair/service, "storage" for vehicle storage fees, ' +
-    '"inspection" for vehicle inspection fees, and "other" if nothing else clearly fits. ' +
+    '"inspection" for vehicle inspection fees, "hotel" for hotel/motel stays, "return_transport" for Uber/bus/taxi getting the driver back home, ' +
+    'and "other" if nothing else clearly fits. ' +
     'Reply with ONLY raw JSON, no markdown formatting, no code fences, in exactly this shape: ' +
     '{"amount": 12.34, "category": "fuel", "vendor": "Shell", "description": "short description under 8 words"}. ' +
     'If you cannot read an amount at all, set "amount" to null. If the image is not a receipt, set "category" to "other" and "description" to "Could not read receipt".'

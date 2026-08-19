@@ -1086,6 +1086,7 @@ export default function DriverJobActions({
                     <option value="storage">Storage</option>
                     <option value="additional_mileage">Additional mileage</option>
                     <option value="return_transport">Return transport (Uber/bus back)</option>
+                    <option value="hotel">Hotel</option>
                     <option value="other">Other</option>
                   </select>
                   {expenseCategory === 'other' && (
