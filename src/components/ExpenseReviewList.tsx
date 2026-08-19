@@ -34,6 +34,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   additional_mileage: 'Additional mileage',
   return_transport: 'Return transport (Uber/bus back)',
   hotel: 'Hotel',
+  charging: 'EV Charging',
+  ferry: 'Ferry',
+  towing: 'Towing',
   other: 'Other',
 }
 
@@ -41,7 +44,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 // A receipt in one of these categories should only add to the job's total if
 // (and to the extent) the driver's actual cost exceeded what was already
 // priced in — food specifically should never add anything at all, per policy.
-const BASELINE_CATEGORIES = ['fuel', 'inspection', 'food', 'hotel'] as const
+const BASELINE_CATEGORIES = ['fuel', 'inspection', 'food', 'hotel', 'ferry'] as const
 
 function categoryLabel(exp: Expense) {
   if (exp.category === 'other' && exp.custom_category) return exp.custom_category
@@ -255,8 +258,8 @@ export default function ExpenseReviewList({
                     {exp.category === 'food'
                       ? 'Food is already covered by the base price — approving this won’t add to the total.'
                       : previewAddAmount === 0
-                      ? `Covered by the ${formatCents(baselines[exp.category as 'fuel' | 'inspection' | 'hotel'])} already priced in — approving this won't add to the total.`
-                      : `Only the amount beyond what's already priced in (${formatCents(baselines[exp.category as 'fuel' | 'inspection' | 'hotel'])}) will be added — approving this adds ${formatCents(previewAddAmount ?? 0)}.`}
+                      ? `Covered by the ${formatCents(baselines[exp.category as 'fuel' | 'inspection' | 'hotel' | 'ferry'])} already priced in — approving this won't add to the total.`
+                      : `Only the amount beyond what's already priced in (${formatCents(baselines[exp.category as 'fuel' | 'inspection' | 'hotel' | 'ferry'])}) will be added — approving this adds ${formatCents(previewAddAmount ?? 0)}.`}
                   </p>
                 )}
                 <p className="text-xs text-gray-400 flex items-center gap-1.5">

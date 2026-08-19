@@ -980,6 +980,7 @@ export default function PostJobPage() {
       baseline_inspection_cents: pricing?.inspectionFeeCents ?? 0,
       baseline_food_cents: pricing?.mealCostCents ?? 0,
       baseline_hotel_cents: pricing?.hotelCents ?? 0,
+      baseline_ferry_cents: pricing?.ferryFeeCents ?? 0,
       pricing_breakdown: pricing ? JSON.stringify(pricing) : null,
       trade_in_year: isDealerToDealerMultiVehicle
         ? (primaryDropoffVehicle && primaryPickupVehicle?.year ? parseInt(primaryPickupVehicle.year) : null)
@@ -1110,6 +1111,7 @@ export default function PostJobPage() {
         baseline_inspection_cents: soloPricing.inspectionFeeCents,
         baseline_food_cents: soloPricing.mealCostCents,
         baseline_hotel_cents: soloPricing.hotelCents,
+        baseline_ferry_cents: soloPricing.ferryFeeCents,
         notes: notes ? `${notes}\n\n(Chase/2nd driver for the linked primary job)` : '(Chase/2nd driver for the linked primary job)',
       }).select('id').single()
 

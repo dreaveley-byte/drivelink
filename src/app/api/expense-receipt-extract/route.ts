@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const VALID_CATEGORIES = ['wait_time', 'repairs', 'tolls', 'parking', 'storage', 'additional_mileage', 'fuel', 'food', 'inspection', 'return_transport', 'hotel', 'other']
+const VALID_CATEGORIES = ['wait_time', 'repairs', 'tolls', 'parking', 'storage', 'additional_mileage', 'fuel', 'food', 'inspection', 'return_transport', 'hotel', 'charging', 'ferry', 'towing', 'other']
 
 export async function POST(req: NextRequest) {
   const { photo } = await req.json()
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     'Use "additional_mileage" only for mileage reimbursement receipts, "fuel" for gas station receipts, "food" for meals, ' +
     '"tolls" for toll roads/bridges, "parking" for parking fees, "repairs" for vehicle repair/service, "storage" for vehicle storage fees, ' +
     '"inspection" for vehicle inspection fees, "hotel" for hotel/motel stays, "return_transport" for Uber/bus/taxi getting the driver back home, ' +
+    '"charging" for EV charging station receipts (not gas - use "fuel" for that), "ferry" for ferry crossing fares, "towing" for vehicle towing/breakdown service (not general "repairs"), ' +
     'and "other" if nothing else clearly fits. ' +
     'Also judge whether this genuinely looks like a real, legible receipt matching its category (not a random photo, a duplicate/reused image, something clearly unrelated to a work delivery expense, or an amount that looks implausible for the category) - set "looksLegitimate" to true only if you have no real doubts. ' +
     'Reply with ONLY raw JSON, no markdown formatting, no code fences, in exactly this shape: ' +
