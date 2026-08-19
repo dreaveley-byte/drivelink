@@ -172,11 +172,22 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Capped per person per day — an overnight trip is treated as 2 days for this
   // purpose (the app's overnight model is a single same-day/next-day threshold,
   // not a full multi-night calendar).
+  //
+  // `mealBreaks` only counts meal stops taken during the driving portion of
+  // the trip — on an overnight job the driver is still away (and still needs
+  // to eat) on the second day even if no further "driving break" happens
+  // there (e.g. an early return flight, or a short final leg). Previously
+  // `mealDays` only widened the cap without ever actually scaling the dollar
+  // total for that second day, so a long overnight trip with few driving-break
+  // meals on day one could end up with a meal budget barely covering a single
+  // day despite the driver being out for two. Cap per day first (matching
+  // what `max_daily_meal_budget_cents` actually means), then multiply by the
+  // number of days the driver is out.
+  const perDayMealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
+    ? Math.min(mealBreaks * settings.meal_allowance_cents, settings.max_daily_meal_budget_cents)
+    : mealBreaks * settings.meal_allowance_cents
   const mealDays = overnightRequired ? 2 : 1
-  const rawMealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
-  const mealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
-    ? Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
-    : rawMealCostCents
+  const mealCostCents = perDayMealCostCents * mealDays * numDrivers
 
   // Every delivery involves real time at the destination beyond pure driving —
   // paperwork, the walkaround, signatures, handing over keys. This wasn't
