@@ -396,7 +396,7 @@ export default function EditJobPage() {
   const runCalculation = useCallback(async () => {
     setCalcError('')
     setDecisionNote('')
-    const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
+    const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
     const jobTypeNameForCalc = jobTypes.find((jt) => jt.id === jobTypeId)?.name
     const isCustomerRideJob = jobTypeNameForCalc === 'Customer Pick Up' || jobTypeNameForCalc === 'Customer Drop Off'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
@@ -1090,7 +1090,7 @@ export default function EditJobPage() {
   }
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
-  const isCourier = jobTypeName === 'Courier / Package'
+  const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
   const isCustomerPickup = jobTypeName === 'Customer Pick Up'
   const isCustomerDropoff = jobTypeName === 'Customer Drop Off'

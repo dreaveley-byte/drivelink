@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const customerFirstName = firstNameProperCase(job.customer_full_name)
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
-  const isCourier = jobTypeName === 'Courier / Package'
+  const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
 
   const body = isCustomerRide
     ? `${customerFirstName ? `${customerFirstName}, t` : 'T'}hank you for driving with Drivflo! You have arrived at your destination.`

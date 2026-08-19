@@ -210,7 +210,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   </p>
                 )}
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
-                {['Courier / Package', 'Paperwork Signing'].includes(jobTypeName ?? '') ? (
+                {['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Paperwork Signing'].includes(jobTypeName ?? '') ? (
                   job.package_description && (
                     <p className="text-xs text-gray-700 mt-0.5">
                       📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}{job.package_description}

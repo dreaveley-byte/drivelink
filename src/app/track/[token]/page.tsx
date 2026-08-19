@@ -39,7 +39,7 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
 
   const vehicleDesc = [info.vehicle_year, info.vehicle_make, info.vehicle_model].filter(Boolean).join(' ')
   const isCustomerRide = info.job_type_name === 'Customer Pick Up' || info.job_type_name === 'Customer Drop Off'
-  const isCourier = info.job_type_name === 'Courier / Package'
+  const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(info.job_type_name ?? '')
 
   return (
     <div className="min-h-screen bg-white">

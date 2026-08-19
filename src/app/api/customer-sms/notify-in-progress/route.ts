@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
-  const isCourier = jobTypeName === 'Courier / Package'
+  const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
 
   // Give a real ETA window based on current traffic-aware drive time from the
   // driver's live position. Window runs from the raw ETA forward by a % buffer

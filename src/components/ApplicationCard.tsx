@@ -20,6 +20,8 @@ export default function ApplicationCard({
   vehicleYear,
   vehicleMake,
   vehicleModel,
+  licenseClass,
+  preferredJobTypes,
   driverFullName,
   driverPhone,
   dealerSubmittedBy,
@@ -39,6 +41,8 @@ export default function ApplicationCard({
   vehicleYear?: number | null
   vehicleMake?: string | null
   vehicleModel?: string | null
+  licenseClass?: string | null
+  preferredJobTypes?: string[] | null
   driverFullName?: string | null
   driverPhone?: string | null
   dealerSubmittedBy?: string
@@ -110,6 +114,9 @@ export default function ApplicationCard({
         if (vehicleYear || vehicleMake || vehicleModel) {
           await supabase.from('profiles').update({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }).eq('id', userId)
         }
+        if (licenseClass || preferredJobTypes) {
+          await supabase.from('profiles').update({ license_class: licenseClass ?? null, preferred_job_types: preferredJobTypes ?? null }).eq('id', userId)
+        }
         // This is the actual activation step — without it, an "approved" driver
         // never shows up in the admin drivers list or is able to claim jobs.
         // Also copies name/phone from the application, since the profile itself
@@ -178,6 +185,15 @@ export default function ApplicationCard({
         <div>
           <p className="text-sm font-medium text-gray-900">{title}</p>
           <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+          {preferredJobTypes && preferredJobTypes.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {preferredJobTypes.map((jt) => (
+                <span key={jt} className="text-[10px] border border-gray-200 text-gray-500 rounded-full px-2 py-0.5">
+                  {jt}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <span className={`text-xs border rounded-full px-2.5 py-1 whitespace-nowrap ${statusStyles[status] ?? 'border-gray-300 text-gray-700'}`}>
           {status.replace('_', ' ')}

@@ -612,7 +612,7 @@ export default function DriverJobActions({
       // in the car.
       if (
         newStatus === 'picked_up' &&
-        (joinName(job.job_types) === 'Courier / Package' || isCustomerRideJob)
+        (['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(joinName(job.job_types) ?? '') || isCustomerRideJob)
       ) {
         fetch('/api/customer-sms/notify-in-progress', {
           method: 'POST',

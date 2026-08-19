@@ -80,7 +80,7 @@ export default async function AdminApplicationsPage() {
                 table="driver_applications"
                 id={app.id}
                 title={app.full_name || 'Unnamed applicant'}
-                subtitle={`${app.email ?? ''} · ${app.cell_phone ?? ''}${app.vehicle_year || app.vehicle_make || app.vehicle_model ? ` · ${[app.vehicle_year, app.vehicle_make, app.vehicle_model].filter(Boolean).join(' ')}${app.vehicle_mileage ? ` (${app.vehicle_mileage.toLocaleString()} km)` : ''}` : ''}`}
+                subtitle={`${app.email ?? ''} · ${app.cell_phone ?? ''}${app.license_class ? ` · ${app.license_class}` : ''}${app.vehicle_year || app.vehicle_make || app.vehicle_model ? ` · ${[app.vehicle_year, app.vehicle_make, app.vehicle_model].filter(Boolean).join(' ')}${app.vehicle_mileage ? ` (${app.vehicle_mileage.toLocaleString()} km)` : ''}` : ''}`}
                 status={app.status}
                 bucket="driver-documents"
                 userId={app.user_id}
@@ -89,6 +89,8 @@ export default async function AdminApplicationsPage() {
                 vehicleYear={app.vehicle_year}
                 vehicleMake={app.vehicle_make}
                 vehicleModel={app.vehicle_model}
+                licenseClass={app.license_class}
+                preferredJobTypes={app.preferred_job_types}
                 driverFullName={app.full_name}
                 driverPhone={app.cell_phone}
                 docs={[

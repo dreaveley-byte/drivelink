@@ -27,6 +27,9 @@ export default function DriverApplyPage() {
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
   const [vehicleMileage, setVehicleMileage] = useState('')
+  const [licenseClass, setLicenseClass] = useState('')
+  const [availableJobTypes, setAvailableJobTypes] = useState<{ id: string; name: string }[]>([])
+  const [preferredJobTypes, setPreferredJobTypes] = useState<string[]>([])
 
   // Uploaded document paths
   const [docs, setDocs] = useState<Record<string, string>>({})
@@ -48,7 +51,14 @@ export default function DriverApplyPage() {
         setEmail(user.email ?? '')
       }
     })
+    supabase.from('job_types').select('id, name').eq('active', true).order('name').then(({ data }) => {
+      if (data) setAvailableJobTypes(data)
+    })
   }, [])
+
+  function toggleJobTypePreference(name: string) {
+    setPreferredJobTypes((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]))
+  }
 
   function setDoc(key: string) {
     return (path: string) => setDocs((prev) => ({ ...prev, [key]: path }))
@@ -105,6 +115,8 @@ export default function DriverApplyPage() {
       vehicle_make: vehicleMake || null,
       vehicle_model: vehicleModel || null,
       vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+      license_class: licenseClass || null,
+      preferred_job_types: preferredJobTypes.length > 0 ? preferredJobTypes : null,
       vehicle_walkaround_video_path: docs.vehicle_walkaround_video ?? null,
       vehicle_photo_path: docs.vehicle_photo ?? null,
       dash_odometer_photo_path: docs.dash_odometer_photo ?? null,
@@ -232,6 +244,47 @@ export default function DriverApplyPage() {
                 fileName="void-cheque"
                 onUploaded={setDoc('void_cheque')}
               />
+            )}
+          </section>
+
+          {/* License & availability */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold text-gray-900">License & availability</h2>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Driver's license class</label>
+              <select
+                value={licenseClass}
+                onChange={(e) => setLicenseClass(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Select a class</option>
+                <option value="Class 5">Class 5 (standard passenger vehicle)</option>
+                <option value="Class 7">Class 7 (novice/learner)</option>
+                <option value="Class 4">Class 4 (passenger vehicles for hire, e.g. taxi/shuttle)</option>
+                <option value="Class 3">Class 3 (larger trucks)</option>
+                <option value="Class 2">Class 2 (buses)</option>
+                <option value="Class 1">Class 1 (tractor-trailers)</option>
+                <option value="Other/Out of province">Other / out of province</option>
+              </select>
+            </div>
+            {availableJobTypes.length > 0 && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-2">
+                  Which kinds of drives are you interested in? (Select all that apply)
+                </label>
+                <div className="space-y-1.5">
+                  {availableJobTypes.map((jt) => (
+                    <label key={jt.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={preferredJobTypes.includes(jt.name)}
+                        onChange={() => toggleJobTypePreference(jt.name)}
+                      />
+                      {jt.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
           </section>
 

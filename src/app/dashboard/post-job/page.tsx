@@ -329,7 +329,7 @@ export default function PostJobPage() {
   const runCalculation = useCallback(async () => {
     setCalcError('')
     setDecisionNote('')
-    const isCourierJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Courier / Package'
+    const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
     const isPaperworkSigningJob = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Paperwork Signing'
     const jobTypeNameForCalc = jobTypes.find((jt) => jt.id === jobTypeId)?.name
     const isCustomerRideJob = jobTypeNameForCalc === 'Customer Pick Up' || jobTypeNameForCalc === 'Customer Drop Off'
@@ -1256,7 +1256,7 @@ export default function PostJobPage() {
   }
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
-  const isCourier = jobTypeName === 'Courier / Package'
+  const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
   const isCustomerPickup = jobTypeName === 'Customer Pick Up'
   const isCustomerDropoff = jobTypeName === 'Customer Drop Off'
@@ -1325,7 +1325,7 @@ export default function PostJobPage() {
                 // reset — a stale true value from a previously-selected job type
                 // would still silently force round-trip pricing underneath the
                 // hidden UI. Clear it all out on entering either simplified form.
-                if (newType?.name === 'Courier / Package' || newType?.name === 'Paperwork Signing') {
+                if (['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Paperwork Signing'].includes(newType?.name ?? '')) {
                   setIsTradeIn(false)
                   setSecondDriver(false)
                   setChaseVehicle(false)
