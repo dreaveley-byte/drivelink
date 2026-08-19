@@ -726,9 +726,15 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               {(() => {
                 const foodRow = expenseComparison.find((c) => c.category === 'food')
                 const leftover = foodRow ? Math.max(0, foodRow.accrued_cents - foodRow.actual_cents) : 0
+                const driverBonus = Math.round(leftover * 0.5)
+                // The driver is reimbursed their actual food spend and keeps
+                // half of whatever's left of the accrued meal budget as an
+                // efficiency bonus — the other half stays as Drivflo profit
+                // (on top of the food accrual never being billed to the
+                // dealer beyond the flat baseline in the first place).
                 return leftover > 0 ? (
                   <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
-                    {formatCents(leftover)} in unused meal budget was added to the driver&apos;s final pay.
+                    {formatCents(leftover)} in unused meal budget — the driver gets {formatCents(driverBonus)} of it as an efficiency bonus (on top of being reimbursed their actual food spend), and Drivflo keeps the other {formatCents(leftover - driverBonus)}.
                   </p>
                 ) : null
               })()}
