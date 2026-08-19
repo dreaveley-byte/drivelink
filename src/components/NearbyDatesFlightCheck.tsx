@@ -43,7 +43,11 @@ export default function NearbyDatesFlightCheck({
   insuranceVisit: boolean
   ferryRequired: boolean
   manualCharges: AdditionalCharge[]
-  onSelectDate: (newScheduledFor: string) => void | Promise<void>
+  // offsetDays lets the caller shift any other date field that's derived from
+  // the same calendar day (e.g. the top-level "Delivery Date & Time" field) by
+  // the same amount, instead of only the pickup time moving while everything
+  // else silently stays on the old day.
+  onSelectDate: (newScheduledFor: string, offsetDays: number) => void | Promise<void>
   originTimeZone?: string | null
 }) {
   const [results, setResults] = useState<DayResult[] | null>(null)
@@ -183,7 +187,7 @@ export default function NearbyDatesFlightCheck({
     const newValue = toLocalDatetimeInputValue(newDate)
     setRecalculatingOffset(offset)
     try {
-      await onSelectDate(newValue)
+      await onSelectDate(newValue, offset)
     } finally {
       setRecalculatingOffset(null)
       setResults(null)

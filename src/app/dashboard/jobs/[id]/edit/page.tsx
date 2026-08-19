@@ -642,8 +642,16 @@ export default function EditJobPage() {
             paidToDriver: false,
           })
         } else {
+          // Include the actual departure date/time in the saved description —
+          // this is what makes the chosen flight's timing visible after the
+          // fact (in the breakdown below, on the saved job, and to admins),
+          // not just transiently while the nearby-dates comparison panel is
+          // still open.
+          const departsText = chosen.flight.departingAt
+            ? ` — departs ${new Date(chosen.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+            : ''
           result.push({
-            description: `Flight back: ${chosen.origin.code} → ${chosen.destination.code} (${chosen.flight.isDirect ? 'direct' : `${chosen.flight.stops} stop${chosen.flight.stops === 1 ? '' : 's'}`})`,
+            description: `Flight back: ${chosen.origin.code} → ${chosen.destination.code} (${chosen.flight.isDirect ? 'direct' : `${chosen.flight.stops} stop${chosen.flight.stops === 1 ? '' : 's'}`})${departsText}`,
             kind: 'flight' as const,
             dealerAmountCents: chosen.flight.priceCents,
             hoursAdded: chosen.flight.hoursToAdd,
@@ -1790,6 +1798,11 @@ export default function EditJobPage() {
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.kind === 'flight')?.dealerAmountCents ?? 0} />
+                    {additionalCharges.find((c) => c.kind === 'flight') && (
+                      <p className="text-[11px] text-gray-400 -mt-1 pl-1">
+                        {additionalCharges.find((c) => c.kind === 'flight')!.description}
+                      </p>
+                    )}
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.kind === 'ground-to-airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.kind === 'ground-home')?.dealerAmountCents ?? 0} />
                     <BreakdownRow
@@ -1866,7 +1879,20 @@ export default function EditJobPage() {
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
                   originTimeZone={originTimeZone}
-                  onSelectDate={async (d) => {
+                  onSelectDate={async (d, offsetDays) => {
+                    // The top "Delivery Date & Time" field (deliveryDeadline) is
+                    // what's actually saved as the job's delivery_deadline and is
+                    // what originally drove this pickup time's calculation — if it
+                    // doesn't shift by the same number of days as the newly picked
+                    // date, the two silently disagree. Shift it directly rather
+                    // than going through handleDeliveryDeadlineChange, which would
+                    // recompute scheduledFor from it and clobber the pickup time
+                    // we're intentionally setting from the comparison panel.
+                    if (deliveryDeadline && offsetDays !== 0) {
+                      const shifted = new Date(deliveryDeadline)
+                      shifted.setDate(shifted.getDate() + offsetDays)
+                      setDeliveryDeadline(toLocalDatetimeInputValue(shifted))
+                    }
                     setScheduledFor(d)
                     // Pass the new date straight into runCalculation rather than
                     // relying on the `scheduledFor` state update to land first —
