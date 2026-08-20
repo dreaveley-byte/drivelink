@@ -664,10 +664,28 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                       </div>
                     ) : null
                   )}
+                  {/* "Hourly (dealer-billed)" above and this are deliberately different
+                      numbers — the dealer is billed for inspection/registry/ferry wait
+                      time that the driver is NOT paid hourly for (that wait time is
+                      covered by its own flat fee line instead), so driver hourly pay
+                      is always lower than dealer-billed hourly. Shown explicitly here
+                      so it's not mistaken for the dealer figure when checking driver
+                      pay math. */}
+                  {pricingBreakdown && pricingBreakdown.hourlyDriverCents != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Driver hourly pay (lower than dealer-billed — excludes inspection/registry wait time)</span>
+                      <span className="text-gray-900">{formatCents(pricingBreakdown.hourlyDriverCents)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Driver pay (hourly, meals, wear & tear)</span>
+                    <span className="text-gray-600">Driver pay total (hourly + meals + wear &amp; tear + overnight fee)</span>
                     <span className="text-gray-900">{formatCents(job.estimated_driver_pay_cents ?? 0)}</span>
                   </div>
+                  <p className="text-xs text-gray-400">
+                    Meals above is the flat accrued estimate — once this job is completed, the driver&apos;s actual pay
+                    (shown further down under &quot;Accrued vs. actual&quot;) reimburses their real food spend plus their
+                    share of any unused meal budget instead.
+                  </p>
                 </div>
               </div>
             ) : (
