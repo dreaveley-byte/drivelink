@@ -894,6 +894,7 @@ export default function PostJobPage() {
           return isCustomerRide ? baseMarkup : null
         })(),
         useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
+        isPartsJob,
       },
       pricingSettings
     )
@@ -2157,14 +2158,27 @@ export default function PostJobPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
-                    <span>Subtotal</span>
-                    <span>{formatCents(pricing.costBasisCents)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
-                    <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
-                  </div>
+                  {pricing.partsCompetitiveRateApplied ? (
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2 py-1.5">
+                        Priced below the normal hourly formula (Subtotal {formatCents(pricing.costBasisCents)}) — this is a short
+                        parts run, so it&apos;s capped at {pricingSettings?.parts_uber_discount_percent ?? 10}% below the Uber-equivalent
+                        estimate ({pricing.partsUberEstimateCents != null ? formatCents(pricing.partsUberEstimateCents) : '—'}) instead,
+                        with the driver getting {pricingSettings?.parts_driver_pay_split_percent ?? 80}% of what&apos;s left after fuel.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
+                        <span>Subtotal</span>
+                        <span>{formatCents(pricing.costBasisCents)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                        <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
