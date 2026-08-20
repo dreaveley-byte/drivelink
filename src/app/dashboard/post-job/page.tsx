@@ -1569,7 +1569,11 @@ export default function PostJobPage() {
                   <label className="block text-xs text-gray-500 mb-1">Part size</label>
                   <select
                     value={packageSize}
-                    onChange={(e) => setPackageSize(e.target.value as 'small' | 'medium' | 'large')}
+                    onChange={(e) => {
+                      const val = e.target.value as 'small' | 'medium' | 'large'
+                      setPackageSize(val)
+                      window.alert('Please ensure this part(s) will fit in the selected vehicle size.')
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   >
                     <option value="small">Small</option>
