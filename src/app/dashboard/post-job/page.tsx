@@ -27,6 +27,8 @@ export default function PostJobPage() {
   const [vehicleYear, setVehicleYear] = useState('')
   const [packageDescription, setPackageDescription] = useState('')
   const [packageDirection, setPackageDirection] = useState<'pickup' | 'dropoff'>('dropoff')
+  const [packageSize, setPackageSize] = useState<'small' | 'medium' | 'large'>('small')
+  const [specialInstructions, setSpecialInstructions] = useState('')
   const [pickupDropoffReason, setPickupDropoffReason] = useState<'sales' | 'service' | 'other'>('sales')
   const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [vehicleMake, setVehicleMake] = useState('')
@@ -997,7 +999,9 @@ export default function PostJobPage() {
       recipient_phone: customerPhone || null,
       vehicle_year: isDealerToDealerMultiVehicle ? (primaryVehicle?.year ? parseInt(primaryVehicle.year) : null) : (vehicleYear ? parseInt(vehicleYear) : null),
       package_description: useSimplifiedForm ? (packageDescription || null) : null,
-      package_direction: isCourier ? packageDirection : null,
+      package_direction: isCourier && !isPartsJob ? packageDirection : null,
+      package_size: isPartsJob ? packageSize : null,
+      special_instructions: useSimplifiedForm ? (specialInstructions || null) : null,
       pickup_dropoff_reason: isCustomerRide ? pickupDropoffReason : null,
       pickup_dropoff_reason_other: isCustomerRide && pickupDropoffReason === 'other' ? (pickupDropoffReasonOther || null) : null,
       vehicle_make: isDealerToDealerMultiVehicle ? (primaryVehicle?.make || null) : (vehicleMake || null),
@@ -1321,6 +1325,7 @@ export default function PostJobPage() {
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
   const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
+  const isPartsJob = ['Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
   const isCustomerPickup = jobTypeName === 'Customer Pick Up'
   const isCustomerDropoff = jobTypeName === 'Customer Drop Off'
@@ -1559,7 +1564,24 @@ export default function PostJobPage() {
               <p className="text-sm font-medium text-gray-900">
                 {isPaperworkSigning ? 'Paperwork' : isCustomerRide ? (isCustomerPickup ? 'Customer Pick Up' : 'Customer Drop Off') : 'Package'}
               </p>
-              {isCourier && (
+              {isPartsJob && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Part size</label>
+                  <select
+                    value={packageSize}
+                    onChange={(e) => setPackageSize(e.target.value as 'small' | 'medium' | 'large')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Small = fits in a car. Medium = fits in an SUV. Large = requires a truck or van.
+                  </p>
+                </div>
+              )}
+              {isCourier && !isPartsJob && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Pick up or drop off</label>
                   <select
@@ -1606,6 +1628,16 @@ export default function PostJobPage() {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Special instructions (optional)</label>
+                <textarea
+                  value={specialInstructions}
+                  onChange={(e) => setSpecialInstructions(e.target.value)}
+                  placeholder="e.g. gate code, ask for Steve at the parts counter, fragile"
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">

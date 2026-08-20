@@ -263,11 +263,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
                 </p>
                 {['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Paperwork Signing'].includes(job.job_types?.name ?? '') ? (
-                  job.package_description && (
-                    <p className="text-xs text-gray-700 mt-0.5">
-                      📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}{job.package_description}
-                    </p>
-                  )
+                  <>
+                    {job.package_description && (
+                      <p className="text-xs text-gray-700 mt-0.5">
+                        📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}
+                        {job.package_size === 'small' ? 'Small: ' : job.package_size === 'medium' ? 'Medium: ' : job.package_size === 'large' ? 'Large: ' : ''}
+                        {job.package_description}
+                      </p>
+                    )}
+                    {job.special_instructions && (
+                      <p className="text-xs text-amber-700 mt-0.5">📝 {job.special_instructions}</p>
+                    )}
+                  </>
                 ) : (
                   (job.vehicle_year || job.vehicle_make || job.stock_number) && (
                     <p className="text-xs text-gray-700 mt-0.5">

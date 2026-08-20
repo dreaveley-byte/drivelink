@@ -23,6 +23,10 @@ type Job = {
   dropoff_address: string
   recipient_name: string | null
   customer_full_name: string | null
+  package_description?: string | null
+  package_direction?: string | null
+  package_size?: string | null
+  special_instructions?: string | null
   estimated_driver_pay_cents: number | null
   admin_pay_override_cents?: number | null
   estimated_driver_reimbursement_cents?: number | null
@@ -1016,6 +1020,16 @@ export default function DriverJobActions({
               </>
             )}
           </p>
+        )}
+        {job.package_description && (
+          <p className="text-xs text-gray-500 mt-0.5">
+            📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}
+            {job.package_size === 'small' ? 'Small (car): ' : job.package_size === 'medium' ? 'Medium (SUV): ' : job.package_size === 'large' ? 'Large (truck/van): ' : ''}
+            {job.package_description}
+          </p>
+        )}
+        {job.special_instructions && (
+          <p className="text-xs text-amber-700 mt-0.5">📝 {job.special_instructions}</p>
         )}
         {(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents) != null && (
           <p className="text-xs text-green-700 font-medium mt-0.5">
