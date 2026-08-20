@@ -664,16 +664,19 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                       </div>
                     ) : null
                   )}
-                  {/* "Hourly (dealer-billed)" above and this are deliberately different
-                      numbers — the dealer is billed for inspection/registry/ferry wait
-                      time that the driver is NOT paid hourly for (that wait time is
-                      covered by its own flat fee line instead), so driver hourly pay
-                      is always lower than dealer-billed hourly. Shown explicitly here
-                      so it's not mistaken for the dealer figure when checking driver
-                      pay math. */}
+                  {/* Driver hourly pay uses the SAME hours and SAME hourly rate as
+                      "Hourly (dealer-billed)" above — the driver is paid for every
+                      hour the dealer is billed for, including inspection/registry/
+                      insurance/ferry wait time (the flat inspection/registry FEE
+                      dollars still go to the dealer only; the driver's compensation
+                      for that time comes through the hourly rate instead). The two
+                      numbers should match exactly; the only place driver pay and
+                      dealer cost diverge is the dealer markup applied afterward,
+                      which the driver doesn't get a share of. Shown explicitly here
+                      so that can be verified directly instead of taken on faith. */}
                   {pricingBreakdown && pricingBreakdown.hourlyDriverCents != null && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Driver hourly pay (lower than dealer-billed — excludes inspection/registry wait time)</span>
+                      <span className="text-gray-600">Driver hourly pay (same hours &amp; rate as dealer-billed, no markup)</span>
                       <span className="text-gray-900">{formatCents(pricingBreakdown.hourlyDriverCents)}</span>
                     </div>
                   )}

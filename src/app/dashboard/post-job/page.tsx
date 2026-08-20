@@ -2100,7 +2100,7 @@ export default function PostJobPage() {
                     <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <p className="text-[11px] text-gray-400">
-                      Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
+                      Note: driver hours include inspection/registry/insurance/ferry wait time (paid at the hourly rate) — the flat inspection/registry fee dollars themselves still go to the dealer only, and flight ticket cost is dealer-paid, not part of driver pay.
                       {secondDriver && ' This breakdown is the combined total for both drivers — each driver’s own job post shows their individual full pay separately, not half of this.'}
                     </p>
                     <div className="flex items-center justify-between pt-1 text-xs font-medium text-gray-700">

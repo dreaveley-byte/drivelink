@@ -152,9 +152,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // the dealerAmountCents dollar figure also gets reimbursed to the driver.
   // (e.g. a flight ticket: the driver is paid for the hours spent traveling,
   // but the ticket cost itself is billed to the dealer only, not added to pay.)
-  const extraDriverPaidHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
-  const extraDealerOnlyHours = additionalCharges
-    .reduce((sum, c) => sum + c.hoursAdded, 0)
+  const extraDealerOnlyHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
 
   // Overnight isn't just about drive time — the inspection/registry stops, ferry
   // wait, break time, and (crucially, for a fly-back job) the flight itself plus
@@ -196,7 +194,18 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const deliveryHandlingHours = settings.delivery_handling_buffer_hours
 
   const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
-  const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours + deliveryHandlingHours
+  // The driver is paid hourly for every hour the dealer is billed for — the
+  // inspection/registry/insurance/ferry wait time is real time the driver
+  // spends on the job, even though the dealer's flat inspection/registry fee
+  // dollars themselves stay dealer-only (that fee covers the shop/registry
+  // cost, not the driver's time — the driver's time is compensated through
+  // the hourly rate instead). Previously this excluded that wait time
+  // entirely, so a driver could sit through a 2-hour inspection and 30-minute
+  // registry stop and get paid for neither. Driver hours now equal dealer
+  // hours exactly; the only place they diverge in dollar terms is the dealer
+  // markup applied on top of the dealer's total afterward, which the driver
+  // never sees a share of.
+  const driverPaidHours = dealerBilledHours
 
   const effectiveHourlyRateCents = useSimpleJobRates ? settings.simple_job_hourly_rate_cents : settings.hourly_rate_cents
   const hourlyDealerCents = Math.round(dealerBilledHours * effectiveHourlyRateCents * numDrivers)
