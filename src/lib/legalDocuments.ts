@@ -13,6 +13,7 @@ export type LegalDocSlug =
   | 'driver_standards_code_of_conduct'
   | 'vehicle_inspection_damage_policy'
   | 'driver_expense_reimbursement_policy'
+  | 'driver_hours_fatigue_safety_policy'
 
 export const ALL_LEGAL_DOC_SLUGS: LegalDocSlug[] = [
   'driver_contractor_agreement',
@@ -25,6 +26,7 @@ export const ALL_LEGAL_DOC_SLUGS: LegalDocSlug[] = [
   'driver_standards_code_of_conduct',
   'vehicle_inspection_damage_policy',
   'driver_expense_reimbursement_policy',
+  'driver_hours_fatigue_safety_policy',
 ]
 
 // Documents a driver must accept before applying / continuing to use the app.
@@ -34,6 +36,7 @@ export const DRIVER_REQUIRED_DOCS: LegalDocSlug[] = [
   'driver_standards_code_of_conduct',
   'vehicle_inspection_damage_policy',
   'driver_expense_reimbursement_policy',
+  'driver_hours_fatigue_safety_policy',
   'privacy_policy',
   'platform_terms_of_service',
 ]

@@ -15,6 +15,7 @@ const DRIVER_DOC_LABELS: Record<string, string> = {
   driver_standards_code_of_conduct: 'Driver Standards and Code of Conduct',
   vehicle_inspection_damage_policy: 'Vehicle Inspection and Damage Policy',
   driver_expense_reimbursement_policy: 'Driver Expense and Reimbursement Policy',
+  driver_hours_fatigue_safety_policy: 'Driver Hours & Fatigue Safety Policy',
   privacy_policy: 'Privacy Policy',
   platform_terms_of_service: 'Platform Terms of Service',
 }
