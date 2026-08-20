@@ -46,11 +46,16 @@ export type PricingSettings = {
   job_review_hold_min_distance_km: number
   // Parts Delivery/Parts Pickup jobs are often short hops where the normal
   // hourly formula prices out above what Uber Courier would charge for the
-  // same trip. When that happens, cap the price at this % below the
-  // Uber-equivalent fare (using the uber_* settings above) instead, and pay
-  // the driver a fixed % of that capped price rather than the hourly rate.
+  // same trip. When that happens, cap the price at this % below a
+  // parts-specific Uber-equivalent fare (using the parts_uber_* settings
+  // below — kept separate from the uber_* settings above, which are
+  // calibrated for airport-transfer ride estimates, a different real-world
+  // rate) instead, and pay the driver a fixed % of what's left after fuel.
   parts_uber_discount_percent: number
   parts_driver_pay_split_percent: number
+  parts_uber_base_fare_cents: number
+  parts_uber_per_km_cents: number
+  parts_uber_minimum_fare_cents: number
 }
 
 export type AdditionalCharge = {
@@ -314,13 +319,13 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   let partsUberEstimateCents: number | null = null
   if (
     input.isPartsJob &&
-    Number.isFinite(settings.uber_base_fare_cents) &&
-    Number.isFinite(settings.uber_per_km_cents) &&
-    Number.isFinite(settings.uber_minimum_fare_cents)
+    Number.isFinite(settings.parts_uber_base_fare_cents) &&
+    Number.isFinite(settings.parts_uber_per_km_cents) &&
+    Number.isFinite(settings.parts_uber_minimum_fare_cents)
   ) {
     const uberEstimateCents = Math.max(
-      Math.round(settings.uber_base_fare_cents + tripDistanceKm * settings.uber_per_km_cents),
-      settings.uber_minimum_fare_cents
+      Math.round(settings.parts_uber_base_fare_cents + tripDistanceKm * settings.parts_uber_per_km_cents),
+      settings.parts_uber_minimum_fare_cents
     )
     partsUberEstimateCents = uberEstimateCents
     const discountPercent = Number.isFinite(settings.parts_uber_discount_percent) ? settings.parts_uber_discount_percent : 10
