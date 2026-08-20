@@ -144,6 +144,11 @@ export default function EditJobPage() {
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [notEditable, setNotEditable] = useState(false)
+  // A cancelled job is editable too, but saving it means something different
+  // than an ordinary edit — it needs to go back to 'awaiting_driver' (and lose
+  // any stale driver_id from before it was cancelled, and any archived_at) so
+  // it's actually postable again, not just silently stay cancelled with new details.
+  const [isRepost, setIsRepost] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -176,11 +181,12 @@ export default function EditJobPage() {
         setPageLoading(false)
         return
       }
-      if (job.status !== 'awaiting_driver') {
+      if (job.status !== 'awaiting_driver' && job.status !== 'cancelled') {
         setNotEditable(true)
         setPageLoading(false)
         return
       }
+      setIsRepost(job.status === 'cancelled')
 
       setJobTypeId(job.job_type_id ?? '')
 
@@ -1000,12 +1006,23 @@ export default function EditJobPage() {
       trade_in_model: isTradeIn ? tradeInModel || null : null,
       trade_in_vin: isTradeIn ? tradeInVin || null : null,
       notes: notes || null,
+      // Reposting a cancelled job: put it back into the unclaimed pool rather
+      // than leaving it stuck as 'cancelled' with updated details nobody can
+      // see. Clear driver_id too — whatever driver was on it before it was
+      // cancelled has no bearing on this new posting, and leaving it set
+      // would incorrectly tie the job to them without them ever re-claiming it.
+      ...(isRepost ? { status: 'awaiting_driver', driver_id: null, archived_at: null } : {}),
     }).eq('id', jobId)
 
     if (jobError) {
       setError(jobError.message)
       setLoading(false)
       return
+    }
+
+    if (isRepost) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('job_status_events').insert({ job_id: jobId, status: 'awaiting_driver', changed_by: user?.id ?? null })
     }
 
     // Replace the stop rows with the current set
@@ -1134,7 +1151,7 @@ export default function EditJobPage() {
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-gray-900 mb-2">This job can no longer be edited</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Once a driver has been assigned, the job details are locked. You can still cancel it from the dashboard if needed.
+            Once a driver has been assigned, the job details are locked. If this job is already done or no longer needed, cancel it first from the dashboard — a cancelled job can be reopened and reposted.
           </p>
           <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-600 hover:text-gray-900 underline">
             Back to dashboard
@@ -1158,10 +1175,19 @@ export default function EditJobPage() {
         <div className="flex items-center gap-2 mb-1">
           <Logo height={20} />
         </div>
-        <h1 className="text-lg font-semibold text-gray-900">Edit job</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{isRepost ? 'Reopen & repost cancelled job' : 'Edit job'}</h1>
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
+        {isRepost && (
+          <div className="mb-6 border border-amber-300 bg-amber-50 rounded-lg px-4 py-3">
+            <p className="text-sm text-amber-800 font-medium">This job was cancelled.</p>
+            <p className="text-xs text-amber-700 mt-1">
+              Review and update the details below, then click &quot;Repost job&quot; to make it available to drivers again.
+              Any previously assigned driver is cleared — this goes back out as a fresh, unclaimed job.
+            </p>
+          </div>
+        )}
         {isAdmin && reviewInfo && !reviewInfo.reviewApprovedAt && reviewInfo.status === 'awaiting_driver'
           && (
             (reviewInfo.estimatedDistanceKm != null && reviewInfo.estimatedDistanceKm >= reviewInfo.holdMinDistanceKm)
@@ -1981,7 +2007,7 @@ export default function EditJobPage() {
               disabled={loading}
               className="bg-[#378ADD] text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Save changes'}
+              {loading ? 'Saving...' : isRepost ? 'Repost job' : 'Save changes'}
             </button>
             <button type="button" onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 px-3 py-2.5">
               Cancel
