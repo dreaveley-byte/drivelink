@@ -818,6 +818,22 @@ export default function PostJobPage() {
         }
       }
 
+      // Defensive safeguard: guarantee at most one auto-generated charge per
+      // kind (flight, ferry, ground-to-airport, ground-home, bus) no matter
+      // how finalCharges got built above - a real job was found billing a
+      // dealer for duplicate ground-transport charges, so this dedupes by
+      // kind right before committing to state as a hard backstop against
+      // that ever slipping through again. Manual (no-kind) charges are
+      // always kept as-is since there's no way to tell two legitimately
+      // separate manual entries apart. Keeps the LAST occurrence of each
+      // kind, since fresh auto-generated charges are always appended after
+      // manualCharges in the array order.
+      const lastIndexByKind = new Map<string, number>()
+      finalCharges.forEach((c, i) => {
+        if (c.kind) lastIndexByKind.set(c.kind, i)
+      })
+      finalCharges = finalCharges.filter((c, i) => !c.kind || lastIndexByKind.get(c.kind) === i)
+
       // Always update the saved charges — this is what clears stale flight/ferry/ground
       // transport entries and what the sync effect below uses for every later recompute.
       setAdditionalCharges(finalCharges)
