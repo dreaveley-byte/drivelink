@@ -10,6 +10,7 @@ import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
 import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
+import VehicleDeliveryAcknowledgementModal from '@/components/VehicleDeliveryAcknowledgementModal'
 import { addCalendarEventNative } from '@/lib/nativeCalendarBridge'
 
 type Job = {
@@ -22,6 +23,10 @@ type Job = {
   dropoff_address: string
   recipient_name: string | null
   customer_full_name: string | null
+  package_description?: string | null
+  package_direction?: string | null
+  package_size?: string | null
+  special_instructions?: string | null
   estimated_driver_pay_cents: number | null
   admin_pay_override_cents?: number | null
   estimated_driver_reimbursement_cents?: number | null
@@ -199,6 +204,9 @@ export default function DriverJobActions({
   }, [])
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [deliveryAckModalOpen, setDeliveryAckModalOpen] = useState(false)
+  const [deliveryAckAccepted, setDeliveryAckAccepted] = useState(false)
+  const [deliveryAckMediaConsent, setDeliveryAckMediaConsent] = useState<boolean | null>(null)
 
   const HEAVY_TYPES = ['photo', 'video', 'upload', 'signature', 'condition_report']
 
@@ -1013,6 +1021,16 @@ export default function DriverJobActions({
             )}
           </p>
         )}
+        {job.package_description && (
+          <p className="text-xs text-gray-500 mt-0.5">
+            📦 {job.package_direction === 'pickup' ? 'Pick up: ' : job.package_direction === 'dropoff' ? 'Drop off: ' : ''}
+            {job.package_size === 'small' ? 'Small (car): ' : job.package_size === 'medium' ? 'Medium (SUV): ' : job.package_size === 'large' ? 'Large (truck/van): ' : ''}
+            {job.package_description}
+          </p>
+        )}
+        {job.special_instructions && (
+          <p className="text-xs text-amber-700 mt-0.5">📝 {job.special_instructions}</p>
+        )}
         {(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents) != null && (
           <p className="text-xs text-green-700 font-medium mt-0.5">
             Est. pay: {formatCents(job.admin_pay_override_cents ?? job.estimated_driver_pay_cents!)}
@@ -1496,26 +1514,49 @@ export default function DriverJobActions({
                               (() => {
                                 const org = joinOrg(job.organizations)
                                 const odometerItem = checklist.find((c) => c.label === 'Delivery: Enter the odometer reading')
-                                const disclosureText = buildDeliveryDisclosureText({
-                                  customerName: job.customer_full_name || job.recipient_name,
-                                  customerAddress: job.customer_address,
-                                  customerPhone: job.customer_phone,
-                                  vehicleYear: job.vehicle_year,
-                                  vehicleMake: job.vehicle_make,
-                                  vehicleModel: job.vehicle_model,
-                                  vin: job.vin,
-                                  odometer: odometerItem?.notes ?? null,
-                                  dealerName: org?.name,
-                                  dealerAddress: org?.address,
-                                  dealerPhone: org?.phone,
-                                  deliveryDateTime: new Date().toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }),
-                                  deliveryLat: job.delivery_gps_lat,
-                                  deliveryLng: job.delivery_gps_lng,
-                                })
+                                const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
+                                const deliveryLocation =
+                                  job.delivery_gps_lat != null && job.delivery_gps_lng != null
+                                    ? `${job.delivery_gps_lat.toFixed(5)}, ${job.delivery_gps_lng.toFixed(5)}`
+                                    : job.dropoff_address
                                 return (
-                                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-line max-h-64 overflow-y-auto">
-                                    {disclosureText}
-                                  </p>
+                                  <div className="space-y-2">
+                                    {deliveryAckAccepted ? (
+                                      <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                                        ✓ Vehicle Delivery Acknowledgement reviewed and agreed to by the customer
+                                        {deliveryAckMediaConsent ? ' (media consent given).' : ' (media consent declined).'}
+                                      </p>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeliveryAckModalOpen(true)}
+                                        className="w-full text-sm font-medium px-4 py-2.5 rounded-lg border border-[#378ADD] text-[#378ADD] hover:bg-blue-50"
+                                      >
+                                        Review & Sign Delivery Acknowledgement
+                                      </button>
+                                    )}
+                                    <VehicleDeliveryAcknowledgementModal
+                                      open={deliveryAckModalOpen}
+                                      jobId={job.id}
+                                      fields={{
+                                        recipientName: job.customer_full_name || job.recipient_name,
+                                        address: job.customer_address,
+                                        phone: job.customer_phone,
+                                        vehicleDesc,
+                                        vin: job.vin,
+                                        odometer: odometerItem?.notes ? `${odometerItem.notes} km` : null,
+                                        dealerName: org?.name,
+                                        deliveryDateTime: new Date().toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }),
+                                        deliveryLocation,
+                                        jobNumber: job.id,
+                                      }}
+                                      onClose={() => setDeliveryAckModalOpen(false)}
+                                      onAccepted={({ mediaConsent }) => {
+                                        setDeliveryAckAccepted(true)
+                                        setDeliveryAckMediaConsent(mediaConsent)
+                                      }}
+                                    />
+                                  </div>
                                 )
                               })()
                             ) : (
@@ -1526,10 +1567,12 @@ export default function DriverJobActions({
                               )
                             )}
 
-                            <ChecklistSignaturePad
-                              saving={uploadingItemId === item.id}
-                              onSave={(blob) => uploadSignatureForItem(item, blob)}
-                            />
+                            {(item.label !== 'Delivery: Customer signs delivery disclosure' || deliveryAckAccepted) && (
+                              <ChecklistSignaturePad
+                                saving={uploadingItemId === item.id}
+                                onSave={(blob) => uploadSignatureForItem(item, blob)}
+                              />
+                            )}
                           </div>
                         )}
 

@@ -91,6 +91,8 @@ export default function EditJobPage() {
   const [registryVisit, setRegistryVisit] = useState(false)
   const [packageDescription, setPackageDescription] = useState('')
   const [packageDirection, setPackageDirection] = useState<'pickup' | 'dropoff'>('dropoff')
+  const [packageSize, setPackageSize] = useState<'small' | 'medium' | 'large'>('small')
+  const [specialInstructions, setSpecialInstructions] = useState('')
   const [pickupDropoffReason, setPickupDropoffReason] = useState<'sales' | 'service' | 'other'>('sales')
   const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [insuranceVisit, setInsuranceVisit] = useState(false)
@@ -144,6 +146,11 @@ export default function EditJobPage() {
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [notEditable, setNotEditable] = useState(false)
+  // A cancelled job is editable too, but saving it means something different
+  // than an ordinary edit — it needs to go back to 'awaiting_driver' (and lose
+  // any stale driver_id from before it was cancelled, and any archived_at) so
+  // it's actually postable again, not just silently stay cancelled with new details.
+  const [isRepost, setIsRepost] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -176,11 +183,12 @@ export default function EditJobPage() {
         setPageLoading(false)
         return
       }
-      if (job.status !== 'awaiting_driver') {
+      if (job.status !== 'awaiting_driver' && job.status !== 'cancelled') {
         setNotEditable(true)
         setPageLoading(false)
         return
       }
+      setIsRepost(job.status === 'cancelled')
 
       setJobTypeId(job.job_type_id ?? '')
 
@@ -235,6 +243,8 @@ export default function EditJobPage() {
       setRegistryVisit(job.registry_visit ?? false)
       setPackageDescription(job.package_description ?? '')
       setPackageDirection(job.package_direction === 'pickup' ? 'pickup' : 'dropoff')
+      setPackageSize(job.package_size === 'medium' ? 'medium' : job.package_size === 'large' ? 'large' : 'small')
+      setSpecialInstructions(job.special_instructions ?? '')
       setPickupDropoffReason(job.pickup_dropoff_reason === 'service' ? 'service' : job.pickup_dropoff_reason === 'other' ? 'other' : 'sales')
       setPickupDropoffReasonOther(job.pickup_dropoff_reason_other ?? '')
       setFerryRequired(job.ferry_required ?? false)
@@ -393,7 +403,16 @@ export default function EditJobPage() {
     setComputingPickupTime(false)
   }
 
-  const runCalculation = useCallback(async () => {
+  // Accepts an optional date override so a caller (e.g. selecting a nearby
+  // date from NearbyDatesFlightCheck) can trigger a full recalculation for a
+  // NEW scheduled date immediately, in the same tick — waiting for the
+  // `scheduledFor` state update to land and this callback to be re-created on
+  // the next render would mean the very first invocation still reads the OLD
+  // date, silently recalculating the wrong quote.
+  const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean, precomputedFlyCharges?: AdditionalCharge[] | null) => {
+    const effectiveScheduledFor = scheduledForOverride ?? scheduledFor
+    const effectiveAutoSelect = forceFlying ? false : autoSelectReturnMethod
+    const effectiveFlyingBack = forceFlying ? true : flyingBack
     setCalcError('')
     setDecisionNote('')
     const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
@@ -416,7 +435,7 @@ export default function EditJobPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           addresses: filledStops,
-          departureTime: originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor),
+          departureTime: originTimeZone ? zonedLocalInputToUtcIso(effectiveScheduledFor, originTimeZone) : localInputToUtcIso(effectiveScheduledFor),
         }),
       })
       const data = await res.json()
@@ -543,12 +562,28 @@ export default function EditJobPage() {
       async function buildFlyCharges(): Promise<AdditionalCharge[] | null> {
         const hasOverride = flightPriceOverride.trim() !== '' && flightHoursOverride.trim() !== ''
 
-        const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings!.max_driving_hours_before_overnight
+        const insuranceHours = insuranceVisit ? pricingSettings!.insurance_visit_min_hours : 0
+        const totalOnGroundHours = oneWayHours + inspectionHours + registryHours + insuranceHours
+        const overnightNeeded = totalOnGroundHours > pricingSettings!.max_driving_hours_before_overnight
         let flightDepartureDate: string | undefined
-        if (scheduledFor) {
-          const d = new Date(scheduledFor)
+        // Real timestamp for when the driver is estimated to actually finish
+        // the drop-off (and any inspection/registry/insurance stops) and be
+        // free to head to the airport — used by the flight search API to only
+        // consider flights the driver could realistically catch, not just any
+        // flight on the right calendar date.
+        let earliestViableDepartureAt: string | undefined
+        if (effectiveScheduledFor) {
+          const d = new Date(effectiveScheduledFor)
           if (overnightNeeded) d.setDate(d.getDate() + 1)
           flightDepartureDate = toLocalDateString(d)
+
+          const startUtcIso = originTimeZone
+            ? zonedLocalInputToUtcIso(effectiveScheduledFor, originTimeZone)
+            : localInputToUtcIso(effectiveScheduledFor)
+          if (startUtcIso) {
+            const completionMs = new Date(startUtcIso).getTime() + totalOnGroundHours * 60 * 60 * 1000
+            earliestViableDepartureAt = new Date(completionMs).toISOString()
+          }
         }
         const flightRes = await fetch('/api/flights/search', {
           method: 'POST',
@@ -557,6 +592,7 @@ export default function EditJobPage() {
             originAddress: filledStops[0],
             destinationAddress: filledStops[filledStops.length - 1],
             departureDate: flightDepartureDate,
+            earliestViableDepartureAt,
           }),
         })
         const flightBody = await flightRes.json().catch(() => ({}))
@@ -618,8 +654,16 @@ export default function EditJobPage() {
             paidToDriver: false,
           })
         } else {
+          // Include the actual departure date/time in the saved description —
+          // this is what makes the chosen flight's timing visible after the
+          // fact (in the breakdown below, on the saved job, and to admins),
+          // not just transiently while the nearby-dates comparison panel is
+          // still open.
+          const departsText = chosen.flight.departingAt
+            ? ` — departs ${new Date(chosen.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+            : ''
           result.push({
-            description: `Flight back: ${chosen.origin.code} → ${chosen.destination.code} (${chosen.flight.isDirect ? 'direct' : `${chosen.flight.stops} stop${chosen.flight.stops === 1 ? '' : 's'}`})`,
+            description: `Flight back: ${chosen.origin.code} → ${chosen.destination.code} (${chosen.flight.isDirect ? 'direct' : `${chosen.flight.stops} stop${chosen.flight.stops === 1 ? '' : 's'}`})${departsText}`,
             kind: 'flight' as const,
             dealerAmountCents: chosen.flight.priceCents,
             hoursAdded: chosen.flight.hoursToAdd,
@@ -671,7 +715,7 @@ export default function EditJobPage() {
         finalCharges = fc ? [...manualCharges, fc] : manualCharges
         if (isTradeIn) setDecisionNote('Trade-in pickup means the driver needs the vehicle both ways — treated as a round trip.')
         else setDecisionNote(`2nd driver (${secondDriver}) + chase vehicle (${chaseVehicle}) means a round trip — flying back was turned off.`)
-      } else if (autoSelectReturnMethod && longHaul) {
+      } else if (effectiveAutoSelect && longHaul) {
         // Compare all three ways to get the driver home, pick the cheapest.
         const [flyCharges, busCharges] = await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
 
@@ -735,17 +779,37 @@ export default function EditJobPage() {
         // Short trip, or a long trip with auto-select manually turned off —
         // either way, respect the manual checkboxes exactly as set rather than
         // re-running the comparison and silently overwriting the choice.
-        if (flyingBack) {
+        if (effectiveFlyingBack) {
           setEffectiveOneWayReturn(true)
-          const flyCharges = await buildFlyCharges()
+          // If the caller already has a freshly-priced flight for this exact
+          // date (e.g. from the nearby-dates comparison panel), use it as-is
+          // instead of re-searching — live flight inventory/pricing can shift
+          // between two separate searches seconds apart, which is how a date
+          // that priced fine in the comparison panel could come back with "no
+          // flight found" on this second, independent search.
+          const flyCharges = precomputedFlyCharges !== undefined ? precomputedFlyCharges : await buildFlyCharges()
           if (flyCharges) {
             const fc = ferryCharge('oneway-vehicle')
             finalCharges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
             setDecisionNote('Short trip, flying back (manually selected).')
           } else {
-            setCalcError('Could not find a flight price — add one manually below if needed.')
+            // Live flight search is flaky enough that a re-search (e.g. from
+            // just clicking "Calculate distance & cost" again) can come back
+            // empty even when a flight was found moments ago for this same
+            // trip. Rather than silently dropping the whole return-transport
+            // cost (and with it the overnight/hotel charges that depended on
+            // those extra hours), keep whatever flight/ground-transport
+            // charges were already on the quote — a stale-but-real price beats
+            // a quote that's suddenly missing hundreds of dollars in costs.
+            const existingFlyCharges = additionalCharges.filter((c) => c.kind === 'flight' || c.kind === 'ground-home' || c.kind === 'ground-to-airport')
             const fc = ferryCharge('oneway-vehicle')
-            finalCharges = fc ? [...manualCharges, fc] : manualCharges
+            if (existingFlyCharges.length > 0) {
+              finalCharges = fc ? [...manualCharges, ...existingFlyCharges, fc] : [...manualCharges, ...existingFlyCharges]
+              setCalcError('Could not find a fresh flight price — kept the previously found flight below instead.')
+            } else {
+              setCalcError('Could not find a flight price — add one manually below if needed.')
+              finalCharges = fc ? [...manualCharges, fc] : manualCharges
+            }
           }
         } else {
           // No trade-in, no chase+2nd driver, not flying, and Uber back wasn't
@@ -841,6 +905,7 @@ export default function EditJobPage() {
         returnVehicleCount,
         markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
         useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
+        isPartsJob,
       },
       pricingSettings
     )
@@ -895,7 +960,9 @@ export default function EditJobPage() {
       recipient_phone: recipientPhone || null,
       vehicle_year: vehicleYear ? parseInt(vehicleYear) : null,
       package_description: useSimplifiedForm ? (packageDescription || null) : null,
-      package_direction: isCourier ? packageDirection : null,
+      package_direction: isCourier && !isPartsJob ? packageDirection : null,
+      package_size: isPartsJob ? packageSize : null,
+      special_instructions: useSimplifiedForm ? (specialInstructions || null) : null,
       pickup_dropoff_reason: isCustomerRide ? pickupDropoffReason : null,
       pickup_dropoff_reason_other: isCustomerRide && pickupDropoffReason === 'other' ? (pickupDropoffReasonOther || null) : null,
       vehicle_make: vehicleMake || null,
@@ -946,12 +1013,23 @@ export default function EditJobPage() {
       trade_in_model: isTradeIn ? tradeInModel || null : null,
       trade_in_vin: isTradeIn ? tradeInVin || null : null,
       notes: notes || null,
+      // Reposting a cancelled job: put it back into the unclaimed pool rather
+      // than leaving it stuck as 'cancelled' with updated details nobody can
+      // see. Clear driver_id too — whatever driver was on it before it was
+      // cancelled has no bearing on this new posting, and leaving it set
+      // would incorrectly tie the job to them without them ever re-claiming it.
+      ...(isRepost ? { status: 'awaiting_driver', driver_id: null, archived_at: null } : {}),
     }).eq('id', jobId)
 
     if (jobError) {
       setError(jobError.message)
       setLoading(false)
       return
+    }
+
+    if (isRepost) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('job_status_events').insert({ job_id: jobId, status: 'awaiting_driver', changed_by: user?.id ?? null })
     }
 
     // Replace the stop rows with the current set
@@ -1080,7 +1158,7 @@ export default function EditJobPage() {
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-gray-900 mb-2">This job can no longer be edited</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Once a driver has been assigned, the job details are locked. You can still cancel it from the dashboard if needed.
+            Once a driver has been assigned, the job details are locked. If this job is already done or no longer needed, cancel it first from the dashboard — a cancelled job can be reopened and reposted.
           </p>
           <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-600 hover:text-gray-900 underline">
             Back to dashboard
@@ -1092,6 +1170,7 @@ export default function EditJobPage() {
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
   const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
+  const isPartsJob = ['Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
   const isCustomerPickup = jobTypeName === 'Customer Pick Up'
   const isCustomerDropoff = jobTypeName === 'Customer Drop Off'
@@ -1104,10 +1183,19 @@ export default function EditJobPage() {
         <div className="flex items-center gap-2 mb-1">
           <Logo height={20} />
         </div>
-        <h1 className="text-lg font-semibold text-gray-900">Edit job</h1>
+        <h1 className="text-lg font-semibold text-gray-900">{isRepost ? 'Reopen & repost cancelled job' : 'Edit job'}</h1>
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8">
+        {isRepost && (
+          <div className="mb-6 border border-amber-300 bg-amber-50 rounded-lg px-4 py-3">
+            <p className="text-sm text-amber-800 font-medium">This job was cancelled.</p>
+            <p className="text-xs text-amber-700 mt-1">
+              Review and update the details below, then click &quot;Repost job&quot; to make it available to drivers again.
+              Any previously assigned driver is cleared — this goes back out as a fresh, unclaimed job.
+            </p>
+          </div>
+        )}
         {isAdmin && reviewInfo && !reviewInfo.reviewApprovedAt && reviewInfo.status === 'awaiting_driver'
           && (
             (reviewInfo.estimatedDistanceKm != null && reviewInfo.estimatedDistanceKm >= reviewInfo.holdMinDistanceKm)
@@ -1236,7 +1324,28 @@ export default function EditJobPage() {
               <p className="text-sm font-medium text-gray-900">
                 {isPaperworkSigning ? 'Paperwork' : isCustomerRide ? (isCustomerPickup ? 'Customer Pick Up' : 'Customer Drop Off') : 'Package'}
               </p>
-              {isCourier && (
+              {isPartsJob && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Part size</label>
+                  <select
+                    value={packageSize}
+                    onChange={(e) => {
+                      const val = e.target.value as 'small' | 'medium' | 'large'
+                      setPackageSize(val)
+                      window.alert('Please ensure this part(s) will fit in the selected vehicle size.')
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Small = fits in a car. Medium = fits in an SUV. Large = requires a truck or van.
+                  </p>
+                </div>
+              )}
+              {isCourier && !isPartsJob && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Pick up or drop off</label>
                   <select
@@ -1283,6 +1392,16 @@ export default function EditJobPage() {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Special instructions (optional)</label>
+                <textarea
+                  value={specialInstructions}
+                  onChange={(e) => setSpecialInstructions(e.target.value)}
+                  placeholder="e.g. gate code, ask for Steve at the parts counter, fragile"
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
@@ -1729,7 +1848,7 @@ export default function EditJobPage() {
 
           <button
             type="button"
-            onClick={runCalculation}
+            onClick={() => runCalculation()}
             disabled={calculating}
             className="w-full border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
@@ -1766,6 +1885,11 @@ export default function EditJobPage() {
                     <BreakdownRow label="Ferry" cents={additionalCharges.find((c) => c.kind === 'ferry')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Bus" cents={additionalCharges.find((c) => c.kind === 'bus')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Flight" cents={additionalCharges.find((c) => c.kind === 'flight')?.dealerAmountCents ?? 0} />
+                    {additionalCharges.find((c) => c.kind === 'flight') && (
+                      <p className="text-[11px] text-gray-400 -mt-1 pl-1">
+                        {additionalCharges.find((c) => c.kind === 'flight')!.description}
+                      </p>
+                    )}
                     <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.kind === 'ground-to-airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.kind === 'ground-home')?.dealerAmountCents ?? 0} />
                     <BreakdownRow
@@ -1781,7 +1905,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
                     <BreakdownRow label="Overnight fee" cents={pricing.overnightFeeCents} />
                     <p className="text-[11px] text-gray-400">
-                      Note: driver hours don&apos;t include inspection/registry wait time (billed to dealer only) — flight ticket cost is dealer-paid, not part of driver pay.
+                      Note: driver hours include inspection/registry/insurance/ferry wait time (paid at the hourly rate) — the flat inspection/registry fee dollars themselves still go to the dealer only, and flight ticket cost is dealer-paid, not part of driver pay.
                       {secondDriver && ' This breakdown is the combined total for both drivers — each driver’s own job post shows their individual full pay separately, not half of this.'}
                     </p>
                     <div className="flex items-center justify-between pt-1 text-xs font-medium text-gray-700">
@@ -1802,14 +1926,27 @@ export default function EditJobPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
-                    <span>Subtotal</span>
-                    <span>{formatCents(pricing.costBasisCents)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
-                    <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
-                  </div>
+                  {pricing.partsCompetitiveRateApplied ? (
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2 py-1.5">
+                        Priced below the normal hourly formula (Subtotal {formatCents(pricing.costBasisCents)}) — this is a short
+                        parts run, so it&apos;s capped at {pricingSettings?.parts_uber_discount_percent ?? 10}% below the Uber-equivalent
+                        estimate ({pricing.partsUberEstimateCents != null ? formatCents(pricing.partsUberEstimateCents) : '—'}) instead,
+                        with the driver getting {pricingSettings?.parts_driver_pay_split_percent ?? 80}% of what&apos;s left after fuel.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200 text-xs text-gray-500">
+                        <span>Subtotal</span>
+                        <span>{formatCents(pricing.costBasisCents)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                        <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1826,6 +1963,14 @@ export default function EditJobPage() {
               <p className="text-xs text-gray-400 pt-1">
                 Estimated price. Additional charges may apply for wait time, repairs, tolls, parking, storage, additional mileage, or other job-related expenses. Final pricing may vary.
               </p>
+              {/* `flyingBack` is a loose "one-way, solo return" flag — it's also
+                  true when Uber back or Bus won the auto-select comparison, not
+                  only an actual flight. This panel is still useful to show in
+                  that case (comparing what flying on a nearby date would cost,
+                  even if Uber-back currently wins) — but picking a date here is
+                  now treated as a deliberate choice to fly, which locks in
+                  flyingBack + turns off auto-select for the recalculation below,
+                  so it can't silently revert back to Uber-back/Bus afterward. */}
               {flyingBack && distanceKm != null && durationMinutes != null && pricingSettings && (
                 <NearbyDatesFlightCheck
                   scheduledFor={scheduledFor}
@@ -1841,9 +1986,48 @@ export default function EditJobPage() {
                   insuranceVisit={insuranceVisit}
                   ferryRequired={ferryRequired}
                   manualCharges={additionalCharges.filter((c) => !c.kind)}
-                  onSelectDate={(d) => {
+                  originTimeZone={originTimeZone}
+                  onSelectDate={async (d, offsetDays, charges, options) => {
+                    // The top "Delivery Date & Time" field (deliveryDeadline) is
+                    // what's actually saved as the job's delivery_deadline and is
+                    // what originally drove this pickup time's calculation — if it
+                    // doesn't shift by the same number of days as the newly picked
+                    // date, the two silently disagree. Shift it directly rather
+                    // than going through handleDeliveryDeadlineChange, which would
+                    // recompute scheduledFor from it and clobber the pickup time
+                    // we're intentionally setting from the comparison panel.
+                    if (deliveryDeadline && offsetDays !== 0) {
+                      const shifted = new Date(deliveryDeadline)
+                      shifted.setDate(shifted.getDate() + offsetDays)
+                      setDeliveryDeadline(toLocalDatetimeInputValue(shifted))
+                    }
                     setScheduledFor(d)
-                    setCalcError('Date updated — click "Calculate distance & cost" again to refresh the quote for this new date.')
+                    // Selecting a specific flight date here is a deliberate choice
+                    // to fly back on that date — lock that in (same pairing as the
+                    // manual "Flying back" checkbox above) so auto-select can't
+                    // silently re-run its own comparison for the new date and land
+                    // back on Uber-back/Bus instead of the flight just chosen.
+                    setFlyingBack(true)
+                    setAutoSelectReturnMethod(false)
+                    // Also refresh the "N airport combinations compared" picker
+                    // with the options found for THIS date — without this it
+                    // either goes stale (still showing combos from whatever
+                    // date was last searched via the "Search flight price"
+                    // button) or stays empty, since selecting a date here skips
+                    // buildFlyCharges() (and its own setFlightOptions call)
+                    // entirely.
+                    setFlightOptions(options ?? [])
+                    setSelectedFlightOptionIdx(0)
+                    // Pass the new date and the forced-flying override straight
+                    // into runCalculation rather than relying on those state
+                    // updates landing first — they're async, so runCalculation's
+                    // own closure would otherwise still see the OLD values on
+                    // this same call. `charges` is the exact flight the panel
+                    // already priced for this date — pass it straight through
+                    // so runCalculation applies it as-is instead of re-searching
+                    // live flight inventory a second time (which can come back
+                    // with a different price, or nothing at all).
+                    await runCalculation(d, true, charges)
                   }}
                 />
               )}
@@ -1863,6 +2047,7 @@ export default function EditJobPage() {
               originAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
               destinationAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
               scheduledFor={scheduledFor}
+              originTimeZone={originTimeZone}
             />
           )}
 
@@ -1874,7 +2059,7 @@ export default function EditJobPage() {
               disabled={loading}
               className="bg-[#378ADD] text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
             >
-              {loading ? 'Saving...' : 'Save changes'}
+              {loading ? 'Saving...' : isRepost ? 'Repost job' : 'Save changes'}
             </button>
             <button type="button" onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 px-3 py-2.5">
               Cancel

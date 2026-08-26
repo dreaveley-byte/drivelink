@@ -61,6 +61,11 @@ type Settings = {
   job_review_hold_minutes: number
   job_review_hold_min_distance_km: number
   job_review_hold_trigger_on_flight: boolean
+  parts_uber_discount_percent: number
+  parts_driver_pay_split_percent: number
+  parts_uber_base_fare_cents: number
+  parts_uber_per_km_cents: number
+  parts_uber_minimum_fare_cents: number
 }
 
 function dollars(cents: number) {
@@ -507,6 +512,51 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Floor for short trips — real rides never cost less than this, regardless of distance</p>
               <input type="number" step="0.01" value={dollars(settings.uber_minimum_fare_cents)}
                 onChange={(e) => updateDollarField('uber_minimum_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Parts job Uber base fare ($)</label>
+              <p className="text-xs text-gray-400 mb-1">
+                Separate from the Uber/taxi settings above (those are calibrated for airport-transfer rides) — used only to
+                estimate a competitive Uber Courier price for Parts Delivery/Parts Pickup jobs. Check a couple of real Uber
+                Courier quotes and tune this to match.
+              </p>
+              <input type="number" step="0.01" value={dollars(settings.parts_uber_base_fare_cents)}
+                onChange={(e) => updateDollarField('parts_uber_base_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Parts job Uber rate per km ($)</label>
+              <input type="number" step="0.01" value={dollars(settings.parts_uber_per_km_cents)}
+                onChange={(e) => updateDollarField('parts_uber_per_km_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Parts job Uber minimum fare ($)</label>
+              <p className="text-xs text-gray-400 mb-1">Floor for short parts runs — the estimate never comes in below this, regardless of distance</p>
+              <input type="number" step="0.01" value={dollars(settings.parts_uber_minimum_fare_cents)}
+                onChange={(e) => updateDollarField('parts_uber_minimum_fare_cents', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Parts job: discount below Uber (%)</label>
+              <p className="text-xs text-gray-400 mb-1">
+                For Parts Delivery/Parts Pickup jobs, if the normal hourly price comes out higher than this much below the
+                parts-job Uber estimate above, the job is priced at that discounted rate instead. Only applies when it&apos;s
+                cheaper — longer parts runs still use the normal hourly formula.
+              </p>
+              <input type="number" step="1" value={settings.parts_uber_discount_percent}
+                onChange={(e) => updateNumberField('parts_uber_discount_percent', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Parts job: driver&apos;s share of that rate (%)</label>
+              <p className="text-xs text-gray-400 mb-1">
+                When the discounted rate above is used, fuel comes off first (Drivflo covers that regardless), then the
+                driver is paid this % of what&apos;s left — Drivflo keeps the rest. Guaranteed never to lose money on the job.
+              </p>
+              <input type="number" step="1" value={settings.parts_driver_pay_split_percent}
+                onChange={(e) => updateNumberField('parts_driver_pay_split_percent', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>

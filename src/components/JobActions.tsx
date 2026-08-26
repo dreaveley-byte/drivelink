@@ -18,6 +18,9 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
   const canEdit = status === 'awaiting_driver'
   const canCancel = status !== 'completed' && status !== 'cancelled'
   const canArchive = !archived && (status === 'completed' || status === 'cancelled')
+  // A cancelled job can be reopened for editing and reposted to drivers —
+  // the edit page itself resets status/driver_id/archived_at on save.
+  const canRepost = status === 'cancelled'
   // Only makes sense once a driver's actually engaged with the job — no point
   // force-completing something nobody's picked up yet.
   const canForceComplete = isAdmin && !['awaiting_driver', 'completed', 'cancelled'].includes(status)
@@ -82,13 +85,20 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
 
   if (archived) {
     return (
-      <button onClick={unarchiveJob} disabled={loading} className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50">
-        {loading ? '...' : 'Unarchive'}
-      </button>
+      <div className="flex items-center gap-3">
+        {canRepost && (
+          <Link href={`/dashboard/jobs/${jobId}/edit`} className="text-xs text-gray-600 hover:text-gray-900">
+            Repost
+          </Link>
+        )}
+        <button onClick={unarchiveJob} disabled={loading} className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50">
+          {loading ? '...' : 'Unarchive'}
+        </button>
+      </div>
     )
   }
 
-  if (!canEdit && !canCancel && !canArchive && !canForceComplete && !canDelete) return null
+  if (!canEdit && !canCancel && !canArchive && !canForceComplete && !canDelete && !canRepost) return null
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -96,6 +106,11 @@ export default function JobActions({ jobId, status, archived = false, isAdmin = 
         {canEdit && (
           <Link href={`/dashboard/jobs/${jobId}/edit`} className="text-xs text-gray-600 hover:text-gray-900">
             Edit
+          </Link>
+        )}
+        {canRepost && (
+          <Link href={`/dashboard/jobs/${jobId}/edit`} className="text-xs text-gray-600 hover:text-gray-900">
+            Repost
           </Link>
         )}
         {canArchive && (

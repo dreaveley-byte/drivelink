@@ -44,6 +44,18 @@ export type PricingSettings = {
   bus_per_km_cents: number
   job_review_hold_minutes: number
   job_review_hold_min_distance_km: number
+  // Parts Delivery/Parts Pickup jobs are often short hops where the normal
+  // hourly formula prices out above what Uber Courier would charge for the
+  // same trip. When that happens, cap the price at this % below a
+  // parts-specific Uber-equivalent fare (using the parts_uber_* settings
+  // below — kept separate from the uber_* settings above, which are
+  // calibrated for airport-transfer ride estimates, a different real-world
+  // rate) instead, and pay the driver a fixed % of what's left after fuel.
+  parts_uber_discount_percent: number
+  parts_driver_pay_split_percent: number
+  parts_uber_base_fare_cents: number
+  parts_uber_per_km_cents: number
+  parts_uber_minimum_fare_cents: number
 }
 
 export type AdditionalCharge = {
@@ -77,6 +89,9 @@ export type PricingInput = {
   // legs when omitted, matching the normal (non-linked) behavior.
   outboundVehicleCount?: number
   returnVehicleCount?: number
+  // Parts Delivery/Parts Pickup only — enables the Uber-undercut price cap
+  // (see parts_uber_discount_percent/parts_driver_pay_split_percent above).
+  isPartsJob?: boolean
 }
 
 export type PricingResult = {
@@ -105,6 +120,11 @@ export type PricingResult = {
   costBasisCents: number // everything before markup
   estimatedDealerCostCents: number // costBasis × markup
   estimatedDriverPayCents: number
+  // Set when the Parts Delivery/Parts Pickup Uber-undercut cap kicked in and
+  // replaced the normal hourly-formula price/pay above with a cheaper,
+  // Uber-anchored flat price split between driver and Drivflo instead.
+  partsCompetitiveRateApplied: boolean
+  partsUberEstimateCents: number | null
 }
 
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
@@ -147,29 +167,45 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   )
   const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
 
-  // Overnight isn't just about drive time — the inspection/registry stops, ferry
-  // wait, and break time add real hours on the ground too, and together they can
-  // push the driver past the point where they can safely finish same-day.
-  const overnightRequired =
-    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours > settings.max_driving_hours_before_overnight
-
-  // Capped per person per day — an overnight trip is treated as 2 days for this
-  // purpose (the app's overnight model is a single same-day/next-day threshold,
-  // not a full multi-night calendar).
-  const mealDays = overnightRequired ? 2 : 1
-  const rawMealCostCents = mealBreaks * settings.meal_allowance_cents * numDrivers
-  const mealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
-    ? Math.min(rawMealCostCents, settings.max_daily_meal_budget_cents * mealDays * numDrivers)
-    : rawMealCostCents
-
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether
   // the dealerAmountCents dollar figure also gets reimbursed to the driver.
   // (e.g. a flight ticket: the driver is paid for the hours spent traveling,
   // but the ticket cost itself is billed to the dealer only, not added to pay.)
-  const extraDriverPaidHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
-  const extraDealerOnlyHours = additionalCharges
-    .reduce((sum, c) => sum + c.hoursAdded, 0)
+  const extraDealerOnlyHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
+
+  // Overnight isn't just about drive time — the inspection/registry stops, ferry
+  // wait, break time, and (crucially, for a fly-back job) the flight itself plus
+  // its ground-transport/check-in-buffer hours all add real time to the driver's
+  // day, and together they can push the driver past the point where they can
+  // safely finish same-day. This must include extraDealerOnlyHours (the flight/
+  // ground-transport/ferry charge hours already computed above) — a job that's
+  // only long because of a late flight and a multi-hour buffer, not the drive
+  // itself, still needs a hotel and the overnight fee just as much as one that's
+  // long from driving alone. Previously this was computed before those extra
+  // hours existed, so a long fly-back day silently never triggered overnight.
+  const overnightRequired =
+    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours > settings.max_driving_hours_before_overnight
+
+  // Capped per person per day — an overnight trip is treated as 2 days for this
+  // purpose (the app's overnight model is a single same-day/next-day threshold,
+  // not a full multi-night calendar).
+  //
+  // `mealBreaks` only counts meal stops taken during the driving portion of
+  // the trip — on an overnight job the driver is still away (and still needs
+  // to eat) on the second day even if no further "driving break" happens
+  // there (e.g. an early return flight, or a short final leg). Previously
+  // `mealDays` only widened the cap without ever actually scaling the dollar
+  // total for that second day, so a long overnight trip with few driving-break
+  // meals on day one could end up with a meal budget barely covering a single
+  // day despite the driver being out for two. Cap per day first (matching
+  // what `max_daily_meal_budget_cents` actually means), then multiply by the
+  // number of days the driver is out.
+  const perDayMealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
+    ? Math.min(mealBreaks * settings.meal_allowance_cents, settings.max_daily_meal_budget_cents)
+    : mealBreaks * settings.meal_allowance_cents
+  const mealDays = overnightRequired ? 2 : 1
+  const mealCostCents = perDayMealCostCents * mealDays * numDrivers
 
   // Every delivery involves real time at the destination beyond pure driving —
   // paperwork, the walkaround, signatures, handing over keys. This wasn't
@@ -178,7 +214,18 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const deliveryHandlingHours = settings.delivery_handling_buffer_hours
 
   const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
-  const driverPaidHours = baseDrivingHours + breakHours + extraDriverPaidHours + deliveryHandlingHours
+  // The driver is paid hourly for every hour the dealer is billed for — the
+  // inspection/registry/insurance/ferry wait time is real time the driver
+  // spends on the job, even though the dealer's flat inspection/registry fee
+  // dollars themselves stay dealer-only (that fee covers the shop/registry
+  // cost, not the driver's time — the driver's time is compensated through
+  // the hourly rate instead). Previously this excluded that wait time
+  // entirely, so a driver could sit through a 2-hour inspection and 30-minute
+  // registry stop and get paid for neither. Driver hours now equal dealer
+  // hours exactly; the only place they diverge in dollar terms is the dealer
+  // markup applied on top of the dealer's total afterward, which the driver
+  // never sees a share of.
+  const driverPaidHours = dealerBilledHours
 
   const effectiveHourlyRateCents = useSimpleJobRates ? settings.simple_job_hourly_rate_cents : settings.hourly_rate_cents
   const hourlyDealerCents = Math.round(dealerBilledHours * effectiveHourlyRateCents * numDrivers)
@@ -264,7 +311,47 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
   const effectiveMarkupPercent = markupPercentOverride != null ? markupPercentOverride : settings.dealer_markup_percent
-  const estimatedDealerCostCents = Math.round(costBasisCents * (effectiveMarkupPercent / 100))
+  let estimatedDealerCostCents = Math.round(costBasisCents * (effectiveMarkupPercent / 100))
+  let estimatedDriverPayCentsFinal = estimatedDriverPayCents
+
+  // Parts Delivery/Parts Pickup jobs are often short hops where an Uber
+  // Courier would legitimately be cheaper than paying a driver a full hourly
+  // rate plus handling time. Rather than let that happen, compare the normal
+  // formula's price against an Uber-equivalent estimate (same base fare/
+  // per-km/minimum settings used elsewhere) discounted by
+  // parts_uber_discount_percent, and use whichever is cheaper for the
+  // dealer. Only kicks in when it's actually cheaper — a long parts run
+  // where real drive time justifies more than the flat Uber-style fare
+  // stays on the normal hourly formula so the driver isn't underpaid.
+  let partsCompetitiveRateApplied = false
+  let partsUberEstimateCents: number | null = null
+  if (
+    input.isPartsJob &&
+    Number.isFinite(settings.parts_uber_base_fare_cents) &&
+    Number.isFinite(settings.parts_uber_per_km_cents) &&
+    Number.isFinite(settings.parts_uber_minimum_fare_cents)
+  ) {
+    const uberEstimateCents = Math.max(
+      Math.round(settings.parts_uber_base_fare_cents + tripDistanceKm * settings.parts_uber_per_km_cents),
+      settings.parts_uber_minimum_fare_cents
+    )
+    partsUberEstimateCents = uberEstimateCents
+    const discountPercent = Number.isFinite(settings.parts_uber_discount_percent) ? settings.parts_uber_discount_percent : 10
+    const cappedDealerCents = Math.round(uberEstimateCents * (1 - discountPercent / 100))
+    // Fuel is a real cost to Drivflo regardless of who's driving (fleet gas
+    // card, not a driver reimbursement) — it comes off the capped price
+    // before splitting the rest between driver pay and Drivflo's margin, so
+    // the job can never lose money even on a very short run. If fuel alone
+    // would eat the whole capped price (nothing left to split), skip the cap
+    // entirely and fall back to the normal hourly formula instead.
+    const splittableCents = cappedDealerCents - gasCostCents
+    if (cappedDealerCents > 0 && cappedDealerCents < estimatedDealerCostCents && splittableCents > 0) {
+      const splitPercent = Number.isFinite(settings.parts_driver_pay_split_percent) ? settings.parts_driver_pay_split_percent : 80
+      estimatedDealerCostCents = cappedDealerCents
+      estimatedDriverPayCentsFinal = Math.round(splittableCents * (splitPercent / 100))
+      partsCompetitiveRateApplied = true
+    }
+  }
 
   return {
     overnightRequired,
@@ -291,7 +378,9 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     reimbursementCents,
     costBasisCents,
     estimatedDealerCostCents,
-    estimatedDriverPayCents,
+    estimatedDriverPayCents: estimatedDriverPayCentsFinal,
+    partsCompetitiveRateApplied,
+    partsUberEstimateCents,
   }
 }
 

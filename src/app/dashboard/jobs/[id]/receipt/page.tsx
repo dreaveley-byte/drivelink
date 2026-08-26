@@ -48,6 +48,26 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
     .eq('id', jobId)
     .single()
 
+  const { data: deliveryAcceptance } = await supabase
+    .from('legal_acceptances')
+    .select('document_version, accepted_at, media_consent')
+    .eq('job_id', jobId)
+    .eq('document_slug', 'vehicle_delivery_acknowledgement')
+    .order('accepted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let deliveryAcceptanceBody: string | null = null
+  if (deliveryAcceptance) {
+    const { data: deliveryDoc } = await supabase
+      .from('legal_documents')
+      .select('body')
+      .eq('slug', 'vehicle_delivery_acknowledgement')
+      .eq('version', deliveryAcceptance.document_version)
+      .maybeSingle()
+    deliveryAcceptanceBody = deliveryDoc?.body ?? null
+  }
+
   if (jobError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
@@ -380,8 +400,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
           return (
             <div className="mb-6">
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
+              {deliveryAcceptance && (
+                <p className="text-xs text-gray-400 mb-1">
+                  Vehicle Delivery Acknowledgement v{deliveryAcceptance.document_version} accepted{' '}
+                  {fmtDateTime(deliveryAcceptance.accepted_at)}
+                  {deliveryAcceptance.media_consent != null &&
+                    (deliveryAcceptance.media_consent ? ' · media consent given' : ' · media consent declined')}
+                </p>
+              )}
               <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
-                {disclosureText}
+                {deliveryAcceptanceBody ?? disclosureText}
               </p>
               {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
                 <div className="mb-2">
@@ -636,10 +664,31 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                       </div>
                     ) : null
                   )}
+                  {/* Driver hourly pay uses the SAME hours and SAME hourly rate as
+                      "Hourly (dealer-billed)" above — the driver is paid for every
+                      hour the dealer is billed for, including inspection/registry/
+                      insurance/ferry wait time (the flat inspection/registry FEE
+                      dollars still go to the dealer only; the driver's compensation
+                      for that time comes through the hourly rate instead). The two
+                      numbers should match exactly; the only place driver pay and
+                      dealer cost diverge is the dealer markup applied afterward,
+                      which the driver doesn't get a share of. Shown explicitly here
+                      so that can be verified directly instead of taken on faith. */}
+                  {pricingBreakdown && pricingBreakdown.hourlyDriverCents != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Driver hourly pay (same hours &amp; rate as dealer-billed, no markup)</span>
+                      <span className="text-gray-900">{formatCents(pricingBreakdown.hourlyDriverCents)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Driver pay (hourly, meals, wear & tear)</span>
+                    <span className="text-gray-600">Driver pay total (hourly + meals + wear &amp; tear + overnight fee)</span>
                     <span className="text-gray-900">{formatCents(job.estimated_driver_pay_cents ?? 0)}</span>
                   </div>
+                  <p className="text-xs text-gray-400">
+                    Meals above is the flat accrued estimate — once this job is completed, the driver&apos;s actual pay
+                    (shown further down under &quot;Accrued vs. actual&quot;) reimburses their real food spend plus their
+                    share of any unused meal budget instead.
+                  </p>
                 </div>
               </div>
             ) : (
@@ -698,10 +747,15 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               {(() => {
                 const foodRow = expenseComparison.find((c) => c.category === 'food')
                 const leftover = foodRow ? Math.max(0, foodRow.accrued_cents - foodRow.actual_cents) : 0
-                const bonus = Math.round(leftover * 0.5)
+                const driverBonus = Math.round(leftover * 0.5)
+                // The driver is reimbursed their actual food spend and keeps
+                // half of whatever's left of the accrued meal budget as an
+                // efficiency bonus — the other half stays as Drivflo profit
+                // (on top of the food accrual never being billed to the
+                // dealer beyond the flat baseline in the first place).
                 return leftover > 0 ? (
                   <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
-                    {formatCents(leftover)} in unused meal budget — {formatCents(bonus)} (50%) was added to the driver&apos;s final pay as an efficiency bonus.
+                    {formatCents(leftover)} in unused meal budget — the driver gets {formatCents(driverBonus)} of it as an efficiency bonus (on top of being reimbursed their actual food spend), and Drivflo keeps the other {formatCents(leftover - driverBonus)}.
                   </p>
                 ) : null
               })()}

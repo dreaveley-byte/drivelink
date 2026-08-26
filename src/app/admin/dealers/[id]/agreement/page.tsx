@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import PrintButton from '@/components/PrintButton'
 import Logo from '@/components/Logo'
+import { DEALER_REQUIRED_DOCS } from '@/lib/legalDocuments'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,25 @@ export default async function DealerAgreementPrintPage({ params }: { params: Pro
     .maybeSingle()
 
   if (!application) notFound()
+
+  const { data: acceptances } = await supabase
+    .from('legal_acceptances')
+    .select('document_slug, document_version, accepted_at')
+    .eq('user_id', application.submitted_by)
+    .eq('application_type', 'dealer')
+    .order('accepted_at', { ascending: false })
+
+  const { data: currentDealerDocs } = await supabase
+    .from('legal_documents')
+    .select('slug, title')
+    .in('slug', DEALER_REQUIRED_DOCS)
+    .eq('is_current', true)
+
+  const docTitles = new Map((currentDealerDocs ?? []).map((d) => [d.slug, d.title]))
+  const latestAcceptanceBySlug = new Map<string, { document_version: number; accepted_at: string }>()
+  for (const a of acceptances ?? []) {
+    if (!latestAcceptanceBySlug.has(a.document_slug)) latestAcceptanceBySlug.set(a.document_slug, a)
+  }
 
   let signatureUrl: string | null = null
   if (application.contract_signature_path) {
@@ -95,9 +115,23 @@ export default async function DealerAgreementPrintPage({ params }: { params: Pro
 
         <div className="border-t border-gray-200 pt-4 mb-8">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Agreement terms acknowledged</p>
-          <ul className="text-sm text-gray-700 space-y-1">
-            <li>{application.liability_release_signed ? '✓' : '✗'} Release of liability</li>
+          <ul className="text-sm text-gray-700 space-y-1.5">
+            {DEALER_REQUIRED_DOCS.map((slug) => {
+              const accepted = latestAcceptanceBySlug.get(slug)
+              return (
+                <li key={slug}>
+                  {accepted ? '✓' : '✗'} {docTitles.get(slug) ?? slug}
+                  {accepted && (
+                    <span className="text-xs text-gray-400">
+                      {' '}
+                      — v{accepted.document_version}, accepted {fmtDateTime(accepted.accepted_at)}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
           </ul>
+          <p className="text-xs text-gray-400 mt-3">Legacy flag — {application.liability_release_signed ? '✓' : '✗'} Release of liability (liability_release_signed)</p>
         </div>
 
         <div className="border-t border-gray-200 pt-4">

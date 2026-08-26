@@ -12,6 +12,8 @@ import ChatBadgeLink from '@/components/ChatBadgeLink'
 import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
+import { getOutstandingLegalDocs } from '@/lib/legalGate'
+import LegalGateModal from '@/components/LegalGateModal'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +35,33 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     redirect('/dashboard')
   }
 
+  // A newly-published/updated required document blocks getting jobs until the
+  // driver re-signs. Rather than silently redirecting to /driver/resign, stay
+  // on this page and show a blocking warning pop-up with a "Click to review"
+  // action — and, crucially, don't fetch or render any job data (active or
+  // available) behind it, so there's genuinely nothing to accept until it's
+  // resolved.
+  const outstandingDocs = await getOutstandingLegalDocs(user.id, 'driver')
+  if (outstandingDocs.length > 0) {
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Logo height={22} />
+            <span className="text-sm text-gray-400">— Driver</span>
+          </div>
+          <SignOutButton />
+        </header>
+        <main className="max-w-2xl mx-auto px-6 py-16 text-center">
+          <p className="text-sm text-gray-400">
+            You&apos;ll be able to see and claim jobs again once you&apos;ve reviewed the agreement below.
+          </p>
+        </main>
+        <LegalGateModal applicationType="driver" resignHref="/driver/resign" documentCount={outstandingDocs.length} />
+      </div>
+    )
+  }
+
   if (!profile.is_active) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
@@ -50,7 +79,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     )
   }
 
-  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_chase_vehicle_job, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, admin_pay_override_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
+  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_chase_vehicle_job, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, package_description, package_direction, package_size, special_instructions, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, admin_pay_override_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
 
   const { data: myJobs } = await supabase
     .from('jobs')

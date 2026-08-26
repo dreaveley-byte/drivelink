@@ -28,7 +28,9 @@ export default function FlightSearchButton({
       hoursToAdd: number
       airportBufferHours: number
       segments: { airline: string | null; flightNumber: string | null; from: string | null; to: string | null; departingAt: string | null; arrivingAt: string | null }[]
+      meetsCheckInBuffer?: boolean
     } | null
+    noFlightMetCheckInBuffer?: boolean
   } | null>(null)
   const [added, setAdded] = useState(false)
 
@@ -110,6 +112,11 @@ export default function FlightSearchButton({
                 {' '}+ {result.flight.airportBufferHours}h airport buffer = {result.flight.hoursToAdd} hrs added to the job
               </p>
               <p className="text-gray-400">Ticket cost billed to dealer only — driver is still paid for the hours.</p>
+              {result.flight.meetsCheckInBuffer === false && (
+                <p className="text-amber-600 mt-1">
+                  ⚠️ No flight this day departs late enough for the driver to realistically catch it (drive time to the airport + check-in buffer) — this is the best fallback available, double-check it&apos;s actually catchable.
+                </p>
+              )}
               {added ? (
                 <p className="text-green-700 mt-1">Added to quote.</p>
               ) : (

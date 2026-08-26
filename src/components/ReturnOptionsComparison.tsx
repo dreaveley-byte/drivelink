@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { calculatePricing, formatCents, type PricingSettings } from '@/lib/pricing'
-import { toLocalDateString } from '@/lib/localDatetime'
+import { toLocalDateString, zonedLocalInputToUtcIso, localInputToUtcIso } from '@/lib/localDatetime'
 
 export default function ReturnOptionsComparison({
   distanceKm,
@@ -16,6 +16,7 @@ export default function ReturnOptionsComparison({
   originAddress,
   destinationAddress,
   scheduledFor,
+  originTimeZone,
 }: {
   distanceKm: number
   durationMinutes: number
@@ -28,6 +29,7 @@ export default function ReturnOptionsComparison({
   originAddress: string
   destinationAddress: string
   scheduledFor?: string
+  originTimeZone?: string | null
 }) {
   const [busFare, setBusFare] = useState('')
   const [flightPriceCents, setFlightPriceCents] = useState<number | null>(null)
@@ -48,12 +50,27 @@ export default function ReturnOptionsComparison({
     const oneWayHours = durationMinutes / 60
     const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
     const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
-    const overnightNeeded = oneWayHours + inspectionHours + registryHours > pricingSettings.max_driving_hours_before_overnight
+    const insuranceHours = insuranceVisit ? pricingSettings.insurance_visit_min_hours : 0
+    const totalOnGroundHours = oneWayHours + inspectionHours + registryHours + insuranceHours
+    const overnightNeeded = totalOnGroundHours > pricingSettings.max_driving_hours_before_overnight
     let flightDepartureDate: string | undefined
+    // Real timestamp for when the driver is estimated to actually finish the
+    // drop-off (and any inspection/registry/insurance stops) and be free to
+    // head to the airport — lets the flight search API only consider flights
+    // the driver could realistically catch, not just any flight that day.
+    let earliestViableDepartureAt: string | undefined
     if (scheduledFor) {
       const d = new Date(scheduledFor)
       if (overnightNeeded) d.setDate(d.getDate() + 1)
       flightDepartureDate = toLocalDateString(d)
+
+      const startUtcIso = originTimeZone
+        ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone)
+        : localInputToUtcIso(scheduledFor)
+      if (startUtcIso) {
+        const completionMs = new Date(startUtcIso).getTime() + totalOnGroundHours * 60 * 60 * 1000
+        earliestViableDepartureAt = new Date(completionMs).toISOString()
+      }
     }
 
     const res = await fetch('/api/flights/search', {
@@ -63,6 +80,7 @@ export default function ReturnOptionsComparison({
         originAddress,
         destinationAddress,
         departureDate: flightDepartureDate,
+        earliestViableDepartureAt,
       }),
     })
     const body = await res.json().catch(() => ({}))
@@ -77,8 +95,14 @@ export default function ReturnOptionsComparison({
     }
     setFlightPriceCents(body.flight.priceCents)
     setFlightHours(body.flight.hoursToAdd ?? 0)
+    const departsText = body.flight.departingAt
+      ? ` · departs ${new Date(body.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+      : ''
+    const bufferWarning = body.noFlightMetCheckInBuffer
+      ? ' ⚠️ no flight this day met the check-in buffer — best available fallback shown'
+      : ''
     setFlightSummary(
-      `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`} · ${body.flight.currency}`
+      `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`} · ${body.flight.currency}${departsText}${bufferWarning}`
     )
     if (body.groundToAirport) {
       const km = body.groundToAirport.distanceKm

@@ -2,7 +2,21 @@
 
 import { useState } from 'react'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
-import { toLocalDateString, toLocalDatetimeInputValue } from '@/lib/localDatetime'
+import { toLocalDateString, toLocalDatetimeInputValue, zonedLocalInputToUtcIso, localInputToUtcIso } from '@/lib/localDatetime'
+
+// Mirrors the `options` shape returned by /api/flights/search and consumed
+// by the caller's own `flightOptions` state (the "N airport combinations
+// compared" picker) — passed through untouched so that picker still gets
+// populated when a date is selected from this panel instead of being
+// re-searched.
+export type FlightOption = {
+  origin: { code: string; name: string }
+  destination: { code: string; name: string }
+  flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number }
+  groundToAirport: { distanceKm: number; durationMinutes: number } | null
+  groundFromAirport: { distanceKm: number; durationMinutes: number } | null
+  effectiveCostCents: number
+}
 
 type DayResult = {
   offset: number
@@ -11,6 +25,20 @@ type DayResult = {
   totalHours: number | null
   flightSummary: string | null
   error: string | null
+  // The exact charges used to price this day's flight option, captured at
+  // search time — passed back up on selection so the caller can apply the
+  // SAME priced flight instead of re-searching live inventory a second time.
+  // A second live search seconds later can return a different (or no)
+  // result — different price, sold out, etc. — which is how "Use this day"
+  // could show a price here but then blow up into "no flight found" once
+  // the parent recalculated from scratch.
+  charges: AdditionalCharge[] | null
+  // Every airport combination considered for this day, so the caller's own
+  // "N airport combinations compared" picker still gets populated when a
+  // date is selected here — without this, that picker either goes stale
+  // (still showing combos from an earlier date) or empty, since selecting a
+  // date from this panel skips the caller's own flight search entirely.
+  options: FlightOption[] | null
 }
 
 export default function NearbyDatesFlightCheck({
@@ -28,6 +56,7 @@ export default function NearbyDatesFlightCheck({
   ferryRequired,
   manualCharges,
   onSelectDate,
+  originTimeZone,
 }: {
   scheduledFor: string
   distanceKm: number
@@ -42,20 +71,51 @@ export default function NearbyDatesFlightCheck({
   insuranceVisit: boolean
   ferryRequired: boolean
   manualCharges: AdditionalCharge[]
-  onSelectDate: (newScheduledFor: string) => void
+  // offsetDays lets the caller shift any other date field that's derived from
+  // the same calendar day (e.g. the top-level "Delivery Date & Time" field) by
+  // the same amount, instead of only the pickup time moving while everything
+  // else silently stays on the old day.
+  // charges is the exact priced flight (plus ground transport legs) found for
+  // this day at search time — the caller should apply it directly rather than
+  // re-searching, since live flight inventory/pricing can change between the
+  // two calls. options is every airport combination considered for this day,
+  // for the caller to populate its own "airport combinations compared" picker.
+  onSelectDate: (newScheduledFor: string, offsetDays: number, charges: AdditionalCharge[] | null, options: FlightOption[] | null) => void | Promise<void>
+  originTimeZone?: string | null
 }) {
   const [results, setResults] = useState<DayResult[] | null>(null)
   const [checking, setChecking] = useState(false)
+  const [recalculatingOffset, setRecalculatingOffset] = useState<number | null>(null)
 
-  function computeFlightDate(startDate: Date): string {
+  // Total time on the road/at stops before the driver is actually free to head
+  // to the airport: one-way driving + any inspection/registry/insurance visits.
+  function totalOnGroundHours(): number {
     const oneWayHours = durationMinutes / 60
     const inspectionHours = outOfProvinceInspection ? pricingSettings.out_of_province_inspection_min_hours : 0
     const registryHours = registryVisit ? pricingSettings.registry_visit_min_hours : 0
     const insuranceHours = insuranceVisit ? pricingSettings.insurance_visit_min_hours : 0
-    const overnightNeeded = oneWayHours + inspectionHours + registryHours + insuranceHours > pricingSettings.max_driving_hours_before_overnight
+    return oneWayHours + inspectionHours + registryHours + insuranceHours
+  }
+
+  function computeFlightDate(startDate: Date): string {
+    const overnightNeeded = totalOnGroundHours() > pricingSettings.max_driving_hours_before_overnight
     const d = new Date(startDate)
     if (overnightNeeded) d.setDate(d.getDate() + 1)
     return toLocalDateString(d)
+  }
+
+  // Real UTC timestamp for when the driver is estimated to actually finish the
+  // drop-off and be free to start heading to the airport, for a given nearby
+  // start date — this (not just a bare calendar date) is what the flight search
+  // API uses to filter out flights the driver couldn't realistically catch.
+  function computeEarliestViableDepartureAt(startDate: Date): string | undefined {
+    const startLocalValue = toLocalDatetimeInputValue(startDate)
+    const startUtcIso = originTimeZone
+      ? zonedLocalInputToUtcIso(startLocalValue, originTimeZone)
+      : localInputToUtcIso(startLocalValue)
+    if (!startUtcIso) return undefined
+    const completionMs = new Date(startUtcIso).getTime() + totalOnGroundHours() * 60 * 60 * 1000
+    return new Date(completionMs).toISOString()
   }
 
   async function checkDates() {
@@ -69,45 +129,81 @@ export default function NearbyDatesFlightCheck({
         const startDate = new Date(base)
         startDate.setDate(startDate.getDate() + offset)
         const flightDepartureDate = computeFlightDate(startDate)
+        const earliestViableDepartureAt = computeEarliestViableDepartureAt(startDate)
 
         const res = await fetch('/api/flights/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ originAddress, destinationAddress, departureDate: flightDepartureDate }),
+          body: JSON.stringify({ originAddress, destinationAddress, departureDate: flightDepartureDate, earliestViableDepartureAt }),
         })
         const body = await res.json().catch(() => ({}))
 
-        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null }
+        const result: DayResult = { offset, startDate, totalCents: null, totalHours: null, flightSummary: null, error: null, charges: null, options: null }
 
         if (!res.ok || !body.flight) {
           result.error = body.error || 'No flight found'
           return result
         }
 
-        const charges: AdditionalCharge[] = [
-          ...manualCharges,
-          {
-            description: 'Return ground transport',
-            dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
-            hoursAdded: pricingSettings.return_ground_transport_hours,
-            paidToDriver: true,
-          },
-        ]
+        // `kind` tags match what the caller's own buildFlyCharges() produces,
+        // so downstream display/gating logic that looks for `kind === 'flight'`
+        // etc. still works when these charges are applied directly. Kept
+        // separate from `manualCharges` (mirroring buildFlyCharges' own
+        // return shape) so the caller can combine them the same way it
+        // combines buildFlyCharges' result — this array is what actually
+        // gets passed back up on selection.
+        //
+        // Return-home leg: price it off the real drive distance
+        // (body.groundFromAirport), same as buildFlyCharges() does — falling
+        // back to the flat estimate only when the real distance couldn't be
+        // calculated. Previously this always used the flat rate regardless,
+        // which is why a date picked here could show a real, correct
+        // distance-based Uber fare on the main calculate screen but a flat
+        // $30 once applied (and later saved) through this panel.
+        const flyCharges: AdditionalCharge[] = body.groundFromAirport
+          ? [
+              {
+                description: `Return ground transport (${body.groundFromAirport.distanceKm}km)`,
+                kind: 'ground-home' as const,
+                dealerAmountCents: Math.max(
+                  Math.round(pricingSettings.uber_base_fare_cents + body.groundFromAirport.distanceKm * pricingSettings.uber_per_km_cents),
+                  pricingSettings.uber_minimum_fare_cents
+                ),
+                hoursAdded: Math.round((body.groundFromAirport.durationMinutes / 60) * 100) / 100,
+                paidToDriver: true,
+              },
+            ]
+          : [
+              {
+                description: 'Return ground transport (flat estimate)',
+                kind: 'ground-home' as const,
+                dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
+                hoursAdded: pricingSettings.return_ground_transport_hours,
+                paidToDriver: true,
+              },
+            ]
         if (body.groundToAirport) {
           const km = body.groundToAirport.distanceKm
-          charges.push({
+          flyCharges.push({
             description: 'Ground transport to airport',
+            kind: 'ground-to-airport' as const,
             dealerAmountCents: Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents),
             hoursAdded: Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100,
             paidToDriver: true,
           })
         }
-        charges.push({
-          description: `Flight back: ${body.origin.code} → ${body.destination.code}`,
+        const departsTextForCharge = body.flight.departingAt
+          ? ` — departs ${new Date(body.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+          : ''
+        flyCharges.push({
+          description: `Flight back: ${body.origin.code} → ${body.destination.code} (${body.flight.isDirect ? 'direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`})${departsTextForCharge}`,
+          kind: 'flight' as const,
           dealerAmountCents: body.flight.priceCents,
           hoursAdded: body.flight.hoursToAdd,
           paidToDriver: false,
         })
+        result.charges = flyCharges
+        result.options = body.options ?? null
 
         const pricing = calculatePricing(
           {
@@ -121,7 +217,7 @@ export default function NearbyDatesFlightCheck({
             ferryRequired,
             useGarageInsurance: false,
             includeTowDeductibleCoverage: false,
-            additionalCharges: charges,
+            additionalCharges: [...manualCharges, ...flyCharges],
             oneWayFlightBack: true,
           },
           pricingSettings
@@ -129,7 +225,11 @@ export default function NearbyDatesFlightCheck({
 
         result.totalCents = pricing.estimatedDealerCostCents
         result.totalHours = Math.round(pricing.dealerBilledHours * 10) / 10
-        result.flightSummary = `${body.origin.code} → ${body.destination.code} · ${formatCents(body.flight.priceCents)} ${body.flight.currency}`
+        const departsText = body.flight.departingAt
+          ? ` · departs ${new Date(body.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
+          : ''
+        const bufferWarning = body.noFlightMetCheckInBuffer ? ' ⚠️ no flight caught the check-in buffer that day' : ''
+        result.flightSummary = `${body.origin.code} → ${body.destination.code} · ${formatCents(body.flight.priceCents)} ${body.flight.currency}${departsText}${bufferWarning}`
         return result
       })
     )
@@ -142,6 +242,29 @@ export default function NearbyDatesFlightCheck({
     ? Math.min(...results.filter((r) => r.totalCents != null).map((r) => r.totalCents as number))
     : null
 
+  // Picking a nearby day should just work in one click — update the scheduled
+  // date AND immediately re-run the full quote calculation (rather than only
+  // updating the date and leaving it to the user to notice a message and go
+  // find the "Calculate distance & cost" button somewhere else on the page).
+  // The stale comparison results get cleared afterward since they were computed
+  // against the old scheduled date and no longer reflect what's now selected.
+  async function useThisDay(offset: number) {
+    if (!scheduledFor) return
+    const newDate = new Date(scheduledFor)
+    newDate.setDate(newDate.getDate() + offset)
+    const newValue = toLocalDatetimeInputValue(newDate)
+    const dayResult = results?.find((r) => r.offset === offset)
+    const charges = dayResult?.charges ?? null
+    const options = dayResult?.options ?? null
+    setRecalculatingOffset(offset)
+    try {
+      await onSelectDate(newValue, offset, charges, options)
+    } finally {
+      setRecalculatingOffset(null)
+      setResults(null)
+    }
+  }
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-200">
       <button
@@ -153,6 +276,9 @@ export default function NearbyDatesFlightCheck({
         {checking ? 'Checking nearby dates…' : 'Compare total price across nearby dates'}
       </button>
       {!scheduledFor && <p className="text-xs text-gray-400 mt-1">Set a scheduled date first.</p>}
+      {recalculatingOffset != null && (
+        <p className="text-xs text-blue-700 mt-1">Recalculating for this date…</p>
+      )}
 
       {results && (
         <div className="mt-2 space-y-1.5">
@@ -184,14 +310,11 @@ export default function NearbyDatesFlightCheck({
                   {r.offset !== 0 && r.totalCents != null && (
                     <button
                       type="button"
-                      onClick={() => {
-                        const newDate = new Date(scheduledFor)
-                        newDate.setDate(newDate.getDate() + r.offset)
-                        onSelectDate(toLocalDatetimeInputValue(newDate))
-                      }}
-                      className="text-xs bg-[#378ADD] text-white px-2 py-1 rounded-lg hover:bg-[#2d6ead]"
+                      onClick={() => useThisDay(r.offset)}
+                      disabled={recalculatingOffset != null}
+                      className="text-xs bg-[#378ADD] text-white px-2 py-1 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
                     >
-                      Use this day
+                      {recalculatingOffset === r.offset ? 'Recalculating…' : 'Use this day'}
                     </button>
                   )}
                 </div>

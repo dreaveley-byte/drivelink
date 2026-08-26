@@ -6,6 +6,20 @@ import { createClient } from '@/lib/supabase/client'
 import FileUploadField from '@/components/FileUploadField'
 import SignaturePad from '@/components/SignaturePad'
 import Logo from '@/components/Logo'
+import LegalDocumentChecklist from '@/components/LegalDocumentChecklist'
+import { DRIVER_REQUIRED_DOCS } from '@/lib/legalDocuments'
+
+const DRIVER_DOC_LABELS: Record<string, string> = {
+  driver_contractor_agreement: 'Driver Independent Contractor Services Agreement',
+  drug_alcohol_policy: 'Drug and Alcohol Policy',
+  driver_standards_code_of_conduct: 'Driver Standards and Code of Conduct',
+  vehicle_inspection_damage_policy: 'Vehicle Inspection and Damage Policy',
+  driver_expense_reimbursement_policy: 'Driver Expense and Reimbursement Policy',
+  driver_hours_fatigue_safety_policy: 'Driver Hours & Fatigue Safety Policy',
+  privacy_policy: 'Privacy Policy',
+  platform_terms_of_service: 'Platform Terms of Service',
+}
+const DRIVER_DOC_LIST = DRIVER_REQUIRED_DOCS.map((slug) => ({ slug, label: DRIVER_DOC_LABELS[slug] }))
 
 export default function DriverApplyPage() {
   const router = useRouter()
@@ -34,9 +48,8 @@ export default function DriverApplyPage() {
   // Uploaded document paths
   const [docs, setDocs] = useState<Record<string, string>>({})
 
-  // Contract
-  const [agreedDrugAlcohol, setAgreedDrugAlcohol] = useState(false)
-  const [agreedProbation, setAgreedProbation] = useState(false)
+  // Contract — accepted legal documents (slug -> version accepted)
+  const [acceptedDocs, setAcceptedDocs] = useState<Record<string, number>>({})
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
 
   const [error, setError] = useState('')
@@ -72,8 +85,9 @@ export default function DriverApplyPage() {
       setError('You need to be signed in to apply.')
       return
     }
-    if (!agreedDrugAlcohol || !agreedProbation) {
-      setError('Please review and agree to both policy items before submitting.')
+    const missingDocs = DRIVER_REQUIRED_DOCS.filter((slug) => acceptedDocs[slug] == null)
+    if (missingDocs.length > 0) {
+      setError('Please review and agree to all agreements/policies before submitting.')
       return
     }
     if (!signatureDataUrl) {
@@ -130,8 +144,11 @@ export default function DriverApplyPage() {
       optical_test_path: docs.optical_test ?? null,
       contract_signed_at: new Date().toISOString(),
       contract_signature_path: signaturePath,
-      agreed_to_drug_alcohol_policy: agreedDrugAlcohol,
-      agreed_to_probation_terms: agreedProbation,
+      // Legacy lightweight flags — kept in sync for backwards compatibility, but the
+      // real source of truth for agreement is the legal_acceptances rows recorded
+      // above via LegalDocumentChecklist.
+      agreed_to_drug_alcohol_policy: true,
+      agreed_to_probation_terms: true,
     })
 
     if (insertError) {
@@ -359,31 +376,21 @@ export default function DriverApplyPage() {
 
           {/* Contract */}
           <section className="space-y-4 border-t border-gray-200 pt-6">
-            <h2 className="text-sm font-semibold text-gray-900">Contractor Agreement</h2>
-            <div className="border border-gray-200 rounded-lg p-4 text-xs text-gray-600 max-h-40 overflow-y-auto">
-              <p className="mb-2">
-                This agreement is between the driver and Drivflo (and, by extension, the dealers and other
-                parties Drivflo assigns jobs on behalf of). It covers the terms of independent contractor
-                work, including per-job compensation, a 90-day initial probationary period during which either
-                party may end the arrangement without cause, and Drivflo&apos;s drug and alcohol policy — which
-                prohibits performing any job while impaired and requires passing the assessments uploaded above
-                prior to approval.
-              </p>
-              <p>
-                Full legal text will be finalized and attached here before this goes live for real applicants.
-              </p>
-            </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" className="mt-0.5" checked={agreedDrugAlcohol} onChange={(e) => setAgreedDrugAlcohol(e.target.checked)} />
-              I have read and agree to Drivflo&apos;s drug and alcohol policy.
-            </label>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" className="mt-0.5" checked={agreedProbation} onChange={(e) => setAgreedProbation(e.target.checked)} />
-              I understand and agree to the 90-day probationary period.
-            </label>
+            <h2 className="text-sm font-semibold text-gray-900">Agreements & Policies</h2>
+            <p className="text-xs text-gray-500">
+              Review and agree to each document below. You must scroll to the bottom of each one before you can agree.
+            </p>
+            <LegalDocumentChecklist
+              applicationType="driver"
+              docs={DRIVER_DOC_LIST}
+              accepted={acceptedDocs}
+              onChange={(slug, version) => setAcceptedDocs((prev) => ({ ...prev, [slug]: version }))}
+            />
 
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Sign below to confirm your agreement</label>
+              <label className="block text-sm text-gray-700 mb-1">
+                Sign below to confirm your agreement to the Driver Independent Contractor Services Agreement
+              </label>
               <SignaturePad onChange={setSignatureDataUrl} />
             </div>
           </section>
@@ -392,7 +399,7 @@ export default function DriverApplyPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || DRIVER_REQUIRED_DOCS.some((slug) => acceptedDocs[slug] == null) || !signatureDataUrl}
             className="w-full bg-[#378ADD] text-white text-sm font-medium px-5 py-3 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Application'}
