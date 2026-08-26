@@ -698,9 +698,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               {(() => {
                 const foodRow = expenseComparison.find((c) => c.category === 'food')
                 const leftover = foodRow ? Math.max(0, foodRow.accrued_cents - foodRow.actual_cents) : 0
+                const bonus = Math.round(leftover * 0.5)
                 return leftover > 0 ? (
                   <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
-                    {formatCents(leftover)} in unused meal budget was added to the driver&apos;s final pay.
+                    {formatCents(leftover)} in unused meal budget — {formatCents(bonus)} (50%) was added to the driver&apos;s final pay as an efficiency bonus.
                   </p>
                 ) : null
               })()}

@@ -225,7 +225,15 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // Guarantee a minimum total payout per job, regardless of how short the trip is.
   // Reimbursements are intentionally excluded — the floor is about fair pay for
   // time worked, not about the size of an unrelated expense reimbursement.
-  const computedDriverPayCents = hourlyDriverCents + mealCostCents + wearAndTearCents + overnightFeeCents
+  // Meal budget is deliberately excluded from upfront driver pay - it's a
+  // reimbursement pool for actual food spending, not guaranteed take-home
+  // pay. The driver gets reimbursed their real spend through the normal
+  // expense system, plus a 50% efficiency bonus on any unspent portion,
+  // calculated separately once the job completes (see the database trigger
+  // that sets final_driver_pay_cents) - showing the full meal budget as if
+  // it were guaranteed pay upfront overstated what a driver would actually
+  // take home.
+  const computedDriverPayCents = hourlyDriverCents + wearAndTearCents + overnightFeeCents
   const effectiveMinimumPayCents = useSimpleJobRates ? settings.simple_job_minimum_pay_cents : settings.minimum_driver_pay_cents
   const estimatedDriverPayCents = Math.max(computedDriverPayCents, effectiveMinimumPayCents)
   // If the floor kicked in, the dealer's cost basis needs to cover that extra amount
