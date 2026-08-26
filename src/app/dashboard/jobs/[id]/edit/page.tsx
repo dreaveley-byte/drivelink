@@ -410,6 +410,13 @@ export default function EditJobPage() {
   // the next render would mean the very first invocation still reads the OLD
   // date, silently recalculating the wrong quote.
   const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean, precomputedFlyCharges?: AdditionalCharge[] | null) => {
+    // Guards against overlapping executions - e.g. a rapid double-click, or
+    // any other code path invoking this while a previous call is still
+    // awaiting the (slow, async) flight search. Without this, two
+    // overlapping runs could each independently build their own set of
+    // flight/ground-transport charges and both get saved, which is very
+    // likely how a real job ended up with duplicate charges on its bill.
+    if (calculating) return
     const effectiveScheduledFor = scheduledForOverride ?? scheduledFor
     const effectiveAutoSelect = forceFlying ? false : autoSelectReturnMethod
     const effectiveFlyingBack = forceFlying ? true : flyingBack
@@ -857,7 +864,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested, selectedFlightOptionIdx])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested, selectedFlightOptionIdx, calculating])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
