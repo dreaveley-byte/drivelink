@@ -73,6 +73,7 @@ export default function AdminComplianceReview({
           expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
           expiryLabel = `Approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
         }
+        const isApproved = !!doc.reviewedAt && !needsReview
         return (
           <div key={key} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3">
             <div>
@@ -82,17 +83,26 @@ export default function AdminComplianceReview({
                   View uploaded file
                 </a>
               ) : (
-                <p className="text-xs text-gray-400">Not uploaded</p>
+                <p className="text-xs text-gray-400">No file uploaded through the app</p>
               )}
-              {expiryLabel && !needsReview && <p className="text-xs text-green-600 mt-0.5">{expiryLabel}</p>}
+              {expiryLabel && <p className="text-xs text-green-600 mt-0.5">{expiryLabel}</p>}
             </div>
-            {needsReview && (
+            {!isApproved && (
               <button
                 onClick={() => approve(key)}
                 disabled={approving === key}
                 className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
               >
-                {approving === key ? 'Approving…' : 'Approve (starts 12-month clock)'}
+                {approving === key ? 'Approving…' : doc.path ? 'Approve (starts 12-month clock)' : 'Approve without file on record'}
+              </button>
+            )}
+            {isApproved && (
+              <button
+                onClick={() => approve(key)}
+                disabled={approving === key}
+                className="text-xs text-gray-500 underline whitespace-nowrap"
+              >
+                Re-approve (reset 12-month clock)
               </button>
             )}
           </div>
