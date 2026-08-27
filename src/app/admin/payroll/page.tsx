@@ -6,6 +6,7 @@ import SettingsGearLink from '@/components/SettingsGearLink'
 import Logo from '@/components/Logo'
 import MarkPaidButton from '@/components/MarkPaidButton'
 import AddDrawButton from '@/components/AddDrawButton'
+import DateRangeFilter from '@/components/DateRangeFilter'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -101,22 +102,17 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
               {!start && <span className="text-gray-400"> (pays out the following Monday)</span>}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <a href={`/admin/payroll?week=${prevWeek.toISOString().slice(0, 10)}`} className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
-              ← Prev week
-            </a>
-            <a href="/admin/payroll" className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
-              This week
-            </a>
-            <form action="/admin/payroll" method="get" className="flex items-center gap-1.5">
-              <input type="date" name="start" defaultValue={start ?? ''} className="text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
-              <span className="text-gray-400 text-sm">to</span>
-              <input type="date" name="end" defaultValue={end ?? ''} className="text-sm border border-gray-300 rounded-lg px-2 py-1.5" />
-              <button type="submit" className="text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5">
-                Custom
-              </button>
-            </form>
-          </div>
+          <DateRangeFilter
+            baseHref="/admin/payroll"
+            isCustomActive={!!start}
+            customStart={start}
+            customEnd={end}
+            activeLabel={start ? `${weekStart.toLocaleDateString('en-CA', { dateStyle: 'medium' })} – ${weekEnd.toLocaleDateString('en-CA', { dateStyle: 'medium' })}` : (week ? 'Previous week' : 'This week')}
+            presets={[
+              { label: 'This week', href: '/admin/payroll', isCurrent: !week && !start },
+              { label: 'Previous week', href: `/admin/payroll?week=${prevWeek.toISOString().slice(0, 10)}`, isCurrent: !!week && !start },
+            ]}
+          />
         </div>
 
         <div className="space-y-3">

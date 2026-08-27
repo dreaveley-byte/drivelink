@@ -1,0 +1,65 @@
+-- Per-drive detail for a dealer within a date range: driver name, booked
+-- time (what was estimated), actual time (from first "assigned" event to
+-- the "completed" event - the full round trip including the drive back
+-- to the pickup location, not just delivery), total cost (driver pay +
+-- reimbursements + approved expenses), total charged (revenue, matching
+-- the same formula as the individual job receipt page), and profit.
+create or replace function get_dealer_drive_details(p_organization_id uuid, p_period_start date, p_period_end date)
+returns table (
+  job_id uuid,
+  driver_name text,
+  scheduled_for timestamptz,
+  booked_minutes int,
+  assigned_at timestamptz,
+  completed_at timestamptz,
+  total_cost_cents bigint,
+  total_charged_cents bigint,
+  profit_cents bigint
+)
+language sql
+stable
+as $$
+  with job_expense_totals as (
+    select job_id, coalesce(sum(approved_addition_cents), 0) as approved_additions_cents
+    from job_expenses
+    group by job_id
+  ),
+  assigned_events as (
+    select distinct on (job_id) job_id, created_at as assigned_at
+    from job_status_events
+    where status = 'assigned'
+    order by job_id, created_at asc
+  ),
+  completed_events as (
+    select distinct on (job_id) job_id, created_at as completed_at
+    from job_status_events
+    where status = 'completed'
+    order by job_id, created_at desc
+  )
+  select
+    j.id as job_id,
+    p.full_name as driver_name,
+    j.scheduled_for,
+    j.estimated_duration_minutes as booked_minutes,
+    ae.assigned_at,
+    ce.completed_at,
+    (coalesce(j.admin_pay_override_cents, j.final_driver_pay_cents, j.estimated_driver_pay_cents, 0)
+      + coalesce(j.estimated_driver_reimbursement_cents, 0)
+      + coalesce(jet.approved_additions_cents, 0)) as total_cost_cents,
+    (coalesce(j.estimated_dealer_cost_cents, 0) + coalesce(jet.approved_additions_cents, 0)) as total_charged_cents,
+    (coalesce(j.estimated_dealer_cost_cents, 0) + coalesce(jet.approved_additions_cents, 0))
+      - (coalesce(j.admin_pay_override_cents, j.final_driver_pay_cents, j.estimated_driver_pay_cents, 0)
+        + coalesce(j.estimated_driver_reimbursement_cents, 0)
+        + coalesce(jet.approved_additions_cents, 0)) as profit_cents
+  from jobs j
+  left join profiles p on p.id = j.driver_id
+  left join job_expense_totals jet on jet.job_id = j.id
+  left join assigned_events ae on ae.job_id = j.id
+  left join completed_events ce on ce.job_id = j.id
+  where j.organization_id = p_organization_id
+    and j.status = 'completed'
+    and j.updated_at::date between p_period_start and p_period_end
+  order by j.updated_at desc;
+$$;
+
+grant execute on function get_dealer_drive_details(uuid, date, date) to authenticated;
