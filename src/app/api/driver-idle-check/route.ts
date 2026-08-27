@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendSms } from '@/lib/sms'
 import { firstNameProperCase } from '@/lib/formatName'
+import { flushPendingCustomerSms } from '@/lib/quietHours'
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371
@@ -33,9 +34,15 @@ export async function POST(req: NextRequest) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('status, driver_id, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, customer_phone, customer_full_name, pickup_lat, pickup_lng, two_min_away_alert_sent_at, arrived_at_pickup_alert_sent_at, tracking_token, job_types(name), driver:driver_id(full_name)')
+    .select('status, driver_id, idle_since, idle_alert_sent_at, vehicle_year, vehicle_make, vehicle_model, package_description, pickup_address, dropoff_address, customer_phone, customer_full_name, pickup_lat, pickup_lng, two_min_away_alert_sent_at, arrived_at_pickup_alert_sent_at, forty_five_min_away_alert_sent_at, estimated_duration_minutes, tracking_token, job_types(name), driver:driver_id(full_name)')
     .eq('id', jobId)
     .single()
+
+  // Cheap opportunistically-run flush of any routine SMS that was queued
+  // during quiet hours and is now due - no reliable cron on this
+  // infrastructure, so this piggybacks on the same frequent pings this
+  // route already handles proximity alerts from.
+  await flushPendingCustomerSms(supabase)
 
   const jobTypeName = job ? (Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name) : null
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
@@ -116,6 +123,62 @@ export async function POST(req: NextRequest) {
           await sendSms(job.customer_phone, body)
         }
       }
+    }
+  }
+
+  // 45-minutes-away alert for longer jobs (>2 hours estimated) actively
+  // in progress toward the final dropoff - separate from the customer-ride
+  // pickup-proximity block above, this applies to any job type (vehicle
+  // delivery, courier, customer ride) once genuinely en route to the
+  // destination. Gives a real, live, traffic-aware ETA at this point,
+  // unlike the flat scheduled-time ETA sent when the trip first started
+  // (see notify-in-progress) - by now the driver's actual position makes
+  // a live calculation meaningful rather than misleading.
+  if (
+    job &&
+    job.status === 'in_progress' &&
+    job.customer_phone &&
+    (job.estimated_duration_minutes ?? 0) > 120 &&
+    !job.forty_five_min_away_alert_sent_at
+  ) {
+    try {
+      const dropoffCoords = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(job.dropoff_address)}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+      ).then((r) => r.json())
+      const loc = dropoffCoords?.results?.[0]?.geometry?.location
+      // Cheap straight-line pre-check before ever calling the real routing
+      // API - roughly 100km is a generous upper bound for "could plausibly
+      // be 45 minutes away by any road," avoids an expensive call on every
+      // single ping for the entire multi-hour duration of a long drive.
+      if (loc && haversineKm(lat, lng, loc.lat, loc.lng) <= 100) {
+        const host = req.headers.get('host')
+        const protocol = host?.includes('localhost') ? 'http' : 'https'
+        const distanceRes = await fetch(`${protocol}://${host}/api/distance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addresses: [`${lat},${lng}`, job.dropoff_address] }),
+        })
+        const distanceData = await distanceRes.json()
+        if (distanceRes.ok && distanceData.durationMinutes != null && distanceData.durationMinutes <= 45) {
+          const { data: claimed } = await supabase
+            .from('jobs')
+            .update({ forty_five_min_away_alert_sent_at: new Date().toISOString() })
+            .eq('id', jobId)
+            .is('forty_five_min_away_alert_sent_at', null)
+            .select('id')
+          if (claimed && claimed.length > 0) {
+            const arrivalTime = new Date(Date.now() + distanceData.durationMinutes * 60 * 1000)
+            const tz = distanceData.destinationTimeZone as string | undefined
+            const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(tz && { timeZone: tz }) })
+            const customerFirstName = firstNameProperCase(job.customer_full_name)
+            const body = `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver is getting close — about 45 minutes out, updated arrival around ${fmt(arrivalTime)}.`
+            await sendSms(job.customer_phone, body)
+            await supabase.from('customer_messages').insert({ job_id: jobId, direction: 'to_customer', body })
+          }
+        }
+      }
+    } catch {
+      // Best-effort - a missed 45-min alert isn't worth failing the whole ping over.
     }
   }
 

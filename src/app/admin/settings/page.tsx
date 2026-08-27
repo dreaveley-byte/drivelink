@@ -48,6 +48,7 @@ type Settings = {
   max_daily_meal_budget_cents: number
   preferred_driver_window_minutes: number
   eta_window_buffer_percent: number
+  quiet_hours_end_hour: number
   admin_alert_phone: string | null
   idle_alert_minutes: number
   idle_fee_grace_minutes: number
@@ -463,6 +464,15 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-gray-400 mb-1">Customer ETA text shows a window from the raw arrival time forward by this % of drive time (e.g. 20% on a 30min drive = 6min window, on a 5hr drive = 1hr window)</p>
               <input type="number" step="1" value={settings.eta_window_buffer_percent}
                 onChange={(e) => updateNumberField('eta_window_buffer_percent', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">No routine texts before this hour (0-23)</label>
+              <p className="text-xs text-gray-400 mb-1">
+                Routine customer texts (e.g. &quot;driver is on the way&quot;) that would land before this hour, in the delivery&apos;s own local time, get queued and sent once this hour arrives instead of waking anyone up early. The 45-minutes-away, proximity, and arrived alerts always send immediately regardless of this setting, since they&apos;re time-critical.
+              </p>
+              <input type="number" step="1" min="0" max="23" value={settings.quiet_hours_end_hour}
+                onChange={(e) => updateNumberField('quiet_hours_end_hour', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
