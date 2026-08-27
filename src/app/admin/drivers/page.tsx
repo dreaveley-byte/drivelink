@@ -32,6 +32,8 @@ export default async function AdminDriversPage() {
     .order('full_name')
 
   const { data: stats } = await supabase.rpc('driver_performance_stats')
+  const { data: completeness } = await supabase.rpc('driver_documentation_completeness')
+  const incompleteDriverIds = new Set((completeness ?? []).filter((c: { driver_id: string; is_complete: boolean }) => !c.is_complete).map((c: { driver_id: string }) => c.driver_id))
   type DriverStat = {
     driver_id: string
     driver_name: string | null
@@ -45,20 +47,6 @@ export default async function AdminDriversPage() {
     avg_dealer_rating: number | null
   }
   const statsByDriver = new Map<string, DriverStat>((stats ?? []).map((s: DriverStat) => [s.driver_id, s]))
-
-  // A driver is "incomplete" if any of the four recurring compliance
-  // documents is missing, unreviewed, or older than the 12-month renewal
-  // window - lets admin spot at a glance who needs follow-up without
-  // opening every driver's page individually.
-  const COMPLIANCE_KEYS = ['driver_abstract', 'drug_alcohol_test', 'medical_fitness_test', 'vulnerable_sector_check'] as const
-  function isComplianceIncomplete(driver: Record<string, unknown>): boolean {
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-    return COMPLIANCE_KEYS.some((key) => {
-      const reviewedAt = driver[`${key}_reviewed_at`] as string | null
-      return !reviewedAt || new Date(reviewedAt) < twelveMonthsAgo
-    })
-  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -114,7 +102,7 @@ export default async function AdminDriversPage() {
                   <p className="text-xs text-gray-500 mt-0.5">{driver.phone || 'No phone on file'}</p>
                 </Link>
                 <div className="flex items-center gap-3">
-                  {isComplianceIncomplete(driver) && (
+                  {incompleteDriverIds.has(driver.id) && (
                     <span className="text-xs border border-red-300 text-red-700 rounded-full px-2.5 py-1 font-medium">
                       Incomplete
                     </span>
