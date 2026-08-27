@@ -467,13 +467,17 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">No routine texts before this hour (0-23)</label>
+              <label className="block text-sm text-gray-700 mb-1">No routine texts before this time</label>
               <p className="text-xs text-gray-400 mb-1">
                 Routine customer texts (e.g. &quot;driver is on the way&quot;) that would land before this hour, in the delivery&apos;s own local time, get queued and sent once this hour arrives instead of waking anyone up early. The 45-minutes-away, proximity, and arrived alerts always send immediately regardless of this setting, since they&apos;re time-critical.
               </p>
-              <input type="number" step="1" min="0" max="23" value={settings.quiet_hours_end_hour}
+              <select value={settings.quiet_hours_end_hour}
                 onChange={(e) => updateNumberField('quiet_hours_end_hour', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Admin alert phone number</label>
