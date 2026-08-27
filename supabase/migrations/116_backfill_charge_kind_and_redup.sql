@@ -39,10 +39,10 @@ $$;
 alter table jobs disable trigger jobs_set_updated_at;
 
 update jobs
-set additional_charges = (
+set additional_charges = coalesce((
   select jsonb_agg(backfill_charge_kind(elem))
   from jsonb_array_elements(additional_charges) as elem
-)
+), '[]'::jsonb)
 where additional_charges is not null and jsonb_typeof(additional_charges) = 'array';
 
 -- Re-fire the dedup trigger now that the backfilled kind values make the
