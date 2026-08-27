@@ -71,6 +71,23 @@ export default function AdminComplianceReview({
     router.refresh()
   }
 
+  async function unapprove(key: DocKey) {
+    setApproving(key)
+    setError(null)
+    setJustApproved(null)
+    const supabase = createClient()
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ [`${key}_reviewed_at`]: null, [`${key}_reviewed_by`]: null })
+      .eq('id', driverId)
+    setApproving(null)
+    if (updateError) {
+      setError(`Could not un-approve ${DOC_LABELS[key]}: ${updateError.message}`)
+      return
+    }
+    router.refresh()
+  }
+
   return (
     <div className="space-y-3">
       {error && (
@@ -80,13 +97,16 @@ export default function AdminComplianceReview({
         const doc = documents[key]
         const url = signedUrls[key]
         const needsReview = !!doc.uploadedAt && (!doc.reviewedAt || (doc.uploadedAt && new Date(doc.uploadedAt) > new Date(doc.reviewedAt)))
+        const isApproved = !!doc.reviewedAt && !needsReview
+        const manuallyApproved = isApproved && !doc.path
         let expiryLabel: string | null = null
         if (doc.reviewedAt) {
           const expiresAt = new Date(doc.reviewedAt)
           expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
-          expiryLabel = `Approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
+          expiryLabel = manuallyApproved
+            ? `Manually approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
+            : `Approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
         }
-        const isApproved = !!doc.reviewedAt && !needsReview
         return (
           <div key={key} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3">
             <div>
@@ -98,27 +118,29 @@ export default function AdminComplianceReview({
               ) : (
                 <p className="text-xs text-gray-400">No file uploaded through the app</p>
               )}
-              {expiryLabel && <p className="text-xs text-green-600 mt-0.5">{expiryLabel}</p>}
+              {expiryLabel && <p className={`text-xs mt-0.5 ${manuallyApproved ? 'text-amber-600' : 'text-green-600'}`}>{expiryLabel}</p>}
               {justApproved === key && <p className="text-xs text-green-600 mt-0.5 font-medium">✓ Approved just now</p>}
             </div>
-            {!isApproved && (
-              <button
-                onClick={() => approve(key)}
-                disabled={approving === key}
-                className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
-              >
-                {approving === key ? 'Approving…' : doc.path ? 'Approve (starts 12-month clock)' : 'Approve without file on record'}
-              </button>
-            )}
-            {isApproved && (
-              <button
-                onClick={() => approve(key)}
-                disabled={approving === key}
-                className="text-xs text-gray-500 underline whitespace-nowrap"
-              >
-                Re-approve (reset 12-month clock)
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!isApproved && (
+                <button
+                  onClick={() => approve(key)}
+                  disabled={approving === key}
+                  className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {approving === key ? 'Approving…' : doc.path ? 'Approve (starts 12-month clock)' : 'Approve without file on record'}
+                </button>
+              )}
+              {isApproved && (
+                <button
+                  onClick={() => unapprove(key)}
+                  disabled={approving === key}
+                  className="text-xs text-red-600 underline whitespace-nowrap disabled:opacity-50"
+                >
+                  {approving === key ? 'Undoing…' : 'Un-approve (mark required)'}
+                </button>
+              )}
+            </div>
           </div>
         )
       })}
