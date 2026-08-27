@@ -109,7 +109,7 @@ export default function PostJobPage() {
   const [flightOptions, setFlightOptions] = useState<Array<{
     origin: { code: string; name: string }
     destination: { code: string; name: string }
-    flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean }
+    flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean; outsidePracticalHours: boolean }
     groundToAirport: { distanceKm: number; durationMinutes: number } | null
     groundFromAirport: { distanceKm: number; durationMinutes: number } | null
     effectiveCostCents: number
@@ -2013,6 +2013,11 @@ export default function PostJobPage() {
                         {!opt.flight.meetsCheckInBuffer && (
                           <p className="text-amber-600 mt-1 font-medium">
                             No flight this day departs late enough for the driver to realistically catch it — this will likely require an additional overnight stay before flying out the next day.
+                          </p>
+                        )}
+                        {opt.flight.meetsCheckInBuffer && opt.flight.outsidePracticalHours && (
+                          <p className="text-amber-600 mt-1 font-medium">
+                            This is the only catchable flight today, but it departs at an unusually early or late hour — worth checking if a same-day-plus-one-more-night flight would actually work out cheaper or more practical overall.
                           </p>
                         )}
                       </button>

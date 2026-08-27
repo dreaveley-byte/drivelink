@@ -262,6 +262,18 @@ export async function POST(req: NextRequest) {
     return isNaN(ms) ? null : ms
   }
 
+  // Duffel returns departing_at as local wall-clock time at the departure
+  // airport with no timezone offset (e.g. "2026-08-29T05:45:00") - extract
+  // the hour directly from the string rather than via Date parsing, since
+  // relying on Date + getUTCHours() to recover the original local hour only
+  // works by coincidence (it depends on the server also running in UTC).
+  function localDepartureHour(offer: Offer): number | null {
+    const dep = offer.slices[0]?.segments?.[0]?.departing_at
+    if (!dep) return null
+    const match = dep.match(/T(\d{2}):/)
+    return match ? parseInt(match[1], 10) : null
+  }
+
   function parseIsoDurationMinutes(iso: string | undefined): number {
     if (!iso) return 0
     const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
@@ -320,6 +332,7 @@ export async function POST(req: NextRequest) {
     }
 
     let metCheckInBuffer = true
+    let outsidePracticalHours = false
     let sorted: Offer[]
     if (earliestCatchableDepartAt != null) {
       const catchable = (offers as Offer[]).filter((o) => {
@@ -331,15 +344,35 @@ export async function POST(req: NextRequest) {
           (a, b) => firstSegmentDepartureMs(a)! - firstSegmentDepartureMs(b)!
         )
         const earliestDepartMs = firstSegmentDepartureMs(sortedByDeparture[0])!
-        // Prefer flights departing reasonably soon after the earliest catchable
-        // one, rather than always grabbing the cheapest flight of the whole day
-        // (which could depart many hours later than necessary) — "near that
-        // time" per product, not "cheapest at any hour."
-        const REASONABLE_WINDOW_MS = 4 * 60 * 60 * 1000
-        const nearEarliest = sortedByDeparture.filter(
-          (o) => firstSegmentDepartureMs(o)! <= earliestDepartMs + REASONABLE_WINDOW_MS
-        )
-        sorted = sortByStopsThenPrice(nearEarliest)
+
+        // An "earliest catchable" flight can still be an unreasonable time
+        // to expect a driver to be at the airport (e.g. 5:45am after a long
+        // drive/overnight) even though it's technically catchable. Prefer
+        // any catchable flight within a practical departure window over
+        // blindly taking the earliest one, since a later-that-day flight
+        // costs no extra money (same calendar day, no extra overnight) -
+        // only falls back to "nearest the earliest catchable time" when
+        // nothing that day falls in practical hours at all.
+        const PRACTICAL_HOUR_START = 6
+        const PRACTICAL_HOUR_END = 22
+        const withinPracticalHours = sortedByDeparture.filter((o) => {
+          const hour = localDepartureHour(o)
+          return hour != null && hour >= PRACTICAL_HOUR_START && hour < PRACTICAL_HOUR_END
+        })
+
+        if (withinPracticalHours.length > 0) {
+          sorted = sortByStopsThenPrice(withinPracticalHours)
+        } else {
+          // Nothing catchable that day falls in practical hours - fall back
+          // to whatever's nearest the earliest catchable time, same as
+          // before, so there's still a result rather than none at all.
+          outsidePracticalHours = true
+          const REASONABLE_WINDOW_MS = 4 * 60 * 60 * 1000
+          const nearEarliest = sortedByDeparture.filter(
+            (o) => firstSegmentDepartureMs(o)! <= earliestDepartMs + REASONABLE_WINDOW_MS
+          )
+          sorted = sortByStopsThenPrice(nearEarliest)
+        }
       } else {
         // Nothing on this date departs late enough for the driver to actually
         // catch it — fall back to the day's best offer anyway (better than no
@@ -406,6 +439,13 @@ export async function POST(req: NextRequest) {
         // buffer past the estimated drop-off completion time) — this is then
         // the best available fallback for the day, not a confirmed-catchable pick.
         meetsCheckInBuffer: metCheckInBuffer,
+        // True when the chosen flight IS technically catchable, but every
+        // catchable option that day fell outside a practical departure
+        // window (before 6am or after 10pm) - distinct from
+        // meetsCheckInBuffer, which is about whether the driver can reach
+        // the airport in time at all, not whether the time itself is
+        // reasonable to expect someone to fly at.
+        outsidePracticalHours,
         // The actual clock time the driver would need to leave the pickup/
         // drop-off location to catch this specific flight, working backwards
         // from its real departure time - lets the caller show the dealer

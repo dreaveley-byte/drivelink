@@ -12,7 +12,7 @@ import { toLocalDateString, toLocalDatetimeInputValue, zonedLocalInputToUtcIso, 
 export type FlightOption = {
   origin: { code: string; name: string }
   destination: { code: string; name: string }
-  flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean }
+  flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean; outsidePracticalHours: boolean }
   groundToAirport: { distanceKm: number; durationMinutes: number } | null
   groundFromAirport: { distanceKm: number; durationMinutes: number } | null
   effectiveCostCents: number
