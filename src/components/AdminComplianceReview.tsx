@@ -49,20 +49,33 @@ export default function AdminComplianceReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverId])
 
+  const [error, setError] = useState<string | null>(null)
+  const [justApproved, setJustApproved] = useState<DocKey | null>(null)
+
   async function approve(key: DocKey) {
     setApproving(key)
+    setError(null)
+    setJustApproved(null)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ [`${key}_reviewed_at`]: new Date().toISOString(), [`${key}_reviewed_by`]: user?.id })
       .eq('id', driverId)
     setApproving(null)
+    if (updateError) {
+      setError(`Could not approve ${DOC_LABELS[key]}: ${updateError.message}`)
+      return
+    }
+    setJustApproved(key)
     router.refresh()
   }
 
   return (
     <div className="space-y-3">
+      {error && (
+        <p className="text-xs text-red-600 border border-red-200 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+      )}
       {DOC_KEYS.map((key) => {
         const doc = documents[key]
         const url = signedUrls[key]
@@ -86,6 +99,7 @@ export default function AdminComplianceReview({
                 <p className="text-xs text-gray-400">No file uploaded through the app</p>
               )}
               {expiryLabel && <p className="text-xs text-green-600 mt-0.5">{expiryLabel}</p>}
+              {justApproved === key && <p className="text-xs text-green-600 mt-0.5 font-medium">✓ Approved just now</p>}
             </div>
             {!isApproved && (
               <button
