@@ -387,6 +387,9 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                   { label: 'Void cheque', path: application.void_cheque_path },
                   { label: 'Vehicle registration', path: application.vehicle_registration_path },
                   { label: 'Vehicle insurance', path: application.vehicle_insurance_path },
+                  { label: 'Vehicle photo', path: application.vehicle_photo_path },
+                  { label: 'Vehicle walkaround video', path: application.vehicle_walkaround_video_path },
+                  { label: 'Dash/odometer photo', path: application.dash_odometer_photo_path },
                   { label: 'Signed contract', path: application.contract_signature_path },
                 ]}
               />
