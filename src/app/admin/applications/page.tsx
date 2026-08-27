@@ -90,6 +90,8 @@ export default async function AdminApplicationsPage() {
                 vehicleMake={app.vehicle_make}
                 vehicleModel={app.vehicle_model}
                 licenseClass={app.license_class}
+                extractedLicenseClass={app.extracted_license_class}
+                canTowTrailer={app.can_tow_trailer}
                 preferredJobTypes={app.preferred_job_types}
                 driverFullName={app.full_name}
                 driverPhone={app.cell_phone}

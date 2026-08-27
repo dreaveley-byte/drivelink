@@ -21,6 +21,8 @@ export default function ApplicationCard({
   vehicleMake,
   vehicleModel,
   licenseClass,
+  extractedLicenseClass,
+  canTowTrailer,
   preferredJobTypes,
   driverFullName,
   driverPhone,
@@ -42,6 +44,8 @@ export default function ApplicationCard({
   vehicleMake?: string | null
   vehicleModel?: string | null
   licenseClass?: string | null
+  extractedLicenseClass?: string | null
+  canTowTrailer?: boolean | null
   preferredJobTypes?: string[] | null
   driverFullName?: string | null
   driverPhone?: string | null
@@ -114,8 +118,13 @@ export default function ApplicationCard({
         if (vehicleYear || vehicleMake || vehicleModel) {
           await supabase.from('profiles').update({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }).eq('id', userId)
         }
-        if (licenseClass || preferredJobTypes) {
-          await supabase.from('profiles').update({ license_class: licenseClass ?? null, preferred_job_types: preferredJobTypes ?? null }).eq('id', userId)
+        if (licenseClass || extractedLicenseClass || canTowTrailer != null || preferredJobTypes) {
+          await supabase.from('profiles').update({
+            license_class: licenseClass ?? null,
+            extracted_license_class: extractedLicenseClass ?? null,
+            can_tow_trailer: canTowTrailer ?? null,
+            preferred_job_types: preferredJobTypes ?? null,
+          }).eq('id', userId)
         }
         // This is the actual activation step — without it, an "approved" driver
         // never shows up in the admin drivers list or is able to claim jobs.

@@ -42,6 +42,9 @@ export default function DriverApplyPage() {
   const [vehicleModel, setVehicleModel] = useState('')
   const [vehicleMileage, setVehicleMileage] = useState('')
   const [licenseClass, setLicenseClass] = useState('')
+  const [extractedLicenseClass, setExtractedLicenseClass] = useState('')
+  const [extractingLicenseClass, setExtractingLicenseClass] = useState(false)
+  const [canTowTrailer, setCanTowTrailer] = useState<boolean | null>(null)
   const [availableJobTypes, setAvailableJobTypes] = useState<{ id: string; name: string }[]>([])
   const [preferredJobTypes, setPreferredJobTypes] = useState<string[]>([])
 
@@ -75,6 +78,47 @@ export default function DriverApplyPage() {
 
   function setDoc(key: string) {
     return (path: string) => setDocs((prev) => ({ ...prev, [key]: path }))
+  }
+
+  // Automatically reads the license class off the photo once uploaded,
+  // rather than relying only on the driver's own self-reported dropdown -
+  // shown to admin alongside the self-reported value so they can be
+  // cross-checked, since some jobs require a specific class (e.g. Class 4)
+  // or towing capability.
+  async function handleLicenseUpload(path: string) {
+    setDoc('drivers_license')(path)
+    setExtractingLicenseClass(true)
+    try {
+      const supabase = createClient()
+      const { data: signedUrlData } = await supabase.storage.from('driver-documents').createSignedUrl(path, 300)
+      if (!signedUrlData?.signedUrl) return
+      const imageRes = await fetch(signedUrlData.signedUrl)
+      const blob = await imageRes.blob()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+      const res = await fetch('/api/license-class-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: base64 }),
+      })
+      const data = await res.json()
+      if (data.licenseClass) {
+        setExtractedLicenseClass(data.licenseClass)
+        // Only auto-fill the self-reported dropdown if it's still blank -
+        // never silently overwrite something the driver already picked
+        // themselves.
+        if (!licenseClass) setLicenseClass(data.licenseClass)
+      }
+    } catch {
+      // Extraction is a nice-to-have on top of the self-reported dropdown
+      // — don't block the application over it.
+    } finally {
+      setExtractingLicenseClass(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -130,6 +174,8 @@ export default function DriverApplyPage() {
       vehicle_model: vehicleModel || null,
       vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
       license_class: licenseClass || null,
+      extracted_license_class: extractedLicenseClass || null,
+      can_tow_trailer: canTowTrailer,
       preferred_job_types: preferredJobTypes.length > 0 ? preferredJobTypes : null,
       vehicle_walkaround_video_path: docs.vehicle_walkaround_video ?? null,
       vehicle_photo_path: docs.vehicle_photo ?? null,
@@ -284,6 +330,25 @@ export default function DriverApplyPage() {
                 <option value="Other/Out of province">Other / out of province</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">Are you able to tow a large trailer?</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCanTowTrailer(true)}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm ${canTowTrailer === true ? 'border-[#378ADD] bg-blue-50 text-[#378ADD]' : 'border-gray-300 text-gray-600'}`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCanTowTrailer(false)}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm ${canTowTrailer === false ? 'border-[#378ADD] bg-blue-50 text-[#378ADD]' : 'border-gray-300 text-gray-600'}`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
             {availableJobTypes.length > 0 && (
               <div>
                 <label className="block text-xs text-gray-500 mb-2">
@@ -340,7 +405,13 @@ export default function DriverApplyPage() {
               <p className="text-xs text-gray-500">Take a photo with your phone or upload a saved file for each.</p>
 
               <FileUploadField label="Clear profile face photo" bucket="driver-documents" folder={userId} fileName="profile-photo" onUploaded={setDoc('profile_photo')} />
-              <FileUploadField label="Driver's license" bucket="driver-documents" folder={userId} fileName="drivers-license" onUploaded={setDoc('drivers_license')} />
+              <div>
+                <FileUploadField label="Driver's license" bucket="driver-documents" folder={userId} fileName="drivers-license" onUploaded={handleLicenseUpload} />
+                {extractingLicenseClass && <p className="text-xs text-gray-400 mt-1">Reading license class from photo…</p>}
+                {!extractingLicenseClass && extractedLicenseClass && (
+                  <p className="text-xs text-green-600 mt-1">Detected: {extractedLicenseClass} — confirm this matches the class you selected above.</p>
+                )}
+              </div>
               <FileUploadField label="Driver's abstract" bucket="driver-documents" folder={userId} fileName="drivers-abstract" onUploaded={setDoc('drivers_abstract')} />
               <FileUploadField label="Criminal background check" bucket="driver-documents" folder={userId} fileName="background-check" onUploaded={setDoc('criminal_background_check')} />
               <FileUploadField label="VSA license" bucket="driver-documents" folder={userId} fileName="vsa-license" onUploaded={setDoc('vsa_license')} optional />

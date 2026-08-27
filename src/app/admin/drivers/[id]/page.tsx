@@ -181,6 +181,35 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               {driver.driver_code && (
                 <p className="text-xs text-gray-400 font-mono mt-0.5">{driver.driver_code}</p>
               )}
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {driver.license_class && (
+                  <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2 py-0.5">
+                    Self-reported: {driver.license_class}
+                  </span>
+                )}
+                {driver.extracted_license_class && (
+                  <span
+                    className={`text-xs border rounded-full px-2 py-0.5 ${
+                      driver.license_class && driver.license_class !== driver.extracted_license_class
+                        ? 'border-red-300 text-red-700'
+                        : 'border-green-300 text-green-700'
+                    }`}
+                  >
+                    From license photo: {driver.extracted_license_class}
+                    {driver.license_class && driver.license_class !== driver.extracted_license_class && ' — mismatch, please verify'}
+                  </span>
+                )}
+                {driver.can_tow_trailer === true && (
+                  <span className="text-xs border border-blue-300 text-blue-700 rounded-full px-2 py-0.5">
+                    Can tow a large trailer
+                  </span>
+                )}
+                {driver.can_tow_trailer === false && (
+                  <span className="text-xs border border-gray-300 text-gray-500 rounded-full px-2 py-0.5">
+                    Cannot tow a large trailer
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap justify-end">
