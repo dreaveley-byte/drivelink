@@ -15,46 +15,34 @@ export default function SupportPage() {
       <main className="max-w-2xl mx-auto px-6 py-12 text-sm text-gray-700 leading-relaxed space-y-8">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Support</h1>
-          <p>Need help with the Drivflo app, your account, or a delivery job? Here's how to reach us.</p>
-        </div>
-
-        <div className="border border-gray-200 rounded-xl p-5 space-y-4">
-          <div>
-            <p className="text-xs text-gray-400 mb-1">Call us</p>
-            <a href="tel:18884993284" className="text-lg font-medium text-gray-900 hover:text-[#378ADD]">
-              1 888-499-3284
-            </a>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-1">Email us</p>
-            <a href="mailto:support@drivflo.ca" className="text-lg font-medium text-gray-900 hover:text-[#378ADD]">
-              support@drivflo.ca
-            </a>
-          </div>
+          <p>Need help with the Drivflo app? We're happy to help.</p>
         </div>
 
         <div>
-          <h2 className="text-base font-semibold text-gray-900 mb-2">Common questions</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Call us</h2>
+          <p>
+            <a href="tel:18884993284" className="text-[#378ADD] underline text-base font-medium">1 888-499-3284</a>
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Common questions</h2>
           <ul className="list-disc pl-5 space-y-2">
-            <li>
-              <strong>Can&apos;t log in?</strong> Try resetting your password from the login screen. If you&apos;re
-              still stuck, contact us using the details above.
-            </li>
-            <li>
-              <strong>Question about a job or payment?</strong> Include the job details or delivery date when you
-              reach out so we can look into it quickly.
-            </li>
-            <li>
-              <strong>Applying as a driver or dealer?</strong> Visit{' '}
-              <a href="https://www.drivflo.ca" className="text-[#378ADD] underline">drivflo.ca</a> to get started.
-            </li>
+            <li><strong>I can't log in.</strong> Try resetting your password from the login screen. If that doesn't work, call us and we'll help directly.</li>
+            <li><strong>My driver documents were rejected or expired.</strong> Check the Compliance section of your driver settings for what's needed, or call us with questions about a specific document.</li>
+            <li><strong>I have a question about a payment or job.</strong> Call us and reference the job or payment in question - we can look it up directly.</li>
+            <li><strong>I want to delete my account.</strong> See our <Link href="/privacy" className="text-[#378ADD] underline">Privacy Policy</Link> for how to request this.</li>
           </ul>
         </div>
 
-        <p className="text-xs text-gray-400">
-          For privacy questions or to request deletion of your account and data, see our{' '}
-          <Link href="/privacy" className="text-[#378ADD] underline">Privacy Policy</Link>.
-        </p>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Other links</h2>
+          <p>
+            <Link href="/privacy" className="text-[#378ADD] underline">Privacy Policy</Link>
+            {' · '}
+            <Link href="/" className="text-[#378ADD] underline">Drivflo home</Link>
+          </p>
+        </div>
       </main>
     </div>
   )
