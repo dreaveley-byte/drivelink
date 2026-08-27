@@ -32,7 +32,7 @@ export default async function AdminDriversPage() {
     .order('full_name')
 
   const { data: stats } = await supabase.rpc('driver_performance_stats')
-  const { data: completeness } = await supabase.rpc('driver_documentation_completeness')
+  const { data: completeness } = await supabase.rpc('driver_documentation_completeness_raw')
   const incompleteDriverIds = new Set((completeness ?? []).filter((c: { driver_id: string; is_complete: boolean }) => !c.is_complete).map((c: { driver_id: string }) => c.driver_id))
   type DriverStat = {
     driver_id: string
