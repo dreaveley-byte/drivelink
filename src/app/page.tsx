@@ -261,6 +261,7 @@ export default async function Home() {
           <Logo height={18} />
           <div className="flex items-center gap-6 text-sm" style={{ color: '#3D4A63' }}>
             <a href="tel:18884993284" className="hover:underline">1 888-499-3284</a>
+            <Link href="/support" className="hover:underline">Support</Link>
             <Link href="/privacy" className="hover:underline">Privacy</Link>
             <Link href="/login" className="hover:underline">Log in</Link>
             <span className="mono text-xs" style={{ color: '#8C8C7E' }}>&copy; {new Date().getFullYear()} Drivflo</span>
