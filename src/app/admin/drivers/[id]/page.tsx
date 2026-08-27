@@ -405,6 +405,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
               driverId={driver.id}
               isOverridden={!!driver.compliance_override}
               note={driver.compliance_override_note}
+              expiresAt={driver.compliance_override_expires_at}
             />
             <div className="mt-3">
               <AdminComplianceReview
