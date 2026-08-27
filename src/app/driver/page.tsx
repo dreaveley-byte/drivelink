@@ -183,6 +183,48 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
         <AutoRefresh />
+        {(() => {
+          const EXPIRY_MONTHS = 12
+          const REMINDER_DAYS = 30
+          const docs: { label: string; reviewedAt: string | null }[] = [
+            { label: "Driver's abstract", reviewedAt: profile?.driver_abstract_reviewed_at ?? null },
+            { label: 'Drug & alcohol test', reviewedAt: profile?.drug_alcohol_test_reviewed_at ?? null },
+            { label: 'Medical fitness test', reviewedAt: profile?.medical_fitness_test_reviewed_at ?? null },
+            { label: 'Vulnerable sector check', reviewedAt: profile?.vulnerable_sector_check_reviewed_at ?? null },
+          ]
+          const now = new Date()
+          const expired: string[] = []
+          const expiringSoon: { label: string; date: string }[] = []
+          for (const doc of docs) {
+            if (!doc.reviewedAt) {
+              expired.push(doc.label)
+              continue
+            }
+            const expiresAt = new Date(doc.reviewedAt)
+            expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
+            const daysLeft = Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            if (daysLeft < 0) expired.push(doc.label)
+            else if (daysLeft <= REMINDER_DAYS) expiringSoon.push({ label: doc.label, date: expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' }) })
+          }
+          if (expired.length === 0 && expiringSoon.length === 0) return null
+          return (
+            <div className={`border rounded-xl px-4 py-3 ${expired.length > 0 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+              {expired.length > 0 && (
+                <p className="text-sm font-medium text-red-700">
+                  You can&apos;t claim new jobs until you upload and get these reviewed: {expired.join(', ')}.
+                </p>
+              )}
+              {expiringSoon.length > 0 && (
+                <p className={`text-sm ${expired.length > 0 ? 'text-red-600 mt-1' : 'text-amber-700 font-medium'}`}>
+                  {expiringSoon.map((d) => `${d.label} expires ${d.date}`).join(' · ')} — upload a renewal before then to keep claiming jobs.
+                </p>
+              )}
+              <Link href="/driver/settings" className="text-xs underline mt-1 inline-block text-gray-700">
+                Go to Compliance
+              </Link>
+            </div>
+          )
+        })()}
         <div className="grid grid-cols-2 gap-3">
           <div className="border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-500">Pending</p>

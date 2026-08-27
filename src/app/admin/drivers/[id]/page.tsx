@@ -10,6 +10,7 @@ import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import DriverQRCode from '@/components/DriverQRCode'
 import AdminProfileEditForm from '@/components/AdminProfileEditForm'
+import AdminComplianceReview from '@/components/AdminComplianceReview'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -396,6 +397,34 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                 <DriverApplicationEditForm userId={driver.id} userEmail={driver.email ?? ''} application={null} />
               </div>
             )}
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Recurring Compliance Documents" subtitle={<span className="text-xs text-gray-400">Renewal required every 12 months</span>}>
+            <AdminComplianceReview
+              driverId={driver.id}
+              documents={{
+                driver_abstract: {
+                  path: driver.driver_abstract_path,
+                  uploadedAt: driver.driver_abstract_uploaded_at,
+                  reviewedAt: driver.driver_abstract_reviewed_at,
+                },
+                drug_alcohol_test: {
+                  path: driver.drug_alcohol_test_path,
+                  uploadedAt: driver.drug_alcohol_test_uploaded_at,
+                  reviewedAt: driver.drug_alcohol_test_reviewed_at,
+                },
+                medical_fitness_test: {
+                  path: driver.medical_fitness_test_path,
+                  uploadedAt: driver.medical_fitness_test_uploaded_at,
+                  reviewedAt: driver.medical_fitness_test_reviewed_at,
+                },
+                vulnerable_sector_check: {
+                  path: driver.vulnerable_sector_check_path,
+                  uploadedAt: driver.vulnerable_sector_check_uploaded_at,
+                  reviewedAt: driver.vulnerable_sector_check_reviewed_at,
+                },
+              }}
+            />
           </CollapsibleSection>
         </div>
 

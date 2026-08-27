@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 
-export default function SettingsTabs({ profile, application }: { profile: ReactNode; application: ReactNode }) {
-  const [tab, setTab] = useState<'profile' | 'application'>('profile')
+export default function SettingsTabs({ profile, application, compliance }: { profile: ReactNode; application: ReactNode; compliance?: ReactNode }) {
+  const [tab, setTab] = useState<'profile' | 'application' | 'compliance'>('profile')
 
   return (
     <div>
@@ -20,8 +20,16 @@ export default function SettingsTabs({ profile, application }: { profile: ReactN
         >
           Application
         </button>
+        {compliance && (
+          <button
+            onClick={() => setTab('compliance')}
+            className={`text-sm px-3 py-1.5 rounded-md ${tab === 'compliance' ? 'bg-[#378ADD] text-white' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            Compliance
+          </button>
+        )}
       </div>
-      {tab === 'profile' ? profile : application}
+      {tab === 'profile' ? profile : tab === 'application' ? application : compliance}
     </div>
   )
 }
