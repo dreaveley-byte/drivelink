@@ -103,7 +103,7 @@ export default function EditJobPage() {
   const [flightOptions, setFlightOptions] = useState<Array<{
     origin: { code: string; name: string }
     destination: { code: string; name: string }
-    flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number }
+    flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean }
     groundToAirport: { distanceKm: number; durationMinutes: number } | null
     groundFromAirport: { distanceKm: number; durationMinutes: number } | null
     effectiveCostCents: number
@@ -1753,19 +1753,35 @@ export default function EditJobPage() {
                         key={i}
                         type="button"
                         onClick={() => setSelectedFlightOptionIdx(i)}
-                        className={`w-full text-left border rounded-lg px-3 py-2 text-xs flex items-center justify-between ${
+                        className={`w-full text-left border rounded-lg px-3 py-2 text-xs ${
                           i === selectedFlightOptionIdx ? 'border-[#378ADD] bg-blue-50/60' : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <span>
-                          <span className="font-medium text-gray-900">
-                            {opt.origin.name} ({opt.origin.code}) → {opt.destination.name} ({opt.destination.code})
+                        <div className="flex items-center justify-between">
+                          <span>
+                            <span className="font-medium text-gray-900">
+                              {opt.origin.name} ({opt.origin.code}) → {opt.destination.name} ({opt.destination.code})
+                            </span>
+                            <span className="text-gray-400 ml-2">
+                              {opt.flight.isDirect ? 'direct' : `${opt.flight.stops} stop${opt.flight.stops === 1 ? '' : 's'}`}
+                            </span>
                           </span>
-                          <span className="text-gray-400 ml-2">
-                            {opt.flight.isDirect ? 'direct' : `${opt.flight.stops} stop${opt.flight.stops === 1 ? '' : 's'}`}
-                          </span>
-                        </span>
-                        <span className="font-semibold text-gray-900">{formatCents(opt.effectiveCostCents)} total</span>
+                          <span className="font-semibold text-gray-900">{formatCents(opt.effectiveCostCents)} total</span>
+                        </div>
+                        {opt.flight.driverMustLeaveBy && (
+                          <p className="text-gray-500 mt-1">
+                            Driver would need to leave the pickup location by{' '}
+                            <span className="font-medium text-gray-700">
+                              {new Date(opt.flight.driverMustLeaveBy).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </span>{' '}
+                            to catch this flight.
+                          </p>
+                        )}
+                        {!opt.flight.meetsCheckInBuffer && (
+                          <p className="text-amber-600 mt-1 font-medium">
+                            No flight this day departs late enough for the driver to realistically catch it — this will likely require an additional overnight stay before flying out the next day.
+                          </p>
+                        )}
                       </button>
                     ))}
                   </div>

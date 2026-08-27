@@ -8,14 +8,14 @@ const DUFFEL_BASE = 'https://api.duffel.com'
 // used to find the nearest real airport to any address — much more reliable
 // than trying to text-match a city name against an airline database, since
 // most people don't live in a city that has its own airport.
-const AIRPORTS: { code: string; name: string; lat: number; lng: number }[] = [
+const AIRPORTS: { code: string; name: string; lat: number; lng: number; islandOnly?: boolean }[] = [
   { code: 'YVR', name: 'Vancouver', lat: 49.1967, lng: -123.1815 },
   { code: 'YXX', name: 'Abbotsford', lat: 49.0253, lng: -122.3606 },
   { code: 'YKA', name: 'Kamloops', lat: 50.7022, lng: -120.4442 },
   { code: 'YLW', name: 'Kelowna', lat: 49.9561, lng: -119.3778 },
   { code: 'YXS', name: 'Prince George', lat: 53.8894, lng: -122.6789 },
-  { code: 'YYJ', name: 'Victoria', lat: 48.6469, lng: -123.4258 },
-  { code: 'YQQ', name: 'Comox', lat: 49.7108, lng: -124.8867 },
+  { code: 'YYJ', name: 'Victoria', lat: 48.6469, lng: -123.4258, islandOnly: true },
+  { code: 'YQQ', name: 'Comox', lat: 49.7108, lng: -124.8867, islandOnly: true },
   { code: 'YXJ', name: 'Fort St. John', lat: 56.2381, lng: -120.7397 },
   { code: 'YDQ', name: 'Dawson Creek', lat: 55.7422, lng: -120.1828 },
   { code: 'YCG', name: 'Castlegar', lat: 49.2964, lng: -117.6317 },
@@ -26,7 +26,7 @@ const AIRPORTS: { code: string; name: string; lat: number; lng: number }[] = [
   { code: 'YQZ', name: 'Quesnel', lat: 52.9536, lng: -122.5108 },
   { code: 'YXC', name: 'Cranbrook', lat: 49.6103, lng: -115.7822 },
   { code: 'YYF', name: 'Penticton', lat: 49.4630, lng: -119.6022 },
-  { code: 'YCD', name: 'Nanaimo', lat: 49.0553, lng: -123.8700 },
+  { code: 'YCD', name: 'Nanaimo', lat: 49.0553, lng: -123.8700, islandOnly: true },
   { code: 'YBL', name: 'Campbell River', lat: 49.9508, lng: -125.2708 },
   { code: 'YPW', name: 'Powell River', lat: 49.8339, lng: -124.5006 },
   { code: 'YAZ', name: 'Tofino', lat: 49.0794, lng: -125.7758 },
@@ -83,7 +83,19 @@ async function nearbyAirports(address: string, maxCandidates: number, maxRadiusK
   const coords = await geocodeAddress(address)
   if (!coords) return { error: `Could not locate "${address}" on the map.` }
 
-  const withDistance = AIRPORTS.map((a) => ({ ...a, dist: haversineKm(coords.lat, coords.lng, a.lat, a.lng) }))
+  // Vancouver Island airports (Victoria, Comox, Nanaimo) can be
+  // geographically "close" in a straight line to a mainland address while
+  // genuinely requiring a ferry crossing to reach by road - a real job was
+  // found where this happened even within a 150km ground-transport sanity
+  // cap, since a short ferry crossing can still report a short driving
+  // distance. Rather than relying on distance alone, island-only airports
+  // are excluded from consideration entirely unless the query address
+  // itself falls within Vancouver Island's own rough bounding box.
+  const ON_VANCOUVER_ISLAND =
+    coords.lat >= 48.2 && coords.lat <= 51.0 && coords.lng <= -123.0 && coords.lng >= -128.6
+  const eligibleAirports = ON_VANCOUVER_ISLAND ? AIRPORTS : AIRPORTS.filter((a) => !a.islandOnly)
+
+  const withDistance = eligibleAirports.map((a) => ({ ...a, dist: haversineKm(coords.lat, coords.lng, a.lat, a.lng) }))
     .sort((a, b) => a.dist - b.dist)
 
   // Always include the single nearest airport regardless of radius (need at
@@ -394,6 +406,18 @@ export async function POST(req: NextRequest) {
         // buffer past the estimated drop-off completion time) — this is then
         // the best available fallback for the day, not a confirmed-catchable pick.
         meetsCheckInBuffer: metCheckInBuffer,
+        // The actual clock time the driver would need to leave the pickup/
+        // drop-off location to catch this specific flight, working backwards
+        // from its real departure time - lets the caller show the dealer
+        // exactly when the driver needs to be on the road by, not just an
+        // abstract "hours to add" figure.
+        driverMustLeaveBy: (() => {
+          const departingAt = best.slices[0]?.segments?.[0]?.departing_at
+          if (!departingAt) return null
+          const groundMinutes = groundToAirport?.durationMinutes ?? DEFAULT_GROUND_TO_AIRPORT_MINUTES
+          const leaveByMs = new Date(departingAt).getTime() - CHECKIN_BUFFER_MINUTES * 60_000 - groundMinutes * 60_000
+          return isNaN(leaveByMs) ? null : new Date(leaveByMs).toISOString()
+        })(),
       },
     }
   }
