@@ -11,6 +11,7 @@ import CollapsibleSection from '@/components/CollapsibleSection'
 import DriverQRCode from '@/components/DriverQRCode'
 import AdminProfileEditForm from '@/components/AdminProfileEditForm'
 import AdminComplianceReview from '@/components/AdminComplianceReview'
+import ComplianceOverrideToggle from '@/components/ComplianceOverrideToggle'
 import Logo from '@/components/Logo'
 import { formatCents } from '@/lib/pricing'
 
@@ -400,7 +401,13 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
           </CollapsibleSection>
 
           <CollapsibleSection title="Recurring Compliance Documents" subtitle={<span className="text-xs text-gray-400">Renewal required every 12 months</span>}>
-            <AdminComplianceReview
+            <ComplianceOverrideToggle
+              driverId={driver.id}
+              isOverridden={!!driver.compliance_override}
+              note={driver.compliance_override_note}
+            />
+            <div className="mt-3">
+              <AdminComplianceReview
               driverId={driver.id}
               documents={{
                 driver_abstract: {
@@ -424,7 +431,8 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                   reviewedAt: driver.vulnerable_sector_check_reviewed_at,
                 },
               }}
-            />
+              />
+            </div>
           </CollapsibleSection>
         </div>
 

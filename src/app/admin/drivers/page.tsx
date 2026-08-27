@@ -107,6 +107,11 @@ export default async function AdminDriversPage() {
                       Incomplete
                     </span>
                   )}
+                  {driver.compliance_override && (
+                    <span className="text-xs border border-amber-300 text-amber-700 rounded-full px-2.5 py-1 font-medium">
+                      Override
+                    </span>
+                  )}
                   {s?.avg_customer_rating != null && (
                     <DriverRatingStars driverId={driver.id} avgRating={s.avg_customer_rating} />
                   )}
