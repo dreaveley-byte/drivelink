@@ -4,35 +4,47 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type DocKey = 'driver_abstract' | 'drug_alcohol_test' | 'medical_fitness_test' | 'vulnerable_sector_check'
+type DocKey = 'driver_abstract' | 'drug_alcohol_test' | 'medical_fitness_test' | 'vulnerable_sector_check' | 'vehicle_safety_inspection'
 
 const DOC_LABELS: Record<DocKey, string> = {
   driver_abstract: "Driver's abstract",
   drug_alcohol_test: 'Drug & alcohol test',
   medical_fitness_test: 'Medical fitness test',
   vulnerable_sector_check: 'Vulnerable sector check',
+  vehicle_safety_inspection: 'Vehicle safety inspection (passenger driving)',
+}
+
+const EXPIRY_MONTHS: Record<DocKey, number> = {
+  driver_abstract: 12,
+  drug_alcohol_test: 12,
+  medical_fitness_test: 12,
+  vulnerable_sector_check: 12,
+  vehicle_safety_inspection: 6,
 }
 
 const DOC_KEYS: DocKey[] = ['driver_abstract', 'drug_alcohol_test', 'medical_fitness_test', 'vulnerable_sector_check']
-const EXPIRY_MONTHS = 12
 
 export default function AdminComplianceReview({
   driverId,
   documents,
+  wantsPassengerJobs,
 }: {
   driverId: string
   documents: Record<DocKey, { path: string | null; uploadedAt: string | null; reviewedAt: string | null }>
+  wantsPassengerJobs: boolean
 }) {
   const router = useRouter()
   const [approving, setApproving] = useState<DocKey | null>(null)
   const [signedUrls, setSignedUrls] = useState<Partial<Record<DocKey, string>>>({})
+
+  const keysToShow = wantsPassengerJobs ? [...DOC_KEYS, 'vehicle_safety_inspection' as DocKey] : DOC_KEYS
 
   useEffect(() => {
     const supabase = createClient()
     let cancelled = false
     ;(async () => {
       const entries = await Promise.all(
-        DOC_KEYS.map(async (key) => {
+        keysToShow.map(async (key) => {
           const path = documents[key]?.path
           if (!path) return [key, null] as const
           const { data } = await supabase.storage.from('driver-documents').createSignedUrl(path, 3600)
@@ -47,7 +59,7 @@ export default function AdminComplianceReview({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [driverId])
+  }, [driverId, wantsPassengerJobs])
 
   const [error, setError] = useState<string | null>(null)
   const [justApproved, setJustApproved] = useState<DocKey | null>(null)
@@ -93,16 +105,17 @@ export default function AdminComplianceReview({
       {error && (
         <p className="text-xs text-red-600 border border-red-200 bg-red-50 rounded-lg px-3 py-2">{error}</p>
       )}
-      {DOC_KEYS.map((key) => {
+      {keysToShow.map((key) => {
         const doc = documents[key]
         const url = signedUrls[key]
         const needsReview = !!doc.uploadedAt && (!doc.reviewedAt || (doc.uploadedAt && new Date(doc.uploadedAt) > new Date(doc.reviewedAt)))
         const isApproved = !!doc.reviewedAt && !needsReview
         const manuallyApproved = isApproved && !doc.path
+        const expiryMonths = EXPIRY_MONTHS[key]
         let expiryLabel: string | null = null
         if (doc.reviewedAt) {
           const expiresAt = new Date(doc.reviewedAt)
-          expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
+          expiresAt.setMonth(expiresAt.getMonth() + expiryMonths)
           expiryLabel = manuallyApproved
             ? `Manually approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
             : `Approved — valid until ${expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })}`
@@ -128,7 +141,7 @@ export default function AdminComplianceReview({
                   disabled={approving === key}
                   className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
                 >
-                  {approving === key ? 'Approving…' : doc.path ? 'Approve (starts 12-month clock)' : 'Approve without file on record'}
+                  {approving === key ? 'Approving…' : doc.path ? `Approve (starts ${expiryMonths}-month clock)` : 'Approve without file on record'}
                 </button>
               )}
               {isApproved && (

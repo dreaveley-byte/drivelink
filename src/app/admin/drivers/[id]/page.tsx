@@ -413,6 +413,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             <div className="mt-3">
               <AdminComplianceReview
               driverId={driver.id}
+              wantsPassengerJobs={!!driver.preferred_job_types?.some((t: string) => t === 'Customer Pick Up' || t === 'Customer Drop Off')}
               documents={{
                 driver_abstract: {
                   path: driver.driver_abstract_path,
@@ -433,6 +434,11 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                   path: driver.vulnerable_sector_check_path,
                   uploadedAt: driver.vulnerable_sector_check_uploaded_at,
                   reviewedAt: driver.vulnerable_sector_check_reviewed_at,
+                },
+                vehicle_safety_inspection: {
+                  path: driver.vehicle_safety_inspection_path,
+                  uploadedAt: driver.vehicle_safety_inspection_uploaded_at,
+                  reviewedAt: driver.vehicle_safety_inspection_reviewed_at,
                 },
               }}
               />

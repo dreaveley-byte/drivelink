@@ -184,13 +184,16 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
         <AutoRefresh />
         {(() => {
-          const EXPIRY_MONTHS = 12
           const REMINDER_DAYS = 30
-          const docs: { label: string; reviewedAt: string | null }[] = [
-            { label: "Driver's abstract", reviewedAt: profile?.driver_abstract_reviewed_at ?? null },
-            { label: 'Drug & alcohol test', reviewedAt: profile?.drug_alcohol_test_reviewed_at ?? null },
-            { label: 'Medical fitness test', reviewedAt: profile?.medical_fitness_test_reviewed_at ?? null },
-            { label: 'Vulnerable sector check', reviewedAt: profile?.vulnerable_sector_check_reviewed_at ?? null },
+          const wantsPassengerJobs = !!profile?.preferred_job_types?.some((t: string) => t === 'Customer Pick Up' || t === 'Customer Drop Off')
+          const docs: { label: string; reviewedAt: string | null; expiryMonths: number }[] = [
+            { label: "Driver's abstract", reviewedAt: profile?.driver_abstract_reviewed_at ?? null, expiryMonths: 12 },
+            { label: 'Drug & alcohol test', reviewedAt: profile?.drug_alcohol_test_reviewed_at ?? null, expiryMonths: 12 },
+            { label: 'Medical fitness test', reviewedAt: profile?.medical_fitness_test_reviewed_at ?? null, expiryMonths: 12 },
+            { label: 'Vulnerable sector check', reviewedAt: profile?.vulnerable_sector_check_reviewed_at ?? null, expiryMonths: 12 },
+            ...(wantsPassengerJobs
+              ? [{ label: 'Vehicle safety inspection', reviewedAt: profile?.vehicle_safety_inspection_reviewed_at ?? null, expiryMonths: 6 }]
+              : []),
           ]
           const now = new Date()
           const expired: string[] = []
@@ -201,7 +204,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
               continue
             }
             const expiresAt = new Date(doc.reviewedAt)
-            expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
+            expiresAt.setMonth(expiresAt.getMonth() + doc.expiryMonths)
             const daysLeft = Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
             if (daysLeft < 0) expired.push(doc.label)
             else if (daysLeft <= REMINDER_DAYS) expiringSoon.push({ label: doc.label, date: expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' }) })

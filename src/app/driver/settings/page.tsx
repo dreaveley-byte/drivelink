@@ -19,11 +19,12 @@ export default async function DriverSettingsPage() {
   const { data: profile } = await supabase
     .from('profiles')
     .select(`
-      full_name, phone, photo_url, sms_notifications_opt_in, gender,
+      full_name, phone, photo_url, sms_notifications_opt_in, gender, preferred_job_types,
       driver_abstract_path, driver_abstract_uploaded_at, driver_abstract_reviewed_at,
       drug_alcohol_test_path, drug_alcohol_test_uploaded_at, drug_alcohol_test_reviewed_at,
       medical_fitness_test_path, medical_fitness_test_uploaded_at, medical_fitness_test_reviewed_at,
-      vulnerable_sector_check_path, vulnerable_sector_check_uploaded_at, vulnerable_sector_check_reviewed_at
+      vulnerable_sector_check_path, vulnerable_sector_check_uploaded_at, vulnerable_sector_check_reviewed_at,
+      vehicle_safety_inspection_path, vehicle_safety_inspection_uploaded_at, vehicle_safety_inspection_reviewed_at
     `)
     .eq('id', user.id)
     .single()
@@ -77,6 +78,7 @@ export default async function DriverSettingsPage() {
           compliance={
             <ComplianceDocumentsSection
               userId={user.id}
+              wantsPassengerJobs={!!profile?.preferred_job_types?.some((t: string) => t === 'Customer Pick Up' || t === 'Customer Drop Off')}
               documents={{
                 driver_abstract: {
                   path: profile?.driver_abstract_path ?? null,
@@ -97,6 +99,11 @@ export default async function DriverSettingsPage() {
                   path: profile?.vulnerable_sector_check_path ?? null,
                   uploadedAt: profile?.vulnerable_sector_check_uploaded_at ?? null,
                   reviewedAt: profile?.vulnerable_sector_check_reviewed_at ?? null,
+                },
+                vehicle_safety_inspection: {
+                  path: profile?.vehicle_safety_inspection_path ?? null,
+                  uploadedAt: profile?.vehicle_safety_inspection_uploaded_at ?? null,
+                  reviewedAt: profile?.vehicle_safety_inspection_reviewed_at ?? null,
                 },
               }}
             />

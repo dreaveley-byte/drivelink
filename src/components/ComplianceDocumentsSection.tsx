@@ -5,22 +5,30 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import FileUploadField from './FileUploadField'
 
-type DocKey = 'driver_abstract' | 'drug_alcohol_test' | 'medical_fitness_test' | 'vulnerable_sector_check'
+type DocKey = 'driver_abstract' | 'drug_alcohol_test' | 'medical_fitness_test' | 'vulnerable_sector_check' | 'vehicle_safety_inspection'
 
 const DOC_LABELS: Record<DocKey, string> = {
   driver_abstract: "Driver's abstract",
   drug_alcohol_test: 'Drug & alcohol test',
   medical_fitness_test: 'Medical fitness test',
   vulnerable_sector_check: 'Vulnerable sector check',
+  vehicle_safety_inspection: 'Vehicle safety inspection (passenger driving)',
+}
+
+const EXPIRY_MONTHS: Record<DocKey, number> = {
+  driver_abstract: 12,
+  drug_alcohol_test: 12,
+  medical_fitness_test: 12,
+  vulnerable_sector_check: 12,
+  vehicle_safety_inspection: 6,
 }
 
 const DOC_KEYS: DocKey[] = ['driver_abstract', 'drug_alcohol_test', 'medical_fitness_test', 'vulnerable_sector_check']
-const EXPIRY_MONTHS = 12
 
-function statusFor(reviewedAt: string | null, uploadedAt: string | null): { label: string; tone: 'green' | 'amber' | 'red' | 'gray' } {
+function statusFor(reviewedAt: string | null, uploadedAt: string | null, expiryMonths: number): { label: string; tone: 'green' | 'amber' | 'red' | 'gray' } {
   if (reviewedAt) {
     const expiresAt = new Date(reviewedAt)
-    expiresAt.setMonth(expiresAt.getMonth() + EXPIRY_MONTHS)
+    expiresAt.setMonth(expiresAt.getMonth() + expiryMonths)
     const now = new Date()
     const daysLeft = Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     if (daysLeft < 0) {
@@ -47,9 +55,11 @@ const TONE_CLASSES: Record<string, string> = {
 export default function ComplianceDocumentsSection({
   userId,
   documents,
+  wantsPassengerJobs,
 }: {
   userId: string
   documents: Record<DocKey, { path: string | null; uploadedAt: string | null; reviewedAt: string | null }>
+  wantsPassengerJobs: boolean
 }) {
   const router = useRouter()
   const [saving, setSaving] = useState<DocKey | null>(null)
@@ -65,15 +75,17 @@ export default function ComplianceDocumentsSection({
     router.refresh()
   }
 
+  const keysToShow = wantsPassengerJobs ? [...DOC_KEYS, 'vehicle_safety_inspection' as DocKey] : DOC_KEYS
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">
-        These need to be uploaded and reviewed by admin at least once every {EXPIRY_MONTHS} months — you won&apos;t be able to claim
+        These need to be uploaded and reviewed by admin (renewal periods vary by document) — you won&apos;t be able to claim
         new jobs once one expires.
       </p>
-      {DOC_KEYS.map((key) => {
+      {keysToShow.map((key) => {
         const doc = documents[key]
-        const status = statusFor(doc.reviewedAt, doc.uploadedAt)
+        const status = statusFor(doc.reviewedAt, doc.uploadedAt, EXPIRY_MONTHS[key])
         return (
           <div key={key} className="border border-gray-200 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
