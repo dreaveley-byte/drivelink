@@ -529,9 +529,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 </div>
               )}
               {(() => {
-                if (job.actual_driver_hours == null || job.driver_paid_hours == null || effectiveDriverPayCents == null) return null
+                const bookedHours = job.driver_paid_hours ?? (job.estimated_duration_minutes != null ? job.estimated_duration_minutes / 60 : null)
+                if (job.actual_driver_hours == null || bookedHours == null || bookedHours <= 0 || effectiveDriverPayCents == null) return null
                 const effectiveRateCents = effectiveDriverPayCents / job.actual_driver_hours
-                const intendedRateCents = effectiveDriverPayCents / job.driver_paid_hours
+                const intendedRateCents = effectiveDriverPayCents / bookedHours
                 // Flag if the driver's real per-hour earnings fell meaningfully
                 // (>10%) below what this job's price was actually set up to pay
                 // them - i.e. the job ran long relative to booked hours.
@@ -542,7 +543,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                       Effective rate {isBelowIntended && '⚠️ ran over booked hours'}
                     </span>
                     <span className={isBelowIntended ? 'text-amber-700 font-semibold' : 'text-gray-900 font-medium'}>
-                      {formatCents(Math.round(effectiveRateCents))}/hr <span className="text-xs font-normal text-gray-400">(priced at {formatCents(Math.round(intendedRateCents))}/hr)</span>
+                      {formatCents(Math.round(effectiveRateCents))}/hr <span className="text-xs font-normal text-gray-400">(priced at {formatCents(Math.round(intendedRateCents))}/hr{job.driver_paid_hours == null && ', one-way est.'})</span>
                     </span>
                   </div>
                 )
