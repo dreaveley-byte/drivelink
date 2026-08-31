@@ -513,9 +513,22 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 </div>
               )}
               {job.actual_driver_hours != null && (
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-sm items-center">
                   <span className="text-gray-600">Actual hours (in progress → completed)</span>
-                  <span className="text-gray-900 font-medium">{job.actual_driver_hours.toFixed(1)} hrs</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-900 font-medium">{job.actual_driver_hours.toFixed(1)} hrs</span>
+                    {job.driver_paid_hours != null && job.driver_paid_hours > 0 && (() => {
+                      const diff = job.actual_driver_hours - job.driver_paid_hours
+                      const isOver = diff > 0.05
+                      const isUnder = diff < -0.05
+                      if (!isOver && !isUnder) return <span className="text-xs text-gray-400">on target</span>
+                      return (
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${isOver ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                          {isOver ? '+' : ''}{diff.toFixed(1)} hrs {isOver ? 'over' : 'under'}
+                        </span>
+                      )
+                    })()}
+                  </span>
                 </div>
               )}
               {(job.driver_paid_hours ?? job.estimated_duration_minutes) != null && (
