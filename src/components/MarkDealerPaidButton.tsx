@@ -24,7 +24,15 @@ export default function MarkDealerPaidButton({
     const { data: { user } } = await supabase.auth.getUser()
     await supabase
       .from('jobs')
-      .update({ dealer_paid_at: new Date().toISOString(), dealer_paid_by: user?.id, dealer_paid_notes: notes || null })
+      .update({
+        dealer_paid_at: new Date().toISOString(),
+        dealer_paid_by: user?.id,
+        dealer_paid_notes: notes || null,
+        // Once a job is fully done and paid, it's naturally ready to be
+        // cleared from the active view - archiving it automatically here
+        // saves a separate manual step.
+        archived_at: new Date().toISOString(),
+      })
       .eq('id', jobId)
     setSaving(false)
     setOpen(false)
@@ -32,10 +40,13 @@ export default function MarkDealerPaidButton({
   }
 
   async function undoPaid() {
-    if (!confirm('Mark this job as unpaid again?')) return
+    if (!confirm('Mark this job as unpaid again? This will also un-archive it.')) return
     setSaving(true)
     const supabase = createClient()
-    await supabase.from('jobs').update({ dealer_paid_at: null, dealer_paid_by: null, dealer_paid_notes: null }).eq('id', jobId)
+    await supabase
+      .from('jobs')
+      .update({ dealer_paid_at: null, dealer_paid_by: null, dealer_paid_notes: null, archived_at: null })
+      .eq('id', jobId)
     setSaving(false)
     router.refresh()
   }
@@ -44,7 +55,7 @@ export default function MarkDealerPaidButton({
     return (
       <div className="flex items-center gap-2">
         <span className="text-xs border border-green-300 text-green-700 rounded-full px-2.5 py-1">
-          Dealer paid {paidAt ? new Date(paidAt).toLocaleDateString('en-CA', { dateStyle: 'medium' }) : ''}
+          Dealer paid {paidAt ? new Date(paidAt).toLocaleDateString('en-CA', { dateStyle: 'medium' }) : ''} · archived
         </span>
         <button onClick={undoPaid} disabled={saving} className="text-xs text-gray-400 hover:text-gray-600 underline disabled:opacity-50">
           Undo
