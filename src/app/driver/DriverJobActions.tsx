@@ -639,6 +639,17 @@ export default function DriverJobActions({
         changed_by: user?.id,
       })
 
+      if (newStatus === 'completed') {
+        // Fire-and-forget - a pricing suggestion is a nice-to-have, never
+        // something that should block or fail the driver's own completion
+        // flow if it errors out for any reason.
+        fetch('/api/analyze-job-pricing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id }),
+        }).catch(() => {})
+      }
+
       if (newStatus === 'in_progress' && !isCustomerRideJob) {
         fetch('/api/customer-sms/notify-in-progress', {
           method: 'POST',

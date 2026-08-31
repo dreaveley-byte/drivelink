@@ -48,6 +48,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .eq('id', user.id)
     .single()
 
+  const { count: pendingSuggestionsCount } = await supabase
+    .from('pricing_suggestions')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
+
   if (profile?.role !== 'platform_admin') {
     redirect('/dashboard')
   }
@@ -152,6 +157,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="max-w-4xl mx-auto flex items-center gap-4 flex-wrap">
           <Link href="/admin/settings" className="text-sm text-gray-600 hover:text-gray-900">
             Pricing
+          </Link>
+          <Link href="/admin/pricing-suggestions" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
+            Pricing suggestions
+            {!!pendingSuggestionsCount && (
+              <span className="text-xs bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">{pendingSuggestionsCount}</span>
+            )}
           </Link>
           <Link href="/admin/drivers" className="text-sm text-gray-600 hover:text-gray-900">
             Drivers
