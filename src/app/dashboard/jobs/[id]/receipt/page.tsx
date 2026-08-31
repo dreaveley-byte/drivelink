@@ -518,6 +518,12 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-900 font-medium">{job.actual_driver_hours.toFixed(1)} hrs</span>
                 </div>
               )}
+              {job.estimated_duration_minutes != null && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Booked hours (estimated for this job)</span>
+                  <span className="text-gray-900 font-medium">{(job.estimated_duration_minutes / 60).toFixed(1)} hrs</span>
+                </div>
+              )}
               {job.total_wait_minutes > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Wait time at stops</span>
