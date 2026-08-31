@@ -92,15 +92,15 @@ export default async function DealerDrivesPage({
             driver_name: string | null
             scheduled_for: string | null
             booked_minutes: number | null
-            assigned_at: string | null
+            in_progress_at: string | null
             completed_at: string | null
             total_cost_cents: number
             total_charged_cents: number
             profit_cents: number
           }) => {
             const actualMinutes =
-              drive.assigned_at && drive.completed_at
-                ? Math.round((new Date(drive.completed_at).getTime() - new Date(drive.assigned_at).getTime()) / 60000)
+              drive.in_progress_at && drive.completed_at
+                ? Math.round((new Date(drive.completed_at).getTime() - new Date(drive.in_progress_at).getTime()) / 60000)
                 : null
             return (
               <Link
@@ -120,7 +120,7 @@ export default async function DealerDrivesPage({
                     <p className="text-gray-900 font-medium mt-0.5">{formatDuration(drive.booked_minutes)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Actual time (round trip)</p>
+                    <p className="text-gray-400">Actual hours (in progress → completed)</p>
                     <p className="text-gray-900 font-medium mt-0.5">{formatDuration(actualMinutes)}</p>
                   </div>
                   <div>

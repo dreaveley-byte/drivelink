@@ -608,8 +608,20 @@ export default function DriverJobActions({
           jobUpdate.return_gps_lat = pos.coords.latitude
           jobUpdate.return_gps_lng = pos.coords.longitude
           jobUpdate.return_gps_at = new Date().toISOString()
-          if (job.pickup_gps_at) {
-            const actualHours = (Date.now() - new Date(job.pickup_gps_at).getTime()) / (60 * 60 * 1000)
+          // Actual hours measures from when the job was marked in_progress
+          // (actively driving, not the earlier pickup/inspection stage) to
+          // right now (completed) - admin-only figure, so this isn't stored
+          // as its own column, just looked up from the status history.
+          const { data: inProgressEvent } = await supabase
+            .from('job_status_events')
+            .select('created_at')
+            .eq('job_id', job.id)
+            .eq('status', 'in_progress')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          if (inProgressEvent) {
+            const actualHours = (Date.now() - new Date(inProgressEvent.created_at).getTime()) / (60 * 60 * 1000)
             jobUpdate.actual_driver_hours = Math.round(actualHours * 100) / 100
           }
         }

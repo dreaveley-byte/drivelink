@@ -514,7 +514,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               )}
               {job.actual_driver_hours != null && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Actual hours (pickup → back at origin)</span>
+                  <span className="text-gray-600">Actual hours (in progress → completed)</span>
                   <span className="text-gray-900 font-medium">{job.actual_driver_hours.toFixed(1)} hrs</span>
                 </div>
               )}
