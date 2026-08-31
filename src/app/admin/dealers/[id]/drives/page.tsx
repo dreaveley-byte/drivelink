@@ -8,14 +8,6 @@ import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
-function formatDuration(minutes: number | null): string {
-  if (minutes == null) return '—'
-  const hours = Math.floor(minutes / 60)
-  const mins = Math.round(minutes % 60)
-  if (hours === 0) return `${mins}m`
-  return `${hours}h ${mins}m`
-}
-
 export default async function DealerDrivesPage({
   params,
   searchParams,
@@ -93,21 +85,26 @@ export default async function DealerDrivesPage({
             scheduled_for: string | null
             booked_hours: number | null
             booked_hours_is_estimate: boolean
+            actual_driver_hours: number | null
+            driver_pay_cents: number
             in_progress_at: string | null
             completed_at: string | null
             total_cost_cents: number
             total_charged_cents: number
             profit_cents: number
           }) => {
-            const actualMinutes =
-              drive.in_progress_at && drive.completed_at
-                ? Math.round((new Date(drive.completed_at).getTime() - new Date(drive.in_progress_at).getTime()) / 60000)
-                : null
+            let effectiveRateCents: number | null = null
+            let isBelowIntended = false
+            if (drive.actual_driver_hours != null && drive.booked_hours != null && drive.actual_driver_hours > 0 && drive.booked_hours > 0) {
+              effectiveRateCents = drive.driver_pay_cents / drive.actual_driver_hours
+              const intendedRateCents = drive.driver_pay_cents / drive.booked_hours
+              isBelowIntended = effectiveRateCents < intendedRateCents * 0.9
+            }
             return (
               <Link
                 key={drive.job_id}
                 href={`/dashboard/jobs/${drive.job_id}/receipt`}
-                className="block border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50"
+                className={`block border rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50 ${isBelowIntended ? 'border-amber-300 bg-amber-50/40' : 'border-gray-200'}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-900">{drive.driver_name || 'Unassigned'}</p>
@@ -115,14 +112,23 @@ export default async function DealerDrivesPage({
                     {drive.scheduled_for ? new Date(drive.scheduled_for).toLocaleDateString('en-CA', { dateStyle: 'medium' }) : '—'}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                {isBelowIntended && (
+                  <p className="text-xs text-amber-700 font-medium mb-2">⚠️ Ran over booked hours — effective rate below what this job was priced to pay</p>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
                   <div>
                     <p className="text-gray-400">Booked hours{drive.booked_hours_is_estimate ? ' (one-way est.)' : ''}</p>
                     <p className="text-gray-900 font-medium mt-0.5">{drive.booked_hours != null ? `${drive.booked_hours.toFixed(1)} hrs` : '—'}</p>
                   </div>
                   <div>
                     <p className="text-gray-400">Actual hours (in progress → completed)</p>
-                    <p className="text-gray-900 font-medium mt-0.5">{formatDuration(actualMinutes)}</p>
+                    <p className="text-gray-900 font-medium mt-0.5">{drive.actual_driver_hours != null ? `${drive.actual_driver_hours.toFixed(1)} hrs` : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Effective rate</p>
+                    <p className={`font-medium mt-0.5 ${isBelowIntended ? 'text-amber-700' : 'text-gray-900'}`}>
+                      {effectiveRateCents != null ? `${formatCents(Math.round(effectiveRateCents))}/hr` : '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-400">Total cost</p>

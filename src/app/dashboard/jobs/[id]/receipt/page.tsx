@@ -528,6 +528,25 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   </span>
                 </div>
               )}
+              {(() => {
+                if (job.actual_driver_hours == null || job.driver_paid_hours == null || effectiveDriverPayCents == null) return null
+                const effectiveRateCents = effectiveDriverPayCents / job.actual_driver_hours
+                const intendedRateCents = effectiveDriverPayCents / job.driver_paid_hours
+                // Flag if the driver's real per-hour earnings fell meaningfully
+                // (>10%) below what this job's price was actually set up to pay
+                // them - i.e. the job ran long relative to booked hours.
+                const isBelowIntended = effectiveRateCents < intendedRateCents * 0.9
+                return (
+                  <div className={`flex justify-between text-sm ${isBelowIntended ? 'bg-amber-50 -mx-2 px-2 py-1 rounded' : ''}`}>
+                    <span className={isBelowIntended ? 'text-amber-700 font-medium' : 'text-gray-600'}>
+                      Effective rate {isBelowIntended && '⚠️ ran over booked hours'}
+                    </span>
+                    <span className={isBelowIntended ? 'text-amber-700 font-semibold' : 'text-gray-900 font-medium'}>
+                      {formatCents(Math.round(effectiveRateCents))}/hr <span className="text-xs font-normal text-gray-400">(priced at {formatCents(Math.round(intendedRateCents))}/hr)</span>
+                    </span>
+                  </div>
+                )
+              })()}
               {job.total_wait_minutes > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Wait time at stops</span>
