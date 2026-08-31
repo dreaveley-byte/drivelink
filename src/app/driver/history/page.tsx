@@ -105,8 +105,10 @@ export default async function DriverHistoryPage() {
                     </span>
                     {payCents != null && job.status === 'completed' && (
                       <span className="text-xs text-green-700 font-medium">
-                        {formatCents(payCents)}
-                        {!!reimbursementCents && <span className="text-gray-500 font-normal"> + {formatCents(reimbursementCents)}</span>}
+                        {formatCents(payCents + reimbursementCents)}
+                        {!!reimbursementCents && (
+                          <span className="text-gray-500 font-normal"> ({formatCents(payCents)} + {formatCents(reimbursementCents)})</span>
+                        )}
                       </span>
                     )}
                   </div>

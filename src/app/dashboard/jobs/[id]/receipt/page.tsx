@@ -546,14 +546,24 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
               {effectiveDriverPayCents != null && (
                 <div className="flex justify-between">
                   <span className="text-base text-gray-700">Your pay</span>
-                  <span className="text-lg font-semibold text-gray-900">{formatCents(effectiveDriverPayCents)}</span>
+                  <span className={driverOwnReimbursementCents > 0 ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
+                    {formatCents(effectiveDriverPayCents)}
+                  </span>
                 </div>
               )}
               {driverOwnReimbursementCents > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-base text-gray-700">Approved expense reimbursements</span>
-                  <span className="text-base text-gray-700">+{formatCents(driverOwnReimbursementCents)}</span>
-                </div>
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-base text-gray-700">Approved expense reimbursements</span>
+                    <span className="text-base text-gray-700">+{formatCents(driverOwnReimbursementCents)}</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-gray-100">
+                    <span className="text-base text-gray-900 font-semibold">Total</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                      {formatCents((effectiveDriverPayCents ?? 0) + driverOwnReimbursementCents)}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
           ) : (
