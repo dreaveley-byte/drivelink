@@ -1,5 +1,5 @@
 export type ChecklistItemType =
-  | 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report'
+  | 'check' | 'photo' | 'video' | 'upload' | 'signature' | 'condition_report' | 'trade_in_condition_report'
   | 'tristate' | 'yesno' | 'input' | 'notes' | 'customer_id_verification'
 
 export type ChecklistDefinitionItem = {
@@ -49,9 +49,14 @@ export const FIRST_NATIONS_CHECKLIST: ChecklistDefinitionItem[] = [
 
 // Appended (delivery phase) whenever the job includes a trade-in.
 export const TRADE_IN_CHECKLIST: ChecklistDefinitionItem[] = [
-  { label: 'Delivery: Verify trade registration and APV9T/transfer form are signed by all owners', type: 'check' },
-  { label: 'Delivery: Verify name on registration matches Bill of Sale', type: 'check' },
-  { label: 'Delivery: Photo of the trade registration signed by the owner', type: 'photo' },
+  { label: 'Trade-in: Verify trade registration and APV9T/transfer form are signed by all owners', type: 'check' },
+  { label: 'Trade-in: Verify name on registration matches Bill of Sale', type: 'check' },
+  { label: 'Trade-in: Photo of the trade registration signed by the owner', type: 'photo' },
+  { label: 'Trade-in: Photograph VIN', type: 'photo' },
+  { label: 'Trade-in: Photograph odometer showing mileage', type: 'photo' },
+  { label: 'Trade-in: Photograph windshield', type: 'photo' },
+  { label: 'Trade-in: Full 360° walkaround video', type: 'video' },
+  { label: 'Trade-in: Condition report', type: 'trade_in_condition_report' },
 ]
 
 // Appended (in-progress phase) when the job requires an out-of-province inspection.

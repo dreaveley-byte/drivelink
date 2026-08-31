@@ -72,6 +72,71 @@ export default function DriverApplyPage() {
     })
   }, [])
 
+  // Auto-save/restore draft progress to localStorage, so navigating away
+  // (or the app being backgrounded/killed) doesn't lose everything typed
+  // in so far - keyed per-user since userId is known by the time this
+  // reads/writes. Deliberately excludes signatureDataUrl (large, and
+  // should be re-signed fresh each time rather than silently restored)
+  // and file upload paths in `docs` are already durable in Supabase
+  // storage/on the profile once uploaded, but still worth restoring here
+  // so the UI reflects what's already been uploaded after a reload.
+  const draftKey = userId ? `driver-application-draft-${userId}` : null
+  const [draftRestored, setDraftRestored] = useState(false)
+
+  useEffect(() => {
+    if (!draftKey || draftRestored) return
+    try {
+      const saved = localStorage.getItem(draftKey)
+      if (saved) {
+        const draft = JSON.parse(saved)
+        if (draft.fullName) setFullName(draft.fullName)
+        if (draft.address) setAddress(draft.address)
+        if (draft.cellPhone) setCellPhone(draft.cellPhone)
+        if (draft.homePhone) setHomePhone(draft.homePhone)
+        if (draft.payoutMethod) setPayoutMethod(draft.payoutMethod)
+        if (draft.companyName) setCompanyName(draft.companyName)
+        if (draft.gstNumber) setGstNumber(draft.gstNumber)
+        if (draft.sinNumber) setSinNumber(draft.sinNumber)
+        if (draft.vehicleYear) setVehicleYear(draft.vehicleYear)
+        if (draft.vehicleMake) setVehicleMake(draft.vehicleMake)
+        if (draft.vehicleModel) setVehicleModel(draft.vehicleModel)
+        if (draft.vehicleMileage) setVehicleMileage(draft.vehicleMileage)
+        if (draft.licenseClass) setLicenseClass(draft.licenseClass)
+        if (draft.extractedLicenseClass) setExtractedLicenseClass(draft.extractedLicenseClass)
+        if (draft.canTowTrailer != null) setCanTowTrailer(draft.canTowTrailer)
+        if (draft.preferredJobTypes) setPreferredJobTypes(draft.preferredJobTypes)
+        if (draft.docs) setDocs(draft.docs)
+        if (draft.acceptedDocs) setAcceptedDocs(draft.acceptedDocs)
+      }
+    } catch {
+      // A corrupted or unreadable draft shouldn't block starting fresh.
+    } finally {
+      setDraftRestored(true)
+    }
+  }, [draftKey, draftRestored])
+
+  useEffect(() => {
+    if (!draftKey || !draftRestored) return
+    const draft = {
+      fullName, address, cellPhone, homePhone, payoutMethod, companyName, gstNumber, sinNumber,
+      vehicleYear, vehicleMake, vehicleModel, vehicleMileage, licenseClass, extractedLicenseClass,
+      canTowTrailer, preferredJobTypes, docs, acceptedDocs,
+    }
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draft))
+    } catch {
+      // Not worth surfacing to the user if localStorage is full/unavailable.
+    }
+  }, [
+    draftKey, draftRestored, fullName, address, cellPhone, homePhone, payoutMethod, companyName,
+    gstNumber, sinNumber, vehicleYear, vehicleMake, vehicleModel, vehicleMileage, licenseClass,
+    extractedLicenseClass, canTowTrailer, preferredJobTypes, docs, acceptedDocs,
+  ])
+
+  function exitWithoutClearingDraft() {
+    router.push('/login')
+  }
+
   function toggleJobTypePreference(name: string) {
     setPreferredJobTypes((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]))
   }
@@ -203,6 +268,7 @@ export default function DriverApplyPage() {
       return
     }
 
+    if (draftKey) localStorage.removeItem(draftKey)
     setSubmitted(true)
     setLoading(false)
   }
@@ -223,8 +289,19 @@ export default function DriverApplyPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
-        <div className="mb-2">
+        <div className="flex items-center justify-between mb-2">
           <Logo height={18} />
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Exit the application? Your progress is saved and you can pick up where you left off next time.')) {
+                exitWithoutClearingDraft()
+              }
+            }}
+            className="text-xs text-gray-400 underline"
+          >
+            Cancel & exit
+          </button>
         </div>
         <h1 className="text-lg font-semibold text-gray-900">Driver Application</h1>
       </header>

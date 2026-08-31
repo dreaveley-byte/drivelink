@@ -208,7 +208,7 @@ export default function DriverJobActions({
   const [deliveryAckAccepted, setDeliveryAckAccepted] = useState(false)
   const [deliveryAckMediaConsent, setDeliveryAckMediaConsent] = useState<boolean | null>(null)
 
-  const HEAVY_TYPES = ['photo', 'video', 'upload', 'signature', 'condition_report']
+  const HEAVY_TYPES = ['photo', 'video', 'upload', 'signature', 'condition_report', 'trade_in_condition_report']
 
   async function refreshFileUrls(paths: string[]) {
     if (paths.length === 0) return
@@ -313,7 +313,7 @@ export default function DriverJobActions({
     }
 
     const updatedPaths = [...item.file_paths, ...newPaths]
-    const shouldComplete = item.item_type === 'condition_report'
+    const shouldComplete = item.item_type === 'condition_report' || item.item_type === 'trade_in_condition_report'
       ? !!(item.notes && item.notes.trim().length > 0)
       : true
 
@@ -335,7 +335,7 @@ export default function DriverJobActions({
 
     refreshFileUrls(newPaths)
     setUploadingItemId(null)
-    if (item.item_type !== 'condition_report') setExpandedId(null)
+    if (item.item_type !== 'condition_report' && item.item_type !== 'trade_in_condition_report') setExpandedId(null)
   }
 
   async function uploadSignatureForItem(item: ChecklistItem, blob: Blob) {
@@ -1429,7 +1429,7 @@ export default function DriverJobActions({
 
                     {expandedId === item.id && (
                       <div className="mt-2">
-                        {item.file_paths.length > 0 && item.item_type !== 'condition_report' && (
+                        {item.file_paths.length > 0 && item.item_type !== 'condition_report' && item.item_type !== 'trade_in_condition_report' && (
                           <div className="flex flex-wrap gap-2 mb-2">
                             {item.file_paths.map((path) => {
                               const isImage = /\.(jpe?g|png|gif|webp)$/i.test(path)
@@ -1464,7 +1464,7 @@ export default function DriverJobActions({
                           </div>
                         )}
 
-                        {item.item_type === 'condition_report' && (
+                        {(item.item_type === 'condition_report' || item.item_type === 'trade_in_condition_report') && (
                           <div className="space-y-2">
                             <ConditionReportCard
                               data={item.condition_data ?? { markers: [], cleanliness: null, smell: '' }}
