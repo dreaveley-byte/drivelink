@@ -91,7 +91,8 @@ export default async function DealerDrivesPage({
             job_id: string
             driver_name: string | null
             scheduled_for: string | null
-            booked_minutes: number | null
+            booked_hours: number | null
+            booked_hours_is_estimate: boolean
             in_progress_at: string | null
             completed_at: string | null
             total_cost_cents: number
@@ -116,8 +117,8 @@ export default async function DealerDrivesPage({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                   <div>
-                    <p className="text-gray-400">Booked time</p>
-                    <p className="text-gray-900 font-medium mt-0.5">{formatDuration(drive.booked_minutes)}</p>
+                    <p className="text-gray-400">Booked hours{drive.booked_hours_is_estimate ? ' (one-way est.)' : ''}</p>
+                    <p className="text-gray-900 font-medium mt-0.5">{drive.booked_hours != null ? `${drive.booked_hours.toFixed(1)} hrs` : '—'}</p>
                   </div>
                   <div>
                     <p className="text-gray-400">Actual hours (in progress → completed)</p>
