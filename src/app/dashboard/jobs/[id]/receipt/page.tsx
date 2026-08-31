@@ -141,7 +141,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
 
   const { data: rawExpenses } = await supabase
     .from('job_expenses')
-    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, added_by_admin, auto_approved, submitted_by:submitted_by(full_name)')
+    .select('id, category, custom_category, description, amount_cents, status, receipt_photo_path, created_at, approved_addition_cents, added_by_admin, auto_approved, paid_by_admin_directly, submitted_by_id:submitted_by, submitted_by:submitted_by(full_name)')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
 
@@ -162,6 +162,8 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
         approved_addition_cents: exp.approved_addition_cents,
         added_by_admin: exp.added_by_admin,
         auto_approved: exp.auto_approved,
+        paid_by_admin_directly: exp.paid_by_admin_directly,
+        submitted_by_id: exp.submitted_by_id,
         receipt_url: signedUrl,
         submitted_by_name: submitter?.full_name ?? null,
       }
@@ -225,6 +227,13 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   // pre-job reimbursement estimate computed before the job even started,
   // which never reflected what was actually submitted and approved.
   const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' ? e.amount_cents : 0), 0)
+  // For the driver's own view specifically - what they actually got
+  // reimbursed, excluding anything admin paid directly instead of paying
+  // the driver back.
+  const driverOwnReimbursementCents = expenses.reduce(
+    (sum, e) => sum + (e.status === 'approved' && !e.paid_by_admin_directly ? e.amount_cents : 0),
+    0
+  )
   const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
   const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents
@@ -540,16 +549,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-lg font-semibold text-gray-900">{formatCents(effectiveDriverPayCents)}</span>
                 </div>
               )}
-              {(job.estimated_driver_reimbursement_cents ?? 0) > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-base text-gray-700">Reimbursements (Uber/bus, etc.)</span>
-                  <span className="text-base text-gray-700">+{formatCents(job.estimated_driver_reimbursement_cents ?? 0)}</span>
-                </div>
-              )}
-              {job.approved_expenses_cents > 0 && (
+              {driverOwnReimbursementCents > 0 && (
                 <div className="flex justify-between">
                   <span className="text-base text-gray-700">Approved expense reimbursements</span>
-                  <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
+                  <span className="text-base text-gray-700">+{formatCents(driverOwnReimbursementCents)}</span>
                 </div>
               )}
             </div>
