@@ -216,10 +216,18 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
   }
   const submittedReceiptsTotalCents = expenses.reduce((sum, e) => sum + e.amount_cents, 0)
   const approvedAdditionsTotalCents = expenses.reduce((sum, e) => sum + (e.approved_addition_cents ?? 0), 0)
+  // The full amount of every APPROVED expense is a real cost to Drivflo
+  // regardless of category, whether it fell within a pre-priced baseline
+  // (fuel/inspection/hotel/ferry), or whether the driver was reimbursed or
+  // admin paid it directly - all of that only affects how much gets passed
+  // through to the dealer's bill (approvedAdditionsTotalCents above), not
+  // whether Drivflo actually paid it out. Previously this used a static
+  // pre-job reimbursement estimate computed before the job even started,
+  // which never reflected what was actually submitted and approved.
+  const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' ? e.amount_cents : 0), 0)
   const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
-  const actualCostCents =
-    effectiveDriverPayCents + (job.estimated_driver_reimbursement_cents ?? 0) + approvedAdditionsTotalCents
+  const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents
   const profitCents = revenueCents - actualCostCents
 
   const ACCRUAL_LABELS: [string, string][] = [
@@ -706,6 +714,10 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                   <span className="text-gray-600">Total actually added to job (after baseline offsets)</span>
                   <span className="text-gray-900">{formatCents(approvedAdditionsTotalCents)}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total approved (full amount owed out, whether reimbursed to driver or paid by admin directly)</span>
+                  <span className="text-gray-900">{formatCents(approvedExpensesFullAmountCents)}</span>
+                </div>
               </div>
             )}
 
@@ -715,7 +727,15 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 <span className="text-gray-900 font-medium">{formatCents(revenueCents)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Actual cost (driver pay + reimbursements + approved expenses)</span>
+                <span className="text-gray-600">Driver pay</span>
+                <span className="text-gray-900">{formatCents(effectiveDriverPayCents)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">+ Approved expenses (full amount, any payer)</span>
+                <span className="text-gray-900">{formatCents(approvedExpensesFullAmountCents)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 font-medium">= Actual cost</span>
                 <span className="text-gray-900 font-medium">{formatCents(actualCostCents)}</span>
               </div>
               <div className="flex justify-between text-base pt-1.5 border-t border-gray-200">

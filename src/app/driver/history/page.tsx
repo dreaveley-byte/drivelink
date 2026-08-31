@@ -25,10 +25,31 @@ export default async function DriverHistoryPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, final_driver_reimbursement_cents, estimated_driver_reimbursement_cents, job_types(name), organizations(name)')
+    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, job_types(name), organizations(name)')
     .eq('driver_id', user.id)
     .in('status', ['completed', 'cancelled'])
     .order('updated_at', { ascending: false })
+
+  // final_driver_reimbursement_cents is never actually populated anywhere in
+  // the app - it always silently fell back to a stale pre-job estimate.
+  // Compute the real, approved reimbursement total directly from the
+  // driver's own submitted expenses instead - excludes anything admin paid
+  // directly rather than reimbursing the driver, since this view is
+  // specifically "what did I actually get paid back."
+  const jobIds = (jobs ?? []).map((j) => j.id)
+  const reimbursementByJob = new Map<string, number>()
+  if (jobIds.length > 0) {
+    const { data: expenseRows } = await supabase
+      .from('job_expenses')
+      .select('job_id, amount_cents')
+      .in('job_id', jobIds)
+      .eq('status', 'approved')
+      .eq('paid_by_admin_directly', false)
+      .eq('submitted_by', user.id)
+    for (const row of expenseRows ?? []) {
+      reimbursementByJob.set(row.job_id, (reimbursementByJob.get(row.job_id) ?? 0) + row.amount_cents)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -57,7 +78,7 @@ export default async function DriverHistoryPage() {
             const org = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
             const jobType = Array.isArray(job.job_types) ? job.job_types[0] : job.job_types
             const payCents = job.final_driver_pay_cents ?? job.estimated_driver_pay_cents
-            const reimbursementCents = job.final_driver_reimbursement_cents ?? job.estimated_driver_reimbursement_cents
+            const reimbursementCents = reimbursementByJob.get(job.id) ?? 0
             return (
               <Link
                 key={job.id}
