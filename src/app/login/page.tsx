@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
+import { isNativeApp } from '@/lib/nativeLocationBridge'
 
 export default function LoginPage() {
   return (
@@ -25,6 +26,13 @@ function LoginPageInner() {
   const [resetSent, setResetSent] = useState(false)
 
   useEffect(() => {
+    // Account creation is deliberately web-only - the native app shell
+    // should never allow signup, regardless of a ?mode=signup URL param
+    // (e.g. a stale deep link).
+    if (isNativeApp()) {
+      setMode('login')
+      return
+    }
     const modeParam = searchParams.get('mode')
     const roleParam = searchParams.get('role')
     if (modeParam === 'signup') setMode('signup')
@@ -56,6 +64,11 @@ function LoginPageInner() {
     const supabase = createClient()
 
     if (mode === 'signup') {
+      if (isNativeApp()) {
+        setError('Account creation is only available on drivflo.ca — please sign up there, then log in here.')
+        setLoading(false)
+        return
+      }
       if (!intendedRole) {
         setError('Please choose whether you want to become a driver or a dealer.')
         setLoading(false)
@@ -166,12 +179,14 @@ function LoginPageInner() {
           </button>
         )}
 
-        <button
-          onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-          className="w-full text-center text-sm text-gray-500 mt-4 hover:text-gray-900"
-        >
-          {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-        </button>
+        {!isNativeApp() && (
+          <button
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="w-full text-center text-sm text-gray-500 mt-4 hover:text-gray-900"
+          >
+            {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          </button>
+        )}
       </div>
     </div>
   )
