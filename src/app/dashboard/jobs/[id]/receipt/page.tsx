@@ -529,10 +529,16 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                 </div>
               )}
               {(() => {
-                const bookedHours = job.driver_paid_hours ?? (job.estimated_duration_minutes != null ? job.estimated_duration_minutes / 60 : null)
-                if (job.actual_driver_hours == null || bookedHours == null || bookedHours <= 0 || effectiveDriverPayCents == null) return null
+                // Deliberately does NOT fall back to the one-way-only
+                // estimate here (unlike "Booked hours" above) - using that
+                // as a divisor for this comparison produces a genuinely
+                // misleading "intended rate" (roughly double the real
+                // figure for a round-trip job), not just an imprecise one.
+                // Only show this once the accurate round-trip figure is on
+                // record.
+                if (job.actual_driver_hours == null || job.driver_paid_hours == null || job.driver_paid_hours <= 0 || effectiveDriverPayCents == null) return null
                 const effectiveRateCents = effectiveDriverPayCents / job.actual_driver_hours
-                const intendedRateCents = effectiveDriverPayCents / bookedHours
+                const intendedRateCents = effectiveDriverPayCents / job.driver_paid_hours
                 // Flag if the driver's real per-hour earnings fell meaningfully
                 // (>10%) below what this job's price was actually set up to pay
                 // them - i.e. the job ran long relative to booked hours.
@@ -543,7 +549,7 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
                       Effective rate {isBelowIntended && '⚠️ ran over booked hours'}
                     </span>
                     <span className={isBelowIntended ? 'text-amber-700 font-semibold' : 'text-gray-900 font-medium'}>
-                      {formatCents(Math.round(effectiveRateCents))}/hr <span className="text-xs font-normal text-gray-400">(priced at {formatCents(Math.round(intendedRateCents))}/hr{job.driver_paid_hours == null && ', one-way est.'})</span>
+                      {formatCents(Math.round(effectiveRateCents))}/hr <span className="text-xs font-normal text-gray-400">(priced at {formatCents(Math.round(intendedRateCents))}/hr)</span>
                     </span>
                   </div>
                 )

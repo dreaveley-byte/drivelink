@@ -95,7 +95,17 @@ export default async function DealerDrivesPage({
           }) => {
             let effectiveRateCents: number | null = null
             let isBelowIntended = false
-            if (drive.actual_driver_hours != null && drive.booked_hours != null && drive.actual_driver_hours > 0 && drive.booked_hours > 0) {
+            // Deliberately excludes the one-way-only estimate case (see
+            // booked_hours_is_estimate) - using that as a divisor here
+            // would produce a genuinely misleading "intended rate" for a
+            // round-trip job, not just an imprecise one.
+            if (
+              drive.actual_driver_hours != null &&
+              drive.booked_hours != null &&
+              !drive.booked_hours_is_estimate &&
+              drive.actual_driver_hours > 0 &&
+              drive.booked_hours > 0
+            ) {
               effectiveRateCents = drive.driver_pay_cents / drive.actual_driver_hours
               const intendedRateCents = drive.driver_pay_cents / drive.booked_hours
               isBelowIntended = effectiveRateCents < intendedRateCents * 0.9
