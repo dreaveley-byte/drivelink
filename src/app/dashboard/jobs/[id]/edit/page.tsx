@@ -183,7 +183,11 @@ export default function EditJobPage() {
         setPageLoading(false)
         return
       }
-      if (job.status !== 'awaiting_driver' && job.status !== 'cancelled') {
+      // Admin can edit a job at any status - once accepted by a driver, a
+      // dealer still can't (editing details a driver already committed to
+      // could cause real confusion/disputes), but admin needs the
+      // flexibility to make corrections after the fact.
+      if (profile?.role !== 'platform_admin' && job.status !== 'awaiting_driver' && job.status !== 'cancelled') {
         setNotEditable(true)
         setPageLoading(false)
         return
