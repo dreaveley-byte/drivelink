@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
 import LocationSharer from '@/components/LocationSharer'
+import PushNotificationSetup from '@/components/PushNotificationSetup'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
@@ -163,6 +164,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="min-h-screen bg-white">
+      <PushNotificationSetup />
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Logo height={22} />

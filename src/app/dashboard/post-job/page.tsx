@@ -1107,6 +1107,18 @@ export default function PostJobPage() {
       body: JSON.stringify({ jobId: newJob.id }),
     }).catch(() => {})
 
+    // Push notification to all active drivers that a new job is available -
+    // fires immediately regardless of whether this job is subject to the
+    // admin review hold above, since properly delaying it until the hold
+    // clears would need its own deferred-send queue (same pattern as the
+    // quiet-hours SMS queue). Simplification worth revisiting if hold-period
+    // jobs turn out to be a large share of postings.
+    fetch('/api/notify-drivers-new-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: newJob.id }),
+    }).catch(() => {})
+
     // Linking is bidirectional — the job we linked to needs to point back at
     // this new one too, so both drivers/admin see they're paired either way.
     if (linkedJobId) {
