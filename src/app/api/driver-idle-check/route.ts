@@ -168,8 +168,8 @@ export async function POST(req: NextRequest) {
             .select('id')
           if (claimed && claimed.length > 0) {
             const arrivalTime = new Date(Date.now() + distanceData.durationMinutes * 60 * 1000)
-            const tz = distanceData.destinationTimeZone as string | undefined
-            const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(tz && { timeZone: tz }) })
+            const tz = (distanceData.destinationTimeZone as string | undefined) || 'America/Vancouver'
+            const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
             const customerFirstName = firstNameProperCase(job.customer_full_name)
             const body = `${customerFirstName ? `${customerFirstName}, y` : 'Y'}our driver is getting close — about 45 minutes out, updated arrival around ${fmt(arrivalTime)}.`
             await sendSms(job.customer_phone, body)

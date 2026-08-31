@@ -37,29 +37,66 @@ export async function POST(req: NextRequest) {
   const isCustomerRide = jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'
   const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
 
-  // Use the scheduled/booked dropoff time (scheduled_for + estimated
-  // duration) rather than a live maps calculation from the driver's
-  // current position - on long drives a driver sometimes leaves a day
-  // early to break the drive up with an overnight stay, which would make
-  // a live ETA from their current (far away) position wildly misleading.
-  // The real, live ETA gets sent separately once the driver is genuinely
-  // close (see the 45-minutes-away alert in driver-idle-check).
+  // Compute two independent estimates and use whichever lands LATER:
+  // (1) the scheduled/booked time (scheduled_for + estimated duration) -
+  //     needed because on long drives a driver sometimes leaves a day
+  //     early to break the drive up with an overnight stay, which would
+  //     make a live position-based ETA look unrealistically soon.
+  // (2) a live, traffic-aware ETA from the driver's actual current
+  //     position right now - needed because the scheduled estimate can
+  //     itself be stale or wrong (e.g. if the job's estimated duration
+  //     was miscalculated), and a live check catches that.
+  // Taking the later of the two protects against both failure modes
+  // rather than trusting either source blindly.
+  //
+  // Also critical: never format a time without an explicit, confirmed
+  // timezone. If the timezone lookup fails for any reason, JS silently
+  // falls back to the SERVER's own timezone (UTC on Vercel) instead of
+  // the delivery's actual local time - on a same-province BC trip this
+  // previously showed times roughly 7 hours later than reality, since it
+  // was quietly displaying a UTC hour as if it were Pacific time.
   let etaText = ''
   let destinationTimeZone: string | undefined
-  if (job.scheduled_for && job.estimated_duration_minutes != null) {
-    try {
-      const dropoffTime = new Date(new Date(job.scheduled_for).getTime() + job.estimated_duration_minutes * 60 * 1000)
-      const { data: distanceData } = await fetch(`${protocol}://${host}/api/distance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses: [job.pickup_address, isCustomerRide ? job.pickup_address : job.dropoff_address] }),
-      }).then((r) => r.json()).catch(() => ({ data: null }))
-      destinationTimeZone = distanceData?.destinationTimeZone as string | undefined
-      const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', ...(destinationTimeZone && { timeZone: destinationTimeZone }) })
-      etaText = ` Estimated arrival: ${fmt(dropoffTime)}.`
-    } catch {
-      // ETA is a nice-to-have on top of the tracking link — don't block the text over it.
+  try {
+    const [scheduledCallResult, liveCallResult] = await Promise.allSettled([
+      job.scheduled_for && job.estimated_duration_minutes != null
+        ? fetch(`${protocol}://${host}/api/distance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addresses: [job.pickup_address, isCustomerRide ? job.pickup_address : job.dropoff_address] }),
+          }).then((r) => r.json())
+        : Promise.resolve(null),
+      job.driver_lat != null && job.driver_lng != null
+        ? fetch(`${protocol}://${host}/api/distance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addresses: [`${job.driver_lat},${job.driver_lng}`, isCustomerRide ? job.pickup_address : job.dropoff_address] }),
+          }).then((r) => r.json())
+        : Promise.resolve(null),
+    ])
+
+    const scheduledData = scheduledCallResult.status === 'fulfilled' ? scheduledCallResult.value : null
+    const liveData = liveCallResult.status === 'fulfilled' ? liveCallResult.value : null
+
+    const scheduledTime =
+      job.scheduled_for && job.estimated_duration_minutes != null
+        ? new Date(new Date(job.scheduled_for).getTime() + job.estimated_duration_minutes * 60 * 1000)
+        : null
+    const liveTime =
+      liveData?.durationMinutes != null ? new Date(Date.now() + liveData.durationMinutes * 60 * 1000) : null
+
+    const candidates = [scheduledTime, liveTime].filter((t): t is Date => t != null)
+    if (candidates.length > 0) {
+      const etaTime = new Date(Math.max(...candidates.map((t) => t.getTime())))
+      // Prefer whichever call actually returned a timezone; fall back to a
+      // sensible BC default rather than ever letting the display fall
+      // through to the server's own (UTC) timezone unlabelled.
+      destinationTimeZone = (scheduledData?.destinationTimeZone || liveData?.destinationTimeZone || 'America/Vancouver') as string
+      const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: destinationTimeZone })
+      etaText = ` Estimated arrival: ${fmt(etaTime)}.`
     }
+  } catch {
+    // ETA is a nice-to-have on top of the tracking link — don't block the text over it.
   }
 
   const customerFirstName = firstNameProperCase(job.customer_full_name)
