@@ -23,7 +23,13 @@ export default function PerformanceBonusOverride({
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [amountInput, setAmountInput] = useState(overrideCents != null ? (overrideCents / 100).toFixed(2) : '')
+  const [amountInput, setAmountInput] = useState(
+    overrideCents != null
+      ? (overrideCents / 100).toFixed(2)
+      : computedBonusCents != null
+        ? (computedBonusCents / 100).toFixed(2)
+        : ''
+  )
   const [error, setError] = useState<string | null>(null)
 
   async function setOverride(cents: number | null) {
