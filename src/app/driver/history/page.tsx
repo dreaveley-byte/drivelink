@@ -25,17 +25,18 @@ export default async function DriverHistoryPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, job_types(name), organizations(name)')
+    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, job_types(name), organizations(name)')
     .eq('driver_id', user.id)
     .in('status', ['completed', 'cancelled'])
     .order('updated_at', { ascending: false })
 
-  // final_driver_reimbursement_cents is never actually populated anywhere in
-  // the app - it always silently fell back to a stale pre-job estimate.
   // Compute the real, approved reimbursement total directly from the
-  // driver's own submitted expenses instead - excludes anything admin paid
+  // driver's own submitted expenses - excludes anything admin paid
   // directly rather than reimbursing the driver, since this view is
-  // specifically "what did I actually get paid back."
+  // specifically "what did I actually get paid back." Food is included
+  // like any other category now - driver pay no longer bakes in a food
+  // component at all (that unused-budget portion is now a separate
+  // performance bonus, see below).
   const jobIds = (jobs ?? []).map((j) => j.id)
   const reimbursementByJob = new Map<string, number>()
   if (jobIds.length > 0) {
@@ -46,11 +47,6 @@ export default async function DriverHistoryPage() {
       .eq('status', 'approved')
       .eq('paid_by_admin_directly', false)
       .eq('submitted_by', user.id)
-      // Food is excluded - it's already fully baked into
-      // final_driver_pay_cents via a dedicated trigger (migration 118)
-      // that reimburses actual food spend directly into pay. Summing it
-      // again here on top of pay would double-count every food receipt.
-      .neq('category', 'food')
     for (const row of expenseRows ?? []) {
       reimbursementByJob.set(row.job_id, (reimbursementByJob.get(row.job_id) ?? 0) + row.amount_cents)
     }
@@ -84,6 +80,7 @@ export default async function DriverHistoryPage() {
             const jobType = Array.isArray(job.job_types) ? job.job_types[0] : job.job_types
             const payCents = job.final_driver_pay_cents ?? job.estimated_driver_pay_cents
             const reimbursementCents = reimbursementByJob.get(job.id) ?? 0
+            const bonusCents = job.performance_bonus_override_cents ?? job.performance_bonus_cents ?? 0
             return (
               <Link
                 key={job.id}
@@ -110,9 +107,14 @@ export default async function DriverHistoryPage() {
                     </span>
                     {payCents != null && job.status === 'completed' && (
                       <span className="text-xs text-green-700 font-medium">
-                        {formatCents(payCents + reimbursementCents)}
-                        {!!reimbursementCents && (
-                          <span className="text-gray-500 font-normal"> ({formatCents(payCents)} + {formatCents(reimbursementCents)})</span>
+                        {formatCents(payCents + reimbursementCents + bonusCents)}
+                        {(!!reimbursementCents || !!bonusCents) && (
+                          <span className="text-gray-500 font-normal">
+                            {' ('}{formatCents(payCents)}
+                            {!!reimbursementCents && ` + ${formatCents(reimbursementCents)}`}
+                            {!!bonusCents && ` + ${formatCents(bonusCents)} bonus`}
+                            {')'}
+                          </span>
                         )}
                       </span>
                     )}

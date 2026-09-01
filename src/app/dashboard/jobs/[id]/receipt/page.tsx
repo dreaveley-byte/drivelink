@@ -12,6 +12,7 @@ import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButto
 import ExpenseReviewList from '@/components/ExpenseReviewList'
 import AdminJobAdjustments from '@/components/AdminJobAdjustments'
 import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
+import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 
 export const dynamic = 'force-dynamic'
 
@@ -240,28 +241,28 @@ export default async function JobReceiptPage({
   // (fuel/inspection/hotel/ferry), or whether the driver was reimbursed or
   // admin paid it directly - all of that only affects how much gets passed
   // through to the dealer's bill (approvedAdditionsTotalCents above), not
-  // whether Drivflo actually paid it out. Previously this used a static
-  // pre-job reimbursement estimate computed before the job even started,
-  // which never reflected what was actually submitted and approved.
-  //
-  // Food is deliberately EXCLUDED here - it's already fully baked into
-  // effectiveDriverPayCents via a dedicated trigger (compute_final_driver_pay,
-  // migration 118) that reimburses actual food spend dollar-for-dollar (plus
-  // a 50% efficiency bonus on any unspent baseline) directly into final_driver_pay_cents.
-  // Summing it again here on top of that double-counts every food receipt -
-  // once inside driver pay, once again as a separate "expense reimbursement".
-  const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' && e.category !== 'food' ? e.amount_cents : 0), 0)
+  // whether Drivflo actually paid it out. Food is included like any other
+  // category now - driver pay no longer bakes in a food component at all
+  // (see effectiveDriverPayCents / performanceBonusCents below), so there's
+  // no double-counting risk here anymore.
+  const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' ? e.amount_cents : 0), 0)
   // For the driver's own view specifically - what they actually got
   // reimbursed, excluding anything admin paid directly instead of paying
-  // the driver back, and excluding food for the same double-counting
-  // reason as above.
+  // the driver back.
   const driverOwnReimbursementCents = expenses.reduce(
-    (sum, e) => sum + (e.status === 'approved' && !e.paid_by_admin_directly && e.category !== 'food' ? e.amount_cents : 0),
+    (sum, e) => sum + (e.status === 'approved' && !e.paid_by_admin_directly ? e.amount_cents : 0),
     0
   )
   const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
+  // Performance bonus: the driver's 50% share of any unused meal budget,
+  // shown as a distinct line from pay entirely - only awarded if every
+  // checklist item was completed AND the customer left a 5-star rating
+  // (computed server-side by compute_performance_bonus(), see migration
+  // 147). Admin's override always wins when set, regardless of computed
+  // eligibility.
+  const performanceBonusCents = job.performance_bonus_override_cents ?? job.performance_bonus_cents ?? 0
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
-  const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents
+  const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents + performanceBonusCents
   const profitCents = revenueCents - actualCostCents
 
   const ACCRUAL_LABELS: [string, string][] = [
@@ -638,24 +639,30 @@ export default async function JobReceiptPage({
               {effectiveDriverPayCents != null && (
                 <div className="flex justify-between">
                   <span className="text-base text-gray-700">Your pay</span>
-                  <span className={driverOwnReimbursementCents > 0 ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
+                  <span className={driverOwnReimbursementCents > 0 || performanceBonusCents > 0 ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
                     {formatCents(effectiveDriverPayCents)}
                   </span>
                 </div>
               )}
               {driverOwnReimbursementCents > 0 && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-base text-gray-700">Approved expense reimbursements</span>
-                    <span className="text-base text-gray-700">+{formatCents(driverOwnReimbursementCents)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-gray-100">
-                    <span className="text-base text-gray-900 font-semibold">Total</span>
-                    <span className="text-lg font-semibold text-gray-900">
-                      {formatCents((effectiveDriverPayCents ?? 0) + driverOwnReimbursementCents)}
-                    </span>
-                  </div>
-                </>
+                <div className="flex justify-between">
+                  <span className="text-base text-gray-700">Approved expense reimbursements</span>
+                  <span className="text-base text-gray-700">+{formatCents(driverOwnReimbursementCents)}</span>
+                </div>
+              )}
+              {performanceBonusCents > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-base text-green-700 font-medium">🌟 Performance bonus</span>
+                  <span className="text-base text-green-700 font-medium">+{formatCents(performanceBonusCents)}</span>
+                </div>
+              )}
+              {(driverOwnReimbursementCents > 0 || performanceBonusCents > 0) && (
+                <div className="flex justify-between pt-1 border-t border-gray-100">
+                  <span className="text-base text-gray-900 font-semibold">Total</span>
+                  <span className="text-lg font-semibold text-gray-900">
+                    {formatCents((effectiveDriverPayCents ?? 0) + driverOwnReimbursementCents + performanceBonusCents)}
+                  </span>
+                </div>
               )}
             </div>
           ) : (
@@ -826,6 +833,17 @@ export default async function JobReceiptPage({
               </div>
             )}
 
+            {job.status === 'completed' && (
+              <PerformanceBonusOverride
+                jobId={job.id}
+                computedBonusCents={job.performance_bonus_cents}
+                eligible={job.performance_bonus_eligible}
+                overrideCents={job.performance_bonus_override_cents}
+                allChecklistComplete={(checklist ?? []).length > 0 && (checklist ?? []).every((item) => item.completed_at != null)}
+                customerRating={job.customer_rating}
+              />
+            )}
+
             <div className="pt-3 border-t border-gray-200 space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Revenue (charged to dealer)</span>
@@ -839,6 +857,12 @@ export default async function JobReceiptPage({
                 <span className="text-gray-600">+ Approved expenses (full amount, any payer)</span>
                 <span className="text-gray-900">{formatCents(approvedExpensesFullAmountCents)}</span>
               </div>
+              {performanceBonusCents > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">+ Performance bonus</span>
+                  <span className="text-gray-900">{formatCents(performanceBonusCents)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 font-medium">= Actual cost</span>
                 <span className="text-gray-900 font-medium">{formatCents(actualCostCents)}</span>
