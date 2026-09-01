@@ -174,18 +174,14 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // but the ticket cost itself is billed to the dealer only, not added to pay.)
   const extraDealerOnlyHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
 
-  // Overnight isn't just about drive time — the inspection/registry stops, ferry
-  // wait, break time, and (crucially, for a fly-back job) the flight itself plus
-  // its ground-transport/check-in-buffer hours all add real time to the driver's
-  // day, and together they can push the driver past the point where they can
-  // safely finish same-day. This must include extraDealerOnlyHours (the flight/
-  // ground-transport/ferry charge hours already computed above) — a job that's
-  // only long because of a late flight and a multi-hour buffer, not the drive
-  // itself, still needs a hotel and the overnight fee just as much as one that's
-  // long from driving alone. Previously this was computed before those extra
-  // hours existed, so a long fly-back day silently never triggered overnight.
-  const overnightRequired =
-    baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours > settings.max_driving_hours_before_overnight
+  // Overnight is now based strictly on actual driving time alone (the
+  // round-trip drive itself), not the combined total of driving plus
+  // breaks/inspections/registry/insurance/ferry/flight-buffer time. Dan
+  // confirmed this explicitly, understanding the trade-off: a job that's
+  // short on driving but long due to a late return flight or long ferry
+  // wait will no longer automatically trigger overnight, even if the
+  // driver ends up stuck overnight in that scenario too.
+  const overnightRequired = baseDrivingHours > settings.max_driving_hours_before_overnight
 
   // Capped per person per day — an overnight trip is treated as 2 days for this
   // purpose (the app's overnight model is a single same-day/next-day threshold,
