@@ -25,7 +25,7 @@ export default async function DriverHistoryPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, job_types(name), organizations(name)')
+    .select('id, status, updated_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, job_types(name), organizations(name)')
     .eq('driver_id', user.id)
     .in('status', ['completed', 'cancelled'])
     .order('updated_at', { ascending: false })
@@ -80,7 +80,7 @@ export default async function DriverHistoryPage() {
             const jobType = Array.isArray(job.job_types) ? job.job_types[0] : job.job_types
             const payCents = job.final_driver_pay_cents ?? job.estimated_driver_pay_cents
             const reimbursementCents = reimbursementByJob.get(job.id) ?? 0
-            const bonusCents = job.performance_bonus_override_cents ?? job.performance_bonus_cents ?? 0
+            const bonusCents = job.performance_bonus_override_cents ?? (job.performance_bonus_eligible ? (job.performance_bonus_cents ?? 0) : 0)
             return (
               <Link
                 key={job.id}

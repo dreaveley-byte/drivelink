@@ -260,7 +260,12 @@ export default async function JobReceiptPage({
   // (computed server-side by compute_performance_bonus(), see migration
   // 147). Admin's override always wins when set, regardless of computed
   // eligibility.
-  const performanceBonusCents = job.performance_bonus_override_cents ?? job.performance_bonus_cents ?? 0
+  // performance_bonus_cents is always the POTENTIAL amount now, regardless
+  // of eligibility - only actually counts toward pay/cost when eligible,
+  // or when admin has explicitly overridden it (which always wins
+  // regardless of eligibility).
+  const potentialBonusCents = job.performance_bonus_cents ?? 0
+  const performanceBonusCents = job.performance_bonus_override_cents ?? (job.performance_bonus_eligible ? potentialBonusCents : 0)
   const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents
   const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents + performanceBonusCents
   const profitCents = revenueCents - actualCostCents
