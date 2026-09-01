@@ -243,12 +243,20 @@ export default async function JobReceiptPage({
   // whether Drivflo actually paid it out. Previously this used a static
   // pre-job reimbursement estimate computed before the job even started,
   // which never reflected what was actually submitted and approved.
-  const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' ? e.amount_cents : 0), 0)
+  //
+  // Food is deliberately EXCLUDED here - it's already fully baked into
+  // effectiveDriverPayCents via a dedicated trigger (compute_final_driver_pay,
+  // migration 118) that reimburses actual food spend dollar-for-dollar (plus
+  // a 50% efficiency bonus on any unspent baseline) directly into final_driver_pay_cents.
+  // Summing it again here on top of that double-counts every food receipt -
+  // once inside driver pay, once again as a separate "expense reimbursement".
+  const approvedExpensesFullAmountCents = expenses.reduce((sum, e) => sum + (e.status === 'approved' && e.category !== 'food' ? e.amount_cents : 0), 0)
   // For the driver's own view specifically - what they actually got
   // reimbursed, excluding anything admin paid directly instead of paying
-  // the driver back.
+  // the driver back, and excluding food for the same double-counting
+  // reason as above.
   const driverOwnReimbursementCents = expenses.reduce(
-    (sum, e) => sum + (e.status === 'approved' && !e.paid_by_admin_directly ? e.amount_cents : 0),
+    (sum, e) => sum + (e.status === 'approved' && !e.paid_by_admin_directly && e.category !== 'food' ? e.amount_cents : 0),
     0
   )
   const effectiveDriverPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0

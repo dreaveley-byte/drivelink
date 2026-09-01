@@ -46,6 +46,11 @@ export default async function DriverHistoryPage() {
       .eq('status', 'approved')
       .eq('paid_by_admin_directly', false)
       .eq('submitted_by', user.id)
+      // Food is excluded - it's already fully baked into
+      // final_driver_pay_cents via a dedicated trigger (migration 118)
+      // that reimburses actual food spend directly into pay. Summing it
+      // again here on top of pay would double-count every food receipt.
+      .neq('category', 'food')
     for (const row of expenseRows ?? []) {
       reimbursementByJob.set(row.job_id, (reimbursementByJob.get(row.job_id) ?? 0) + row.amount_cents)
     }
