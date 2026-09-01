@@ -16,6 +16,10 @@ import { isNativeApp } from './nativeLocationBridge'
 // rotates it.
 export async function registerForPushNotifications(): Promise<void> {
   if (!isNativeApp()) return
+  // Push notifications aren't implemented on Android yet (needs Firebase
+  // Cloud Messaging setup) - bail out early rather than letting every call
+  // below throw "not implemented" errors.
+  if (!Capacitor.isPluginAvailable('PushNotifications')) return
 
   try {
     let permStatus = await PushNotifications.checkPermissions()
@@ -37,20 +41,28 @@ export async function registerForPushNotifications(): Promise<void> {
 // listeners should only be attached once per app session, not on every call.
 export function setupPushTokenListener(): void {
   if (!isNativeApp()) return
+  // Same reasoning as registerForPushNotifications() above - Android doesn't
+  // implement this plugin yet, so addListener() itself would reject.
+  if (!Capacitor.isPluginAvailable('PushNotifications')) return
 
-  PushNotifications.addListener('registration', async (token) => {
-    try {
-      await fetch('/api/driver/register-push-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceToken: token.value, platform: Capacitor.getPlatform() }),
-      })
-    } catch {
-      // Will retry naturally next time registerForPushNotifications() runs.
-    }
-  })
+  try {
+    PushNotifications.addListener('registration', async (token) => {
+      try {
+        await fetch('/api/driver/register-push-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceToken: token.value, platform: Capacitor.getPlatform() }),
+        })
+      } catch {
+        // Will retry naturally next time registerForPushNotifications() runs.
+      }
+    })
 
-  PushNotifications.addListener('registrationError', () => {
-    // Best-effort feature - nothing actionable to do client-side here.
-  })
+    PushNotifications.addListener('registrationError', () => {
+      // Best-effort feature - nothing actionable to do client-side here.
+    })
+  } catch {
+    // Belt-and-suspenders: isPluginAvailable() should already prevent this,
+    // but never let a push-notification setup failure break the app.
+  }
 }
