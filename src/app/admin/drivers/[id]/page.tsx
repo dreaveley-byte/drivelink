@@ -128,7 +128,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, pickup_address, dropoff_address, estimated_driver_pay_cents, organizations(name)')
+    .select('id, status, scheduled_for, pickup_address, dropoff_address, estimated_driver_pay_cents, final_driver_pay_cents, admin_pay_override_cents, organizations(name)')
     .eq('driver_id', driverId)
     .order('scheduled_for', { ascending: false, nullsFirst: false })
     .limit(25)
@@ -504,9 +504,17 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                     <span className="text-xs border border-gray-300 text-gray-700 rounded-full px-2.5 py-1 whitespace-nowrap">
                       {statusLabels[job.status] ?? job.status}
                     </span>
-                    {job.estimated_driver_pay_cents != null && (
-                      <span className="text-xs text-gray-500">{formatCents(job.estimated_driver_pay_cents)}</span>
-                    )}
+                    {(() => {
+                      const displayPayCents = job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents
+                      if (displayPayCents == null) return null
+                      const isEstimateOnly = job.admin_pay_override_cents == null && job.final_driver_pay_cents == null
+                      return (
+                        <span className="text-xs text-gray-500">
+                          {formatCents(displayPayCents)}
+                          {isEstimateOnly && job.status !== 'completed' && ' (est.)'}
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
               </Link>
