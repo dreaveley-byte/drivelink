@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import PrintButton from '@/components/PrintButton'
 import CloseButton from '@/components/CloseButton'
@@ -31,16 +32,32 @@ function fmtDateTime(iso: string) {
 const CONDITION_LABEL_MATCH = /condition report|walkaround|photos of any.*damage/i
 const DISCLOSURE_LABEL_MATCH = /delivery disclosure/i
 
-export default async function JobReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobReceiptPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ viewAs?: string }>
+}) {
   const { id: jobId } = await params
+  const { viewAs } = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  const isAdmin = profile?.role === 'platform_admin'
-  const isDriver = profile?.role === 'driver'
+  const realIsAdmin = profile?.role === 'platform_admin'
+  // Lets an actual admin see this page exactly as the driver themselves
+  // would see it - hides every admin-only section (expense review,
+  // adjustments, mark-paid, the full profit breakdown, etc.) and shows the
+  // driver's own pay breakdown instead, rather than mixing both views
+  // together. Real access control (RLS) is unaffected either way - this
+  // only changes what's rendered, not what the database will actually let
+  // anyone do.
+  const isViewingAsDriver = realIsAdmin && viewAs === 'driver'
+  const isAdmin = realIsAdmin && !isViewingAsDriver
+  const isDriver = profile?.role === 'driver' || isViewingAsDriver
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
@@ -259,8 +276,26 @@ export default async function JobReceiptPage({ params }: { params: Promise<{ id:
       <div className="max-w-2xl mx-auto px-6 py-8 print:px-0 print:py-0">
         <div className="flex items-center justify-between mb-8 print:hidden">
           <CloseButton />
-          <PrintButton />
+          <div className="flex items-center gap-3">
+            {realIsAdmin && (
+              <Link
+                href={isViewingAsDriver ? `/dashboard/jobs/${jobId}/receipt` : `/dashboard/jobs/${jobId}/receipt?viewAs=driver`}
+                className="text-xs text-gray-500 underline"
+              >
+                {isViewingAsDriver ? '← Back to admin view' : 'View as the driver sees it'}
+              </Link>
+            )}
+            <PrintButton />
+          </div>
         </div>
+
+        {isViewingAsDriver && (
+          <div className="mb-6 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2 print:hidden">
+            <p className="text-xs text-blue-700 font-medium">
+              Viewing exactly as this driver would see it — admin tools and the full profit breakdown are hidden below.
+            </p>
+          </div>
+        )}
 
         <div className="border-b border-gray-200 pb-6 mb-6">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Receipt</p>

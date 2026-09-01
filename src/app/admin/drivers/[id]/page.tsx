@@ -484,7 +484,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
             {jobs?.map((job) => (
               <Link
                 key={job.id}
-                href={`/dashboard/jobs/${job.id}/receipt`}
+                href={`/dashboard/jobs/${job.id}/receipt?viewAs=driver`}
                 target="_blank"
                 className="block border border-gray-200 rounded-xl px-4 py-3 hover:border-gray-300 hover:bg-gray-50"
               >
