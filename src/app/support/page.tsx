@@ -31,7 +31,7 @@ export default function SupportPage() {
             <li><strong>I can't log in.</strong> Try resetting your password from the login screen. If that doesn't work, call us and we'll help directly.</li>
             <li><strong>My driver documents were rejected or expired.</strong> Check the Compliance section of your driver settings for what's needed, or call us with questions about a specific document.</li>
             <li><strong>I have a question about a payment or job.</strong> Call us and reference the job or payment in question - we can look it up directly.</li>
-            <li><strong>I want to delete my account.</strong> See our <Link href="/privacy" className="text-[#378ADD] underline">Privacy Policy</Link> for how to request this.</li>
+            <li><strong>I want to delete my account.</strong> Visit our <Link href="/delete-account" className="text-[#378ADD] underline">account deletion page</Link> for instructions.</li>
           </ul>
         </div>
 
@@ -39,6 +39,8 @@ export default function SupportPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Other links</h2>
           <p>
             <Link href="/privacy" className="text-[#378ADD] underline">Privacy Policy</Link>
+            {' · '}
+            <Link href="/delete-account" className="text-[#378ADD] underline">Delete Account</Link>
             {' · '}
             <Link href="/" className="text-[#378ADD] underline">Drivflo home</Link>
           </p>
