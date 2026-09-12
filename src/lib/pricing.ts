@@ -161,8 +161,17 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
 
   // Every meal break also costs real time on the road (bathroom, gas, food) —
   // not just the meal allowance dollars. Same cadence, two effects.
+  // A trip under the threshold needs zero breaks (e.g. a 20-minute local
+  // delivery shouldn't get charged a rest stop). Past that threshold, round
+  // UP rather than down: a driver 4.5 hours into a new block still needs
+  // that next break before finishing, even though they haven't hit a full
+  // multiple of the interval yet. Previously this floored, which meant a
+  // job could be several hours past its last "real" break and still show
+  // zero additional break time/pay for it.
   const mealBreaks = Math.min(
-    Math.floor(baseDrivingHours / settings.meal_allowance_every_hours),
+    baseDrivingHours < settings.meal_allowance_every_hours
+      ? 0
+      : Math.ceil(baseDrivingHours / settings.meal_allowance_every_hours),
     settings.meal_allowance_max_count
   )
   const breakHours = (mealBreaks * settings.break_duration_minutes) / 60

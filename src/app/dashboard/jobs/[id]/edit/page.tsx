@@ -365,7 +365,9 @@ export default function EditJobPage() {
 
       const driveHours = data.durationMinutes / 60
       const mealBreaks = Math.min(
-        Math.floor(driveHours / pricingSettings.meal_allowance_every_hours),
+        driveHours < pricingSettings.meal_allowance_every_hours
+          ? 0
+          : Math.ceil(driveHours / pricingSettings.meal_allowance_every_hours),
         pricingSettings.meal_allowance_max_count
       )
       const breakHours = (mealBreaks * pricingSettings.break_duration_minutes) / 60
