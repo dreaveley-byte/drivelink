@@ -18,6 +18,8 @@ export default function AdminJobAdjustments({
   approvedExpensesCents,
   baselines,
   existingExpenses,
+  currentIdleHoursAdded,
+  currentIdleHoursNote,
 }: {
   jobId: string
   driverId: string | null
@@ -27,10 +29,16 @@ export default function AdminJobAdjustments({
   approvedExpensesCents: number
   baselines: ExpenseBaselines
   existingExpenses: { category: string; status: string; amount_cents: number }[]
+  currentIdleHoursAdded: number | null
+  currentIdleHoursNote: string | null
 }) {
   const router = useRouter()
   const [hoursInput, setHoursInput] = useState(currentHoursOverride != null ? String(currentHoursOverride) : '')
   const [savingHours, setSavingHours] = useState(false)
+
+  const [idleHoursInput, setIdleHoursInput] = useState(currentIdleHoursAdded != null ? String(currentIdleHoursAdded) : '')
+  const [idleNoteInput, setIdleNoteInput] = useState(currentIdleHoursNote ?? '')
+  const [savingIdleHours, setSavingIdleHours] = useState(false)
 
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [expCategory, setExpCategory] = useState('other')
@@ -73,6 +81,45 @@ export default function AdminJobAdjustments({
       .eq('id', jobId)
 
     setSavingHours(false)
+    if (updateError) {
+      setError(`Could not save: ${updateError.message}`)
+      return
+    }
+    router.refresh()
+  }
+
+  async function saveIdleHours() {
+    setError('')
+    setSavingIdleHours(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const trimmed = idleHoursInput.trim()
+    const hours = trimmed === '' ? null : parseFloat(trimmed)
+    if (trimmed !== '' && (isNaN(hours as number) || (hours as number) < 0)) {
+      setError('Enter a valid number of idle hours, or clear the field to remove it.')
+      setSavingIdleHours(false)
+      return
+    }
+
+    // Additive, not a replacement: adds this many hours (at the job's normal
+    // hourly rate) on top of whatever the dealer bill and driver pay already
+    // are, on both sides equally - same rate/hours for dealer and driver,
+    // same simplification the hours-override field above already makes.
+    const cents = hours != null ? Math.round(hours * hourlyRateCents) : null
+    const { error: updateError } = await supabase
+      .from('jobs')
+      .update({
+        admin_idle_hours_added: hours,
+        admin_idle_hours_dealer_cents: cents,
+        admin_idle_hours_driver_cents: cents,
+        admin_idle_hours_note: hours != null ? (idleNoteInput.trim() || null) : null,
+        admin_idle_hours_added_by: hours != null ? user?.id : null,
+        admin_idle_hours_added_at: hours != null ? new Date().toISOString() : null,
+      })
+      .eq('id', jobId)
+
+    setSavingIdleHours(false)
     if (updateError) {
       setError(`Could not save: ${updateError.message}`)
       return
@@ -187,6 +234,39 @@ export default function AdminJobAdjustments({
             {savingHours ? 'Saving…' : 'Save'}
           </button>
         </div>
+      </div>
+
+      <div className="mb-4 pt-3 border-t border-gray-100">
+        <label className="block text-xs text-gray-500 mb-1">Add idle hours (e.g. customer not home at delivery)</label>
+        <p className="text-xs text-gray-400 mb-1.5">
+          {currentIdleHoursAdded != null
+            ? `Currently adding ${currentIdleHoursAdded} hrs (${formatCents(Math.round(currentIdleHoursAdded * hourlyRateCents))} to both the dealer bill and driver pay). Clear the field and save to remove it.`
+            : 'Adds hours on top of the booked hours already calculated - billed to the dealer and paid to the driver, at this job\'s normal hourly rate. Does not touch the original estimate.'}
+        </p>
+        <div className="flex gap-2 mb-1.5">
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={idleHoursInput}
+            onChange={(e) => setIdleHoursInput(e.target.value)}
+            placeholder="e.g. 1.5"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <button
+            onClick={saveIdleHours}
+            disabled={savingIdleHours}
+            className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+          >
+            {savingIdleHours ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+        <input
+          value={idleNoteInput}
+          onChange={(e) => setIdleNoteInput(e.target.value)}
+          placeholder="Reason (optional, shown on the receipt)"
+          className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+        />
       </div>
 
       <div className="pt-3 border-t border-gray-100">
