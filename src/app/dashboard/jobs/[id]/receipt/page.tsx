@@ -551,7 +551,7 @@ export default async function JobReceiptPage({
               )}
               {job.approved_expenses_cents > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Approved additional expenses</span>
+                  <span className="text-gray-600">Approved additional expenses (over accrued baseline)</span>
                   <span className="text-gray-900 font-medium">+{formatCents(job.approved_expenses_cents)}</span>
                 </div>
               )}
@@ -711,7 +711,7 @@ export default async function JobReceiptPage({
                 </div>
                 {job.approved_expenses_cents > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-base text-gray-700">Approved additional expenses</span>
+                    <span className="text-base text-gray-700">Approved additional expenses (over accrued baseline)</span>
                     <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
                   </div>
                 )}
