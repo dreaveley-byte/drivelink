@@ -1058,6 +1058,10 @@ export default function EditJobPage() {
     if (isRepost) {
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('job_status_events').insert({ job_id: jobId, status: 'awaiting_driver', changed_by: user?.id ?? null })
+      // Clear out the previous driver's checklist so the next driver who claims
+      // this job gets a fresh one instead of inheriting old (possibly
+      // half-completed) items — the driver app backfills a new set automatically.
+      await supabase.from('job_checklist_items').delete().eq('job_id', jobId)
     }
 
     // Replace the stop rows with the current set

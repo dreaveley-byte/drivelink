@@ -80,23 +80,34 @@ export default function ExpenseReviewList({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editCategory, setEditCategory] = useState('')
   const [editCustomCategory, setEditCustomCategory] = useState('')
+  const [editAmount, setEditAmount] = useState('')
 
   function startEdit(exp: Expense) {
     setEditingId(exp.id)
     setEditCategory(exp.category)
     setEditCustomCategory(exp.custom_category ?? '')
+    setEditAmount((exp.amount_cents / 100).toFixed(2))
   }
 
   async function saveCategory(expenseId: string) {
+    const parsedAmount = Math.round(parseFloat(editAmount) * 100)
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      alert('Enter a valid dollar amount.')
+      return
+    }
     setLoadingId(expenseId)
     const supabase = createClient()
     const { error } = await supabase
       .from('job_expenses')
-      .update({ category: editCategory, custom_category: editCategory === 'other' ? (editCustomCategory || null) : null })
+      .update({
+        category: editCategory,
+        custom_category: editCategory === 'other' ? (editCustomCategory || null) : null,
+        amount_cents: parsedAmount,
+      })
       .eq('id', expenseId)
     setLoadingId(null)
     if (error) {
-      alert(`Could not update category: ${error.message}`)
+      alert(`Could not update expense: ${error.message}`)
       return
     }
     setEditingId(null)
@@ -228,6 +239,16 @@ export default function ExpenseReviewList({
                         className="text-sm border border-gray-300 rounded-lg px-2 py-1"
                       />
                     )}
+                    <span className="text-sm text-gray-400">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="text-sm border border-gray-300 rounded-lg px-2 py-1 w-24"
+                    />
                     <button
                       onClick={() => saveCategory(exp.id)}
                       disabled={loadingId === exp.id}
@@ -247,7 +268,7 @@ export default function ExpenseReviewList({
                     {categoryLabel(exp)} — <span className="font-medium">{formatCents(exp.amount_cents)}</span>
                     {isAdmin && exp.status === 'pending' && (
                       <button onClick={() => startEdit(exp)} className="text-xs text-blue-600 hover:underline ml-2">
-                        Change category
+                        Edit
                       </button>
                     )}
                   </p>

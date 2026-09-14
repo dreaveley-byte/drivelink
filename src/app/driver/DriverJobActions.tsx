@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -178,6 +178,10 @@ export default function DriverJobActions({
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
+  // Guards against the default-checklist backfill running twice for the same
+  // job (e.g. the effect re-firing before the first insert finishes), which
+  // was creating duplicate checklist rows.
+  const checklistBackfillJobIdRef = useRef<string | null>(null)
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
   const [sendingVerification, setSendingVerification] = useState(false)
   const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
@@ -245,6 +249,25 @@ export default function DriverJobActions({
       }
 
       // Older jobs claimed before this feature existed won't have items yet — backfill them.
+      // Guard against this running twice for the same job (e.g. a second effect
+      // invocation firing before the first insert below finishes) — only one
+      // backfill attempt per job.id is allowed to proceed past this point.
+      if (checklistBackfillJobIdRef.current === job.id) return
+      checklistBackfillJobIdRef.current = job.id
+
+      // Re-check right before inserting — closes the window where two calls
+      // both passed the initial `data.length === 0` check above.
+      const { data: recheck } = await supabase
+        .from('job_checklist_items')
+        .select('id, label, item_type, completed_at, file_paths, notes, condition_data')
+        .eq('job_id', job.id)
+        .order('sort_order')
+      if (recheck && recheck.length > 0) {
+        setChecklist(recheck)
+        refreshFileUrls(recheck.flatMap((i) => i.file_paths))
+        return
+      }
+
       const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery, {
       keyCount: job.key_count,
       hasWheelLock: !!job.has_wheel_lock,
