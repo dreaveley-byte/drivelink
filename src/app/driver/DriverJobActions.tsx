@@ -12,6 +12,7 @@ import ConditionReportCard, { type ConditionData } from '@/components/ConditionR
 import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
 import VehicleDeliveryAcknowledgementModal from '@/components/VehicleDeliveryAcknowledgementModal'
+import SimpleCameraCapture from '@/components/SimpleCameraCapture'
 import { addCalendarEventNative } from '@/lib/nativeCalendarBridge'
 
 type Job = {
@@ -187,6 +188,9 @@ export default function DriverJobActions({
   const [confirmingIdMatch, setConfirmingIdMatch] = useState(false)
   const [manualIdConfirmChecked, setManualIdConfirmChecked] = useState(false)
   const [guidedCaptureItem, setGuidedCaptureItem] = useState<{ item: ChecklistItem; mode: 'walkaround' | 'dash' | 'windshield' } | null>(null)
+  // Which target a just-opened camera capture should go to: the expense
+  // receipt, or a specific photo checklist item.
+  const [cameraCaptureFor, setCameraCaptureFor] = useState<'receipt' | ChecklistItem | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [justSubmittedExpense, setJustSubmittedExpense] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState('wait_time')
@@ -1153,15 +1157,21 @@ export default function DriverJobActions({
 
                   <div className="bg-white border-2 border-dashed border-[#378ADD] rounded-lg p-3 text-center">
                     <p className="text-2xl mb-1">📸</p>
-                    <label className="block cursor-pointer">
-                      <span className="text-sm font-semibold text-[#378ADD]">Take a photo of the receipt</span>
-                      <p className="text-xs text-gray-500 mt-0.5">We'll read it and fill in the amount, category, and details for you automatically</p>
+                    <button
+                      type="button"
+                      onClick={() => setCameraCaptureFor('receipt')}
+                      className="text-sm font-semibold text-[#378ADD]"
+                    >
+                      Take a photo of the receipt
+                    </button>
+                    <p className="text-xs text-gray-500 mt-0.5">We'll read it and fill in the amount, category, and details for you automatically</p>
+                    <label className="block cursor-pointer mt-2">
+                      <span className="text-xs text-gray-400 underline">or choose from your photo library</span>
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         onChange={(e) => handleReceiptFileSelected(e.target.files?.[0] ?? null)}
-                        className="block w-full text-sm mt-2"
+                        className="hidden"
                       />
                     </label>
                   </div>
@@ -1696,28 +1706,40 @@ export default function DriverJobActions({
                               {uploadingItemId === item.id ? 'Uploading...' : '📷 Take guided photo'}
                             </button>
                           ) : (
-                          <label className="inline-block text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] cursor-pointer">
-                            {uploadingItemId === item.id
-                              ? 'Uploading...'
-                              : item.item_type === 'video'
-                              ? 'Record / upload video'
-                              : item.item_type === 'photo'
-                              ? 'Take / upload photo'
-                              : 'Upload document'}
-                            <input
-                              type="file"
-                              className="hidden"
-                              disabled={uploadingItemId === item.id}
-                              multiple={item.item_type === 'photo'}
-                              accept={item.item_type === 'video' ? 'video/*' : item.item_type === 'photo' ? 'image/*' : 'image/*,.pdf'}
-                              capture={item.item_type === 'video' || item.item_type === 'photo' ? 'environment' : undefined}
-                              onChange={(e) => {
-                                const files = e.target.files ? Array.from(e.target.files) : []
-                                if (files.length > 0) uploadFilesForItem(item, files)
-                                e.target.value = ''
-                              }}
-                            />
-                          </label>
+                          <div className="space-y-1.5">
+                            {item.item_type === 'photo' && (
+                              <button
+                                type="button"
+                                onClick={() => setCameraCaptureFor(item)}
+                                disabled={uploadingItemId === item.id}
+                                className="block text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                              >
+                                {uploadingItemId === item.id ? 'Uploading...' : '📷 Take photo'}
+                              </button>
+                            )}
+                            <label className="inline-block text-xs text-[#378ADD] border border-[#378ADD] px-3 py-1.5 rounded-lg hover:bg-blue-50 cursor-pointer">
+                              {uploadingItemId === item.id
+                                ? 'Uploading...'
+                                : item.item_type === 'video'
+                                ? 'Record / upload video'
+                                : item.item_type === 'photo'
+                                ? 'or upload from library'
+                                : 'Upload document'}
+                              <input
+                                type="file"
+                                className="hidden"
+                                disabled={uploadingItemId === item.id}
+                                multiple={item.item_type === 'photo'}
+                                accept={item.item_type === 'video' ? 'video/*' : item.item_type === 'photo' ? 'image/*' : 'image/*,.pdf'}
+                                capture={item.item_type === 'video' ? 'environment' : undefined}
+                                onChange={(e) => {
+                                  const files = e.target.files ? Array.from(e.target.files) : []
+                                  if (files.length > 0) uploadFilesForItem(item, files)
+                                  e.target.value = ''
+                                }}
+                              />
+                            </label>
+                          </div>
                           )
                         )}
                       </div>
@@ -1761,6 +1783,21 @@ export default function DriverJobActions({
           }}
         />
       )}
+
+      <SimpleCameraCapture
+        open={cameraCaptureFor !== null}
+        onClose={() => setCameraCaptureFor(null)}
+        filenamePrefix={cameraCaptureFor === 'receipt' ? 'receipt' : 'checklist'}
+        onCapture={(file) => {
+          const target = cameraCaptureFor
+          setCameraCaptureFor(null)
+          if (target === 'receipt') {
+            handleReceiptFileSelected(file)
+          } else if (target) {
+            uploadFilesForItem(target, [file])
+          }
+        }}
+      />
     </div>
   )
 }
