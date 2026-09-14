@@ -12,6 +12,10 @@ export default function OrgSettingsPage() {
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
+  const [googleReviewLink, setGoogleReviewLink] = useState('')
+  const [sendGoogleReviewDefault, setSendGoogleReviewDefault] = useState(true)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [lookupError, setLookupError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -32,12 +36,18 @@ export default function OrgSettingsPage() {
         router.push('/dashboard')
         return
       }
-      const { data: org } = await supabase.from('organizations').select('id, name, address, phone').eq('id', profile.organization_id).single()
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('id, name, address, phone, google_review_link, send_google_review_default')
+        .eq('id', profile.organization_id)
+        .single()
       if (org) {
         setOrgId(org.id)
         setName(org.name ?? '')
         setAddress(org.address ?? '')
         setPhone(org.phone ?? '')
+        setGoogleReviewLink(org.google_review_link ?? '')
+        setSendGoogleReviewDefault(org.send_google_review_default ?? true)
       }
       setLoading(false)
     })
@@ -47,10 +57,37 @@ export default function OrgSettingsPage() {
     if (!orgId) return
     setSaving(true)
     const supabase = createClient()
-    await supabase.from('organizations').update({ address, phone }).eq('id', orgId)
+    await supabase
+      .from('organizations')
+      .update({ address, phone, google_review_link: googleReviewLink || null, send_google_review_default: sendGoogleReviewDefault })
+      .eq('id', orgId)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleLookup() {
+    if (!orgId) return
+    setLookingUp(true)
+    setLookupError('')
+    try {
+      const res = await fetch('/api/organizations/lookup-google-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: orgId }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setGoogleReviewLink(data.reviewLink)
+      } else if (data.error === 'not_found') {
+        setLookupError("Couldn't find a matching Google Business listing — check the address above, or paste your review link in directly below.")
+      } else {
+        setLookupError('Lookup failed — you can paste your review link in directly below instead.')
+      }
+    } catch {
+      setLookupError('Lookup failed — you can paste your review link in directly below instead.')
+    }
+    setLookingUp(false)
   }
 
   if (loading) return null
@@ -78,6 +115,33 @@ export default function OrgSettingsPage() {
           <label className="block text-sm text-gray-700 mb-1">Phone</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         </div>
+
+        <div className="pt-2 border-t border-gray-100">
+          <label className="block text-sm text-gray-700 mb-1">Google review link</label>
+          <p className="text-xs text-gray-500 mb-1.5">Used to ask customers for a Google review after their delivery.</p>
+          <div className="flex gap-2 mb-1.5">
+            <input
+              value={googleReviewLink}
+              onChange={(e) => setGoogleReviewLink(e.target.value)}
+              placeholder="https://search.google.com/local/writereview?placeid=..."
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <button
+              onClick={handleLookup}
+              disabled={lookingUp}
+              className="text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap"
+            >
+              {lookingUp ? 'Looking up…' : 'Look up automatically'}
+            </button>
+          </div>
+          {lookupError && <p className="text-xs text-red-600 mb-1.5">{lookupError}</p>}
+          <label className="flex items-center gap-2 text-sm text-gray-700 mt-2">
+            <input type="checkbox" checked={sendGoogleReviewDefault} onChange={(e) => setSendGoogleReviewDefault(e.target.checked)} />
+            Request a Google review by default when scheduling a delivery
+          </label>
+          <p className="text-xs text-gray-400 mt-1">Can still be turned off for an individual delivery when it's booked.</p>
+        </div>
+
         <button
           onClick={handleSave}
           disabled={saving}

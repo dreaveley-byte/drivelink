@@ -358,6 +358,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
                 dealerSubmittedBy={application.submitted_by}
                 dealerOrganizationId={application.organization_id}
                 dealerBusinessName={application.business_name}
+                dealerBusinessAddress={application.business_address}
                 docs={[
                   { label: 'Pre-authorized debit form', path: application.pre_authorized_debit_form_path },
                   { label: 'Signed contract', path: application.contract_signature_path },

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   // RLS already restricts this to the job's own driver/dealer/admin
   const { data: job } = await supabase
     .from('jobs')
-    .select('customer_phone, customer_full_name, vehicle_year, vehicle_make, vehicle_model, id_verification_token, driver:driver_id(full_name), job_types(name), package_description')
+    .select('customer_phone, customer_full_name, vehicle_year, vehicle_make, vehicle_model, id_verification_token, driver:driver_id(full_name), job_types(name), package_description, send_google_review, organization_id')
     .eq('id', jobId)
     .single()
 
@@ -58,13 +58,23 @@ export async function POST(req: NextRequest) {
 
   // Thank-you + rate-your-driver follow-up, sent right after the arrival
   // notice. Reuses the same tracking link the customer already has - the
-  // rating form lives right there on that page.
+  // rating form lives right there on that page. Also asks for a Google
+  // review in the same text (rather than a separate message) when this job
+  // has that turned on and the dealer has a review link on file - combining
+  // both asks into one text instead of sending a third message.
   const { data: trackingRow } = await supabase.from('jobs').select('tracking_token').eq('id', jobId).single()
   if (trackingRow?.tracking_token) {
     const trackingLink = `${protocol}://${host}/track/${trackingRow.tracking_token}`
+    let googleReviewLink: string | null = null
+    if (job.send_google_review && job.organization_id) {
+      const { data: org } = await supabase.from('organizations').select('google_review_link').eq('id', job.organization_id).single()
+      googleReviewLink = org?.google_review_link ?? null
+    }
     const thankYouBody = isCustomerRide
-      ? `Rate ${driverName} — how was your drive today? ${trackingLink}`
-      : `${customerFirstName ? `Thanks ${customerFirstName} f` : 'F'}or using Drivflo! Rate ${driverName} — how did they do? ${trackingLink}`
+      ? `Rate ${driverName} — how was your drive today? ${trackingLink}` +
+        (googleReviewLink ? ` If you have a moment, a Google review helps us out a lot too: ${googleReviewLink}` : '')
+      : `${customerFirstName ? `Thanks ${customerFirstName} f` : 'F'}or using Drivflo! Rate ${driverName} — how did they do? ${trackingLink}` +
+        (googleReviewLink ? ` If you have a moment, a Google review helps us out a lot too: ${googleReviewLink}` : '')
     const thankYouResult = await sendSms(job.customer_phone, thankYouBody)
     if (thankYouResult.ok) {
       await supabase.from('customer_messages').insert({ job_id: jobId, direction: 'to_customer', body: thankYouBody })

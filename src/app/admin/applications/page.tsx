@@ -135,6 +135,7 @@ export default async function AdminApplicationsPage() {
                 dealerSubmittedBy={app.submitted_by}
                 dealerOrganizationId={app.organization_id}
                 dealerBusinessName={app.business_name}
+                dealerBusinessAddress={app.business_address}
                 docs={[
                   { label: 'Pre-authorized debit form', path: app.pre_authorized_debit_form_path },
                   { label: 'Signed contract', path: app.contract_signature_path },

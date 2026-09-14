@@ -259,7 +259,13 @@ export default async function JobReceiptPage({
   const idleHoursAdded = job.admin_idle_hours_added ?? 0
   const idleDealerCents = job.admin_idle_hours_dealer_cents ?? 0
   const idleDriverCents = job.admin_idle_hours_driver_cents ?? 0
-  const effectiveDriverPayCents = (job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0) + idleDriverCents
+  // The driver's own "start/stop waiting" timer (grace period + per-minute
+  // rate, set in Settings) - previously computed and displayed but never
+  // actually added to what the dealer's billed or the driver's paid. Billed
+  // and paid the same way the admin idle-hours addition above is (both
+  // sides, same amount) - it's real time lost the same way.
+  const timerIdleFeeCents = job.idle_fee_cents ?? 0
+  const effectiveDriverPayCents = (job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0) + idleDriverCents + timerIdleFeeCents
   // Performance bonus: the driver's 50% share of any unused meal budget,
   // shown as a distinct line from pay entirely - only awarded if every
   // checklist item was completed AND the customer left a 5-star rating
@@ -272,7 +278,7 @@ export default async function JobReceiptPage({
   // regardless of eligibility).
   const potentialBonusCents = job.performance_bonus_cents ?? 0
   const performanceBonusCents = job.performance_bonus_override_cents ?? (job.performance_bonus_eligible ? potentialBonusCents : 0)
-  const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents + idleDealerCents
+  const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents + idleDealerCents + timerIdleFeeCents
   const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents + performanceBonusCents
   const profitCents = revenueCents - actualCostCents
 
@@ -557,10 +563,10 @@ export default async function JobReceiptPage({
                   <span className="text-gray-900 font-medium">+{formatCents(idleDealerCents)}</span>
                 </div>
               )}
-              {(job.approved_expenses_cents > 0 || idleDealerCents > 0) && job.estimated_dealer_cost_cents != null && (
+              {(job.approved_expenses_cents > 0 || idleDealerCents > 0 || timerIdleFeeCents > 0) && job.estimated_dealer_cost_cents != null && (
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
                   <span className="text-gray-900 font-medium">Final total</span>
-                  <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents)}</span>
+                  <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents + timerIdleFeeCents)}</span>
                 </div>
               )}
               {effectiveDriverPayCents != null && (
@@ -638,7 +644,7 @@ export default async function JobReceiptPage({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Wait time at stops</span>
                   <span className="text-gray-900 font-medium">
-                    {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee ${formatCents(job.idle_fee_cents)}`}
+                    {job.total_wait_minutes} min{job.idle_fee_cents > 0 && ` — idle fee ${formatCents(job.idle_fee_cents)} (billed to dealer, paid to driver, included above)`}
                   </span>
                 </div>
               )}
@@ -682,6 +688,9 @@ export default async function JobReceiptPage({
               {idleDriverCents > 0 && (
                 <p className="text-xs text-gray-400">Includes {formatCents(idleDriverCents)} for {idleHoursAdded}h idle time{job.admin_idle_hours_note ? ` (${job.admin_idle_hours_note})` : ''}, already added above.</p>
               )}
+              {timerIdleFeeCents > 0 && (
+                <p className="text-xs text-gray-400">Includes {formatCents(timerIdleFeeCents)} idle fee ({job.total_wait_minutes} min waiting), already added above.</p>
+              )}
               {(driverOwnReimbursementCents > 0 || performanceBonusCents > 0) && (
                 <div className="flex justify-between pt-1 border-t border-gray-100">
                   <span className="text-base text-gray-900 font-semibold">Total</span>
@@ -712,10 +721,16 @@ export default async function JobReceiptPage({
                     <span className="text-base text-gray-700">+{formatCents(idleDealerCents)}</span>
                   </div>
                 )}
-                {(job.approved_expenses_cents > 0 || idleDealerCents > 0) && (
+                {timerIdleFeeCents > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-base text-gray-700">Idle fee ({job.total_wait_minutes} min wait)</span>
+                    <span className="text-base text-gray-700">+{formatCents(timerIdleFeeCents)}</span>
+                  </div>
+                )}
+                {(job.approved_expenses_cents > 0 || idleDealerCents > 0 || timerIdleFeeCents > 0) && (
                   <div className="flex justify-between pt-1 border-t border-gray-200">
                     <span className="text-base text-gray-900 font-medium">Total charged</span>
-                    <span className="text-lg font-semibold text-gray-900">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents)}</span>
+                    <span className="text-lg font-semibold text-gray-900">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents + timerIdleFeeCents)}</span>
                   </div>
                 )}
               </div>

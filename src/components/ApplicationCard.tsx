@@ -29,6 +29,7 @@ export default function ApplicationCard({
   dealerSubmittedBy,
   dealerOrganizationId,
   dealerBusinessName,
+  dealerBusinessAddress,
 }: {
   table: 'driver_applications' | 'dealer_applications'
   id: string
@@ -52,6 +53,7 @@ export default function ApplicationCard({
   dealerSubmittedBy?: string
   dealerOrganizationId?: string | null
   dealerBusinessName?: string | null
+  dealerBusinessAddress?: string | null
 }) {
   const router = useRouter()
   const [showDocs, setShowDocs] = useState(false)
@@ -156,7 +158,7 @@ export default function ApplicationCard({
         if (!orgId) {
           const { data: newOrg, error: orgError } = await supabase
             .from('organizations')
-            .insert({ name: dealerBusinessName || 'New Dealer', org_type: 'dealer_customer' })
+            .insert({ name: dealerBusinessName || 'New Dealer', org_type: 'dealer_customer', address: dealerBusinessAddress || null })
             .select('id')
             .single()
           if (orgError || !newOrg) {
@@ -166,6 +168,21 @@ export default function ApplicationCard({
           }
           orgId = newOrg.id
           await supabase.from('dealer_applications').update({ organization_id: orgId }).eq('id', id)
+
+          // Best-effort: try to auto-find this dealer's Google Business
+          // listing from its name/address so a review link is ready without
+          // the dealer needing to track down their own Place ID. Never
+          // blocks approval if it fails - the dealer can also set this (or
+          // look it up again) from their own Business Info settings page.
+          try {
+            await fetch('/api/organizations/lookup-google-review', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ organizationId: orgId }),
+            })
+          } catch {
+            // Ignored - non-critical, see comment above.
+          }
         }
 
         // Same idea as the driver activation above — without linking the org,

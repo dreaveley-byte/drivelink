@@ -54,6 +54,7 @@ export default function PostJobPage() {
   const [decisionNote, setDecisionNote] = useState('')
   const [ferryDebugNote, setFerryDebugNote] = useState('')
   const [secondDriver, setSecondDriver] = useState(false)
+  const [sendGoogleReview, setSendGoogleReview] = useState(true)
   const [chaseVehicle, setChaseVehicle] = useState(false)
   const [isTradeIn, setIsTradeIn] = useState(false)
   const [tradeInYear, setTradeInYear] = useState('')
@@ -186,16 +187,22 @@ export default function PostJobPage() {
 
   // Whichever org this job is actually being posted for (admin picks one,
   // dealer uses their own) - fetch any active discount so it applies to the
-  // live price shown before posting, not just after.
+  // live price shown before posting, not just after. Also pulls that org's
+  // "request a Google review by default" preference so the checkbox below
+  // starts in the right state for whichever dealer is selected.
   useEffect(() => {
     const effectiveOrgId = isAdmin ? selectedOrgId : myOrgId
     if (!effectiveOrgId || effectiveOrgId === '__new__') {
       setDiscountPercent(0)
+      setSendGoogleReview(true)
       return
     }
     const supabase = createClient()
     supabase.rpc('get_active_discount_percent', { p_org_id: effectiveOrgId }).then(({ data }) => {
       setDiscountPercent(data ?? 0)
+    })
+    supabase.from('organizations').select('send_google_review_default').eq('id', effectiveOrgId).single().then(({ data }) => {
+      setSendGoogleReview(data?.send_google_review_default ?? true)
     })
   }, [isAdmin, selectedOrgId, myOrgId])
 
@@ -1019,6 +1026,7 @@ export default function PostJobPage() {
       organization_id: orgIdToUse,
       job_type_id: jobTypeId,
       created_by: user.id,
+      send_google_review: sendGoogleReview,
       pickup_address: filledStops[0],
       dropoff_address: filledStops[filledStops.length - 1],
       recipient_name: customerFullName || null,
@@ -1163,6 +1171,7 @@ export default function PostJobPage() {
         organization_id: orgIdToUse,
         job_type_id: jobTypeId,
         created_by: user.id,
+        send_google_review: sendGoogleReview,
         pickup_address: filledStops[0],
         dropoff_address: filledStops[filledStops.length - 1],
         // A chase-vehicle driver isn't delivering anything or interacting
@@ -1281,6 +1290,7 @@ export default function PostJobPage() {
           organization_id: orgIdToUse,
           job_type_id: jobTypeId,
           created_by: user.id,
+          send_google_review: sendGoogleReview,
           pickup_address: filledStops[0],
           dropoff_address: filledStops[filledStops.length - 1],
           recipient_name: customerFullName || null,
@@ -1973,6 +1983,10 @@ export default function PostJobPage() {
             <p className="text-xs text-gray-400 -mt-1 ml-6">
               Ferries are detected and priced automatically based on the pickup/dropoff addresses — only check this if you know a ferry is needed and it wasn't picked up.
             </p>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={sendGoogleReview} onChange={(e) => setSendGoogleReview(e.target.checked)} />
+              Send Google review request to the customer after delivery
+            </label>
             <div className="pt-2 border-t border-gray-100">
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
