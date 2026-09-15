@@ -28,18 +28,6 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
   }
-  const { data: { session } } = await supabase.auth.getSession()
-  let jwtRole = 'unknown'
-  try {
-    const payloadB64 = session?.access_token.split('.')[1]
-    if (payloadB64) {
-      const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString('utf8'))
-      jwtRole = payload.role ?? 'none'
-    }
-  } catch {
-    jwtRole = 'decode_failed'
-  }
-  const secondsUntilExpiry = session?.expires_at ? session.expires_at - Math.floor(Date.now() / 1000) : null
 
   const insertRow: Record<string, unknown> = {
     application_type: applicationType,
@@ -61,19 +49,24 @@ export async function POST(req: NextRequest) {
     if (signaturePath) insertRow.signature_path = signaturePath
   }
 
-  const { data, error } = await supabase.from('legal_acceptances').insert(insertRow).select('id').single()
+  // Deliberately a plain insert with no .select() chained after it. Traced
+  // through Postgres's own logs to find this: when PostgREST is asked to
+  // return the inserted row (?select=...), it wraps the INSERT inside a
+  // `WITH ... RETURNING` CTE - and a row-level security policy that looks
+  // up another table (this one checks jobs.driver_id) evaluates
+  // differently, and incorrectly rejects the row, specifically inside that
+  // CTE-wrapped form. The exact same insert as a plain top-level statement
+  // (what this produces) passes the identical policy every time. This
+  // looks like a genuine Postgres/PostgREST edge case, not anything wrong
+  // with the policy itself - confirmed by testing both forms directly
+  // against the database with everything else held identical. The
+  // inserted id was never used by any caller, so nothing is lost by not
+  // asking for it back.
+  const { error } = await supabase.from('legal_acceptances').insert(insertRow)
 
   if (error) {
-    // Re-added temporarily: the middleware fix (src/proxy.ts -> src/
-    // middleware.ts) addressed a real bug, but this error recurring means
-    // it wasn't the whole story, or the fix hasn't rolled out to this
-    // request yet - surfacing the same detail again to get concrete facts
-    // rather than guessing further blind.
-    return NextResponse.json(
-      { error: `${error.message} [debug: authedUser=${user.id}, sentJobId=${insertRow.job_id ?? 'none'}, applicationType=${insertRow.application_type}, jwtRole=${jwtRole}, secondsUntilExpiry=${secondsUntilExpiry}]` },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ acceptanceId: data.id })
+  return NextResponse.json({ ok: true })
 }
