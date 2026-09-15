@@ -43,6 +43,7 @@ export default function VehicleDeliveryAcknowledgementModal({
   onAccepted: (result: { version: number; mediaConsent: boolean }) => void
 }) {
   const [doc, setDoc] = useState<LegalDocument | null>(null)
+  const [mediaDoc, setMediaDoc] = useState<LegalDocument | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [scrolledToBottom, setScrolledToBottom] = useState(false)
@@ -56,6 +57,7 @@ export default function VehicleDeliveryAcknowledgementModal({
   useEffect(() => {
     if (!open) return
     setDoc(null)
+    setMediaDoc(null)
     setError('')
     setScrolledToBottom(false)
     setAckReceipt(false)
@@ -63,11 +65,18 @@ export default function VehicleDeliveryAcknowledgementModal({
     setAckRead(false)
     setMediaConsent(false)
     setLoading(true)
-    fetch('/api/legal/document?slug=vehicle_delivery_acknowledgement')
-      .then(async (res) => {
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to load document.')
-        setDoc(data.document)
+    Promise.all([
+      fetch('/api/legal/document?slug=vehicle_delivery_acknowledgement').then((res) => res.json().then((data) => ({ res, data }))),
+      fetch('/api/legal/document?slug=media_consent_release').then((res) => res.json().then((data) => ({ res, data }))),
+    ])
+      .then(([main, media]) => {
+        if (!main.res.ok) throw new Error(main.data.error || 'Failed to load document.')
+        setDoc(main.data.document)
+        // The media consent document is optional by design (the checkbox
+        // itself is optional) - if it's missing for any reason, the
+        // acknowledgement itself still loads and works fine, just without
+        // the media section below.
+        if (media.res.ok) setMediaDoc(media.data.document)
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -114,6 +123,7 @@ export default function VehicleDeliveryAcknowledgementModal({
           applicationType: 'customer',
           jobId,
           mediaConsent,
+          mediaConsentDocumentVersion: mediaConsent ? mediaDoc?.version ?? null : null,
         }),
       })
       const data = await res.json()
@@ -178,12 +188,18 @@ export default function VehicleDeliveryAcknowledgementModal({
                 <p className="text-xs text-gray-500 mb-2">
                   This section is voluntary and is not required to receive the vehicle.
                 </p>
+                {mediaDoc && (
+                  <div className="border border-gray-200 rounded-lg p-3 mb-3 bg-gray-50 text-xs">
+                    <p className="font-medium text-gray-700 mb-1">
+                      {mediaDoc.title} — Version {mediaDoc.version}
+                    </p>
+                    <p className="whitespace-pre-line text-gray-600">{mediaDoc.body}</p>
+                  </div>
+                )}
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={mediaConsent} onChange={(e) => setMediaConsent(e.target.checked)} />
-                  YES — I authorize Drivflo Inc. and the selling Dealer to use photographs/video of me taken during
-                  delivery for advertising, website, social-media and promotional purposes. Participation is
-                  voluntary, I receive no compensation unless separately agreed, and declining does not affect my
-                  purchase or delivery.
+                  YES — I have read the above and authorize Drivflo Inc. and the selling Dealer to use photographs/video
+                  of me taken during delivery as described.
                 </label>
               </div>
             </>

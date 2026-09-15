@@ -68,7 +68,7 @@ export default async function JobReceiptPage({
 
   const { data: deliveryAcceptance } = await supabase
     .from('legal_acceptances')
-    .select('document_version, accepted_at, media_consent')
+    .select('document_version, accepted_at, media_consent, media_consent_document_version')
     .eq('job_id', jobId)
     .eq('document_slug', 'vehicle_delivery_acknowledgement')
     .order('accepted_at', { ascending: false })
@@ -84,6 +84,21 @@ export default async function JobReceiptPage({
       .eq('version', deliveryAcceptance.document_version)
       .maybeSingle()
     deliveryAcceptanceBody = deliveryDoc?.body ?? null
+  }
+
+  // Reproduces the exact media-consent document text the customer actually
+  // saw and agreed (or declined) to, pinned to the version on record for
+  // this acceptance - not just whatever the current version happens to be,
+  // in case it's since been revised.
+  let mediaConsentDoc: { title: string; body: string; version: number } | null = null
+  if (deliveryAcceptance?.media_consent_document_version) {
+    const { data } = await supabase
+      .from('legal_documents')
+      .select('title, body, version')
+      .eq('slug', 'media_consent_release')
+      .eq('version', deliveryAcceptance.media_consent_document_version)
+      .maybeSingle()
+    mediaConsentDoc = data
   }
 
   if (jobError) {
@@ -219,6 +234,21 @@ export default async function JobReceiptPage({
             )}
           </a>
         ))}
+      </div>
+    )
+  }
+
+  // A signature is wide and short, not square - showing it through the
+  // generic small square thumbnail above (which crops with object-cover)
+  // cut off most of the actual signature. This renders it at its full,
+  // uncropped aspect ratio instead, in a fixed-height box that comfortably
+  // fits on a printed page.
+  function SignatureImage({ files }: { files: { path: string; url: string }[] }) {
+    const sig = files.find((f) => isImagePath(f.path))
+    if (!sig) return null
+    return (
+      <div className="mt-2 border border-gray-200 rounded-lg bg-white p-2 inline-block print:break-inside-avoid">
+        <img src={sig.url} alt="Customer signature" className="h-24 w-auto max-w-full object-contain" />
       </div>
     )
   }
@@ -458,8 +488,10 @@ export default async function JobReceiptPage({
         {/* Two separate, clean documents for the file: the Vehicle Delivery
             Acknowledgement (full text + condition report + signature) and,
             as its own distinct document sharing the same signature, Media
-            Consent (with the customer's contact info on it). Both print on
-            their own page, right after the main receipt. */}
+            Consent (its own real document, not just a bare checkbox — plus
+            the customer's contact info). Both print on their own page,
+            right after the main receipt, with break-inside-avoid on the
+            signature so it can't be split/cut off across a page boundary. */}
         {disclosureItem && (() => {
           const odometerItem = checklistWithUrls.find((i) => i.label === 'Delivery: Enter the odometer reading')
           const deliveryConditionItem = conditionItems.find((i) => i.label.startsWith('Delivery:'))
@@ -480,15 +512,51 @@ export default async function JobReceiptPage({
             deliveryLng: job.delivery_gps_lng,
           })
           const signedDate = disclosureItem.completed_at ? fmtDateTime(disclosureItem.completed_at) : null
+          const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
+          // Matches exactly what the customer actually saw and signed on the
+          // driver's device (same fields, same order, same GPS-with-address-
+          // fallback logic) — this header previously only appeared when
+          // there was no stored legal_documents body to show instead, which
+          // meant the delivery location silently disappeared from the
+          // record on every job that had one. Now always shown, regardless
+          // of which document body ends up displayed below it.
+          const deliveryLocation =
+            job.delivery_gps_lat != null && job.delivery_gps_lng != null
+              ? `${job.delivery_gps_lat.toFixed(5)}, ${job.delivery_gps_lng.toFixed(5)}`
+              : job.dropoff_address
+          const headerLines: [string, string | null | undefined][] = [
+            ['Recipient', job.customer_full_name || job.recipient_name],
+            ['Address', job.customer_address],
+            ['Phone', job.customer_phone],
+            ['Email', job.customer_email],
+            ['Vehicle', vehicleDesc],
+            ['VIN', job.vin],
+            ['Odometer', odometerItem?.notes],
+            ['Dealer', org?.name],
+            ['Delivery Date/Time', signedDate],
+            ['Delivery Location/GPS', deliveryLocation],
+            ['Job Number', job.id],
+          ]
+          const headerBlock = (
+            <div className="border border-gray-200 rounded-lg p-3 mb-3 bg-gray-50 text-xs space-y-0.5">
+              {headerLines.map(([label, value]) => (
+                <p key={label}>
+                  <span className="text-gray-400">{label}: </span>
+                  <span className="text-gray-800">{value || '—'}</span>
+                </p>
+              ))}
+            </div>
+          )
           return (
             <>
-              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:pt-0 print:border-t-0">
+              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:break-inside-avoid print:pt-0 print:border-t-0">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 1 of 2 — Vehicle Delivery Acknowledgement</p>
                 {deliveryAcceptance && (
                   <p className="text-xs text-gray-400 mb-1">
                     Version {deliveryAcceptance.document_version} · accepted {fmtDateTime(deliveryAcceptance.accepted_at)}
                   </p>
                 )}
+                {headerBlock}
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
                   {deliveryAcceptanceBody ?? disclosureText}
                 </p>
@@ -501,39 +569,36 @@ export default async function JobReceiptPage({
                 <p className="text-sm text-gray-700 mt-2">
                   {signedDate ? `Signed by ${job.customer_full_name || 'customer'} on ${signedDate}` : 'Not yet signed'}
                 </p>
-                <FileThumbs files={disclosureItem.files} />
+                <SignatureImage files={disclosureItem.files} />
               </div>
 
-              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:pt-0 print:border-t-0">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent</p>
-                {deliveryAcceptance?.accepted_at && (
-                  <p className="text-xs text-gray-400 mb-1">{fmtDateTime(deliveryAcceptance.accepted_at)}</p>
+              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:break-inside-avoid print:pt-0 print:border-t-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent & Photo/Video Release</p>
+                {mediaConsentDoc && (
+                  <p className="text-xs text-gray-400 mb-1">Version {mediaConsentDoc.version}</p>
                 )}
-                <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 space-y-0.5">
-                  {job.customer_full_name && <p>{job.customer_full_name}</p>}
-                  {job.customer_address && <p>{job.customer_address}</p>}
-                  {job.customer_phone && <p>{job.customer_phone}</p>}
-                  {job.customer_email && <p>{job.customer_email}</p>}
-                  {!job.customer_full_name && !job.customer_address && !job.customer_phone && !job.customer_email && (
-                    <p className="text-gray-400">No customer contact details on file for this job.</p>
-                  )}
-                </div>
-                <p className="text-sm text-gray-700 mb-2">
+                {headerBlock}
+                <p className="text-sm font-medium text-gray-700 mb-2">
                   {deliveryAcceptance?.media_consent == null
                     ? 'Media consent not yet recorded.'
                     : deliveryAcceptance.media_consent
-                      ? 'The customer gave consent for delivery photos/video to be used (e.g. for marketing or reviews).'
-                      : 'The customer declined consent for delivery photos/video to be used beyond internal records.'}
+                      ? '✓ The customer gave consent — see terms below.'
+                      : '✗ The customer declined consent — no photos/video may be used for marketing purposes.'}
                 </p>
+                {deliveryAcceptance?.media_consent && (
+                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
+                    {mediaConsentDoc?.body ??
+                      'The specific consent document text on file for this acceptance could not be found — consent was recorded, but the exact terms shown to the customer at the time could not be reproduced here.'}
+                  </p>
+                )}
                 <p className="text-sm text-gray-700 mt-2">
                   {signedDate ? `Signed by ${job.customer_full_name || 'customer'} on ${signedDate}` : 'Not yet signed'}
                 </p>
-                <FileThumbs files={disclosureItem.files} />
+                <SignatureImage files={disclosureItem.files} />
               </div>
             </>
           )
         })()}
-
 
 
         {/* Full checklist for reference */}
