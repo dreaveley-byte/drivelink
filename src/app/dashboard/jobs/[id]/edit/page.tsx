@@ -1309,7 +1309,7 @@ export default function EditJobPage() {
                 const newId = e.target.value
                 setJobTypeId(newId)
                 const newType = jobTypes.find((jt) => jt.id === newId)
-                if (newType?.name !== 'Vehicle Delivery' && multiVehicleArrangement !== 'none') {
+                if (newType?.name !== 'Sold Vehicle Delivery' && multiVehicleArrangement !== 'none') {
                   setMultiVehicleArrangement('none')
                 }
               }}
@@ -1321,7 +1321,7 @@ export default function EditJobPage() {
             </select>
           </div>
 
-          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Delivery' && (
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Sold Vehicle Delivery' && (
             <div>
               <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
               <select

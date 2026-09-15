@@ -78,7 +78,7 @@ export const DOCUMENT_CHECKLIST: ChecklistDefinitionItem[] = [
   { label: 'Get signature or confirmation of receipt', type: 'signature' },
 ]
 
-const VEHICLE_JOB_TYPES = ['Vehicle Delivery', 'Vehicle Pickup', 'Dealer to Dealer']
+const VEHICLE_JOB_TYPES = ['Sold Vehicle Delivery', 'Vehicle Pick / Drop Off', 'Dealer Trade']
 
 export function getDocumentTextForLabel(label: string): string | undefined {
   const displayLabel = label.replace(/^(Pickup|Delivery|Inspection):\s*/, '')

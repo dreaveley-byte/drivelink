@@ -1433,10 +1433,10 @@ export default function PostJobPage() {
                 const newId = e.target.value
                 setJobTypeId(newId)
                 const newType = jobTypes.find((jt) => jt.id === newId)
-                if (newType?.name !== 'Vehicle Delivery' && multiVehicleArrangement !== 'none') {
+                if (newType?.name !== 'Sold Vehicle Delivery' && multiVehicleArrangement !== 'none') {
                   setMultiVehicleArrangement('none')
                 }
-                if (newType?.name !== 'Dealer to Dealer' && (dealerDropoffCount > 0 || dealerPickupCount > 0)) {
+                if (newType?.name !== 'Dealer Trade' && (dealerDropoffCount > 0 || dealerPickupCount > 0)) {
                   setDealerDropoffCount(0)
                   setDealerPickupCount(0)
                   setDealerDropoffVehicles([])
@@ -1463,7 +1463,7 @@ export default function PostJobPage() {
             </select>
           </div>
 
-          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Delivery' && (
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Sold Vehicle Delivery' && (
             <div>
               <label className="block text-xs text-gray-500 mb-1">Multi-vehicle deal (2 vehicles, only 1 trip logged here)</label>
               <select
@@ -1501,7 +1501,7 @@ export default function PostJobPage() {
             </div>
           )}
 
-          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Dealer to Dealer' && (
+          {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Dealer Trade' && (
             <div className="space-y-4 border border-gray-200 rounded-lg p-4">
               <p className="text-sm font-medium text-gray-900">Vehicles In This Trade</p>
               <div className="grid grid-cols-2 gap-3">

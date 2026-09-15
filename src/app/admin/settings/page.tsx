@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import SignOutButton from '@/components/SignOutButton'
 import SettingsGearLink from '@/components/SettingsGearLink'
+import JobTypesToggle from '@/components/JobTypesToggle'
 import Logo from '@/components/Logo'
 
 type Settings = {
@@ -190,6 +191,17 @@ export default function PricingSettingsPage() {
       </div>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+        <section className="space-y-4 border border-gray-200 rounded-xl p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Job Types</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Turn off any job type that isn&apos;t ready yet — it disappears from the post-job dropdown immediately,
+              without deleting it or affecting any existing jobs of that type.
+            </p>
+          </div>
+          <JobTypesToggle />
+        </section>
+
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-900">Driver Pay</h2>
           <div className="grid grid-cols-2 gap-4">
