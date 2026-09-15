@@ -193,7 +193,7 @@ function LoginPageInner() {
             href="https://www.drivflo.ca"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center text-sm text-gray-500 mt-4 hover:text-gray-900"
+            className="block w-full text-center text-sm text-[#378ADD] underline hover:text-[#2d6ead] mt-4"
           >
             Don&apos;t have an account? Register at drivflo.ca
           </a>
