@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 
 export default function SignaturePad({
   onChange,
@@ -8,18 +8,37 @@ export default function SignaturePad({
   onChange: (dataUrl: string | null) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasDrawn, setHasDrawn] = useState(false)
 
-  useEffect(() => {
+  // See ChecklistSignaturePad for why this matters: without it, the
+  // canvas's fixed drawing-buffer resolution (previously 500x150) gets
+  // stretched by CSS to whatever width the device actually renders it at,
+  // so touch/mouse coordinates (measured in on-screen pixels) land in the
+  // wrong spot in the buffer - the signature ends up warped or offset from
+  // where the finger actually is.
+  const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    const container = containerRef.current
+    if (!canvas || !container) return
+    const rect = container.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = Math.round(rect.width * dpr)
+    canvas.height = Math.round(rect.height * dpr)
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.strokeStyle = '#111827'
+    if (ctx) {
+      ctx.scale(dpr, dpr)
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.strokeStyle = '#111827'
+    }
   }, [])
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(resizeCanvas)
+    return () => cancelAnimationFrame(raf)
+  }, [resizeCanvas])
 
   function getPos(e: React.MouseEvent | React.TouchEvent) {
     const canvas = canvasRef.current!
@@ -68,19 +87,19 @@ export default function SignaturePad({
 
   return (
     <div>
-      <canvas
-        ref={canvasRef}
-        width={500}
-        height={150}
-        className="w-full border border-gray-300 rounded-lg touch-none bg-white"
-        onMouseDown={start}
-        onMouseMove={move}
-        onMouseUp={end}
-        onMouseLeave={end}
-        onTouchStart={start}
-        onTouchMove={move}
-        onTouchEnd={end}
-      />
+      <div ref={containerRef} className="h-36">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full border border-gray-300 rounded-lg touch-none bg-white"
+          onMouseDown={start}
+          onMouseMove={move}
+          onMouseUp={end}
+          onMouseLeave={end}
+          onTouchStart={start}
+          onTouchMove={move}
+          onTouchEnd={end}
+        />
+      </div>
       <button
         type="button"
         onClick={clear}
