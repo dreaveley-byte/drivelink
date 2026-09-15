@@ -1055,6 +1055,15 @@ export default function EditJobPage() {
       return
     }
 
+    // Editing the job just recalculated and overwrote the baseline_*_cents
+    // figures above (fuel/inspection/hotel/ferry) - any already-approved
+    // expense receipts had their dealer-bill addition locked in against
+    // whatever the OLD baseline was at the time they were approved, and
+    // never got revisited. Reconcile them now against the new baseline so
+    // the dealer's bill reflects the current numbers, not stale ones from
+    // before this edit.
+    await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
+
     if (isRepost) {
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('job_status_events').insert({ job_id: jobId, status: 'awaiting_driver', changed_by: user?.id ?? null })
