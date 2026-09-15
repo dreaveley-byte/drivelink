@@ -187,6 +187,17 @@ function LoginPageInner() {
             {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
         )}
+
+        {isNativeApp() && (
+          <a
+            href="https://www.drivflo.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center text-sm text-gray-500 mt-4 hover:text-gray-900"
+          >
+            Don&apos;t have an account? Register at drivflo.ca
+          </a>
+        )}
       </div>
     </div>
   )
