@@ -455,7 +455,11 @@ export default async function JobReceiptPage({
           </div>
         )}
 
-        {/* Delivery Disclosure: the full acknowledgement / condition acceptance / media consent document */}
+        {/* Two separate, clean documents for the file: the Vehicle Delivery
+            Acknowledgement (full text + condition report + signature) and,
+            as its own distinct document sharing the same signature, Media
+            Consent (with the customer's contact info on it). Both print on
+            their own page, right after the main receipt. */}
         {disclosureItem && (() => {
           const odometerItem = checklistWithUrls.find((i) => i.label === 'Delivery: Enter the odometer reading')
           const deliveryConditionItem = conditionItems.find((i) => i.label.startsWith('Delivery:'))
@@ -475,33 +479,62 @@ export default async function JobReceiptPage({
             deliveryLat: job.delivery_gps_lat,
             deliveryLng: job.delivery_gps_lng,
           })
+          const signedDate = disclosureItem.completed_at ? fmtDateTime(disclosureItem.completed_at) : null
           return (
-            <div className="mb-6">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Disclosure</p>
-              {deliveryAcceptance && (
-                <p className="text-xs text-gray-400 mb-1">
-                  Vehicle Delivery Acknowledgement v{deliveryAcceptance.document_version} accepted{' '}
-                  {fmtDateTime(deliveryAcceptance.accepted_at)}
-                  {deliveryAcceptance.media_consent != null &&
-                    (deliveryAcceptance.media_consent ? ' · media consent given' : ' · media consent declined')}
+            <>
+              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:pt-0 print:border-t-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 1 of 2 — Vehicle Delivery Acknowledgement</p>
+                {deliveryAcceptance && (
+                  <p className="text-xs text-gray-400 mb-1">
+                    Version {deliveryAcceptance.document_version} · accepted {fmtDateTime(deliveryAcceptance.accepted_at)}
+                  </p>
+                )}
+                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
+                  {deliveryAcceptanceBody ?? disclosureText}
                 </p>
-              )}
-              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
-                {deliveryAcceptanceBody ?? disclosureText}
-              </p>
-              {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
-                <div className="mb-2">
-                  <p className="text-xs text-gray-500 mb-1">Condition at delivery</p>
-                  <ConditionReportView data={deliveryConditionItem.condition_data} />
+                {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs text-gray-500 mb-1">Condition at delivery</p>
+                    <ConditionReportView data={deliveryConditionItem.condition_data} />
+                  </div>
+                )}
+                <p className="text-sm text-gray-700 mt-2">
+                  {signedDate ? `Signed by ${job.customer_full_name || 'customer'} on ${signedDate}` : 'Not yet signed'}
+                </p>
+                <FileThumbs files={disclosureItem.files} />
+              </div>
+
+              <div className="mb-6 pt-6 border-t border-gray-200 print:break-before-page print:pt-0 print:border-t-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent</p>
+                {deliveryAcceptance?.accepted_at && (
+                  <p className="text-xs text-gray-400 mb-1">{fmtDateTime(deliveryAcceptance.accepted_at)}</p>
+                )}
+                <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 space-y-0.5">
+                  {job.customer_full_name && <p>{job.customer_full_name}</p>}
+                  {job.customer_address && <p>{job.customer_address}</p>}
+                  {job.customer_phone && <p>{job.customer_phone}</p>}
+                  {job.customer_email && <p>{job.customer_email}</p>}
+                  {!job.customer_full_name && !job.customer_address && !job.customer_phone && !job.customer_email && (
+                    <p className="text-gray-400">No customer contact details on file for this job.</p>
+                  )}
                 </div>
-              )}
-              <p className="text-sm text-gray-700">
-                {disclosureItem.completed_at ? `Signed by ${job.customer_full_name || 'customer'} on ${fmtDateTime(disclosureItem.completed_at)}` : 'Not yet signed'}
-              </p>
-              <FileThumbs files={disclosureItem.files} />
-            </div>
+                <p className="text-sm text-gray-700 mb-2">
+                  {deliveryAcceptance?.media_consent == null
+                    ? 'Media consent not yet recorded.'
+                    : deliveryAcceptance.media_consent
+                      ? 'The customer gave consent for delivery photos/video to be used (e.g. for marketing or reviews).'
+                      : 'The customer declined consent for delivery photos/video to be used beyond internal records.'}
+                </p>
+                <p className="text-sm text-gray-700 mt-2">
+                  {signedDate ? `Signed by ${job.customer_full_name || 'customer'} on ${signedDate}` : 'Not yet signed'}
+                </p>
+                <FileThumbs files={disclosureItem.files} />
+              </div>
+            </>
           )
         })()}
+
+
 
         {/* Full checklist for reference */}
         {otherItems.length > 0 && (
