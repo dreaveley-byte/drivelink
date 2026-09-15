@@ -794,7 +794,7 @@ export default async function JobReceiptPage({
             calculatedDriverPayCents={job.estimated_driver_pay_cents}
             hourlyRateCents={hourlyRateCents}
             approvedExpensesCents={job.approved_expenses_cents ?? 0}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0 }}
             existingExpenses={(rawExpenses ?? []).map((e) => ({ category: e.category, status: e.status, amount_cents: e.amount_cents }))}
             currentIdleHoursAdded={job.admin_idle_hours_added}
             currentIdleHoursNote={job.admin_idle_hours_note}
@@ -808,7 +808,7 @@ export default async function JobReceiptPage({
             jobId={job.id}
             expenses={expenses}
             isAdmin={isAdmin}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0 }}
           />
         </div>
       )}

@@ -116,6 +116,7 @@ export type PricingResult = {
   hourlyDealerCents: number
   hourlyDriverCents: number
   extrasDealerCents: number
+  groundHomeCents: number
   reimbursementCents: number
   costBasisCents: number // everything before markup
   estimatedDealerCostCents: number // costBasis × markup
@@ -268,6 +269,15 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const registryFeeCents = registryVisit ? settings.registry_visit_fee_cents : 0
 
   const extrasDealerCents = additionalCharges.reduce((sum, c) => sum + c.dealerAmountCents, 0)
+  // The "Uber/taxi/bus back" ground-transport estimate, specifically -
+  // tracked apart from the general extras total so the dealer's original
+  // price can be checked against the driver's actual ground-transport
+  // receipt for the SAME ride home, the same way fuel/hotel/ferry/
+  // inspection already are. Without this, that estimate was invisible
+  // inside the generic "Other extras" bucket, and the driver's real Uber
+  // receipt for that same ride got billed to the dealer a second time on
+  // top of it.
+  const groundHomeCents = additionalCharges.filter((c) => c.kind === 'ground-home').reduce((sum, c) => sum + c.dealerAmountCents, 0)
   // Reimbursements (e.g. Uber/bus the driver paid for out of pocket) are tracked
   // separately from pay — they're money owed back for real costs, not wages.
   const reimbursementCents = additionalCharges
@@ -380,6 +390,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     hourlyDealerCents,
     hourlyDriverCents,
     extrasDealerCents,
+    groundHomeCents,
     reimbursementCents,
     costBasisCents,
     estimatedDealerCostCents,

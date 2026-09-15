@@ -1042,6 +1042,7 @@ export default function EditJobPage() {
       baseline_food_cents: pricing?.mealCostCents ?? 0,
       baseline_hotel_cents: pricing?.hotelCents ?? 0,
       baseline_ferry_cents: pricing?.ferryFeeCents ?? 0,
+      baseline_return_transport_cents: pricing?.groundHomeCents ?? 0,
       pricing_breakdown: pricing ? JSON.stringify(pricing) : null,
       trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
       trade_in_make: isTradeIn ? tradeInMake || null : null,
