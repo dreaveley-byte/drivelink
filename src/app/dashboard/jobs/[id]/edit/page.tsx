@@ -8,6 +8,7 @@ import { calculatePricing, formatCents, type PricingSettings, type AdditionalCha
 import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import AdminQuoteEditor from '@/components/AdminQuoteEditor'
+import AdminDriverReassign from '@/components/AdminDriverReassign'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
@@ -151,6 +152,9 @@ export default function EditJobPage() {
   // any stale driver_id from before it was cancelled, and any archived_at) so
   // it's actually postable again, not just silently stay cancelled with new details.
   const [isRepost, setIsRepost] = useState(false)
+  const [jobStatus, setJobStatus] = useState('')
+  const [currentDriverId, setCurrentDriverId] = useState<string | null>(null)
+  const [currentDriverName, setCurrentDriverName] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -174,7 +178,7 @@ export default function EditJobPage() {
 
       const { data: job } = await supabase
         .from('jobs')
-        .select('*, job_stops(address, stop_order), reviewer:review_claimed_by(full_name)')
+        .select('*, job_stops(address, stop_order), reviewer:review_claimed_by(full_name), driver:driver_id(full_name)')
         .eq('id', jobId)
         .single()
 
@@ -183,6 +187,9 @@ export default function EditJobPage() {
         setPageLoading(false)
         return
       }
+      setJobStatus(job.status)
+      setCurrentDriverId(job.driver_id)
+      setCurrentDriverName(Array.isArray(job.driver) ? job.driver[0]?.full_name ?? null : job.driver?.full_name ?? null)
       // Admin can edit a job at any status - once accepted by a driver, a
       // dealer still can't (editing details a driver already committed to
       // could cause real confusion/disputes), but admin needs the
@@ -1256,6 +1263,21 @@ export default function EditJobPage() {
               reviewClaimedAt={reviewInfo.reviewClaimedAt}
               reviewApproved={false}
               isClaimedByMe={reviewInfo.reviewClaimedBy === currentUserId}
+            />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="mb-6 border border-gray-200 rounded-xl p-4">
+            <AdminDriverReassign
+              jobId={jobId}
+              jobStatus={jobStatus}
+              currentDriverId={currentDriverId}
+              currentDriverName={currentDriverName}
+              onSaved={(driverId, driverName) => {
+                setCurrentDriverId(driverId)
+                setCurrentDriverName(driverName)
+                setJobStatus((s) => (driverId ? (s === 'awaiting_driver' ? 'assigned' : s) : (['delivered', 'completed', 'cancelled'].includes(s) ? s : 'awaiting_driver')))
+              }}
             />
           </div>
         )}

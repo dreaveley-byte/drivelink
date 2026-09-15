@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,19 +9,44 @@ export default function AdminDriverReassign({
   jobStatus,
   currentDriverId,
   currentDriverName,
-  drivers,
+  onSaved,
 }: {
   jobId: string
   jobStatus: string
   currentDriverId: string | null
   currentDriverName: string | null
-  drivers: { id: string; full_name: string | null }[]
+  onSaved?: (driverId: string | null, driverName: string | null) => void
 }) {
   const router = useRouter()
+  const [drivers, setDrivers] = useState<{ id: string; full_name: string | null }[]>([])
   const [selectedId, setSelectedId] = useState(currentDriverId ?? '')
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Fetches its own driver list client-side, rather than requiring the
+  // page it's dropped into to fetch and pass one down - this component
+  // needs to work equally well from a server component (the receipt
+  // page) and a client component (the edit page, which is 'use client'
+  // start to finish), and self-fetching is the one approach that works
+  // unchanged in both.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'driver')
+      .eq('is_active', true)
+      .order('full_name')
+      .then(({ data }) => setDrivers(data ?? []))
+  }, [])
+
+  // Keeps the dropdown's selection in sync after a save (router.refresh()
+  // brings a new currentDriverId down as a prop, but React won't reset
+  // local state from a changed prop on its own).
+  useEffect(() => {
+    setSelectedId(currentDriverId ?? '')
+  }, [currentDriverId])
 
   const isUnchanged = (selectedId || null) === (currentDriverId ?? null)
   const selectedDriver = drivers.find((d) => d.id === selectedId)
@@ -54,6 +79,7 @@ export default function AdminDriverReassign({
       return
     }
     setConfirming(false)
+    onSaved?.(selectedId || null, selectedDriver?.full_name ?? null)
     router.refresh()
   }
 

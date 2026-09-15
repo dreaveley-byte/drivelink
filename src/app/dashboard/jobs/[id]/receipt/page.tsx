@@ -121,18 +121,6 @@ export default async function JobReceiptPage({
     }
   }
 
-  // For the admin driver-reassignment override below.
-  let activeDrivers: { id: string; full_name: string | null }[] = []
-  if (isAdmin) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'driver')
-      .eq('is_active', true)
-      .order('full_name')
-    activeDrivers = data ?? []
-  }
-
   if (jobError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
@@ -797,7 +785,6 @@ export default async function JobReceiptPage({
               jobStatus={job.status}
               currentDriverId={job.driver_id}
               currentDriverName={driverName ?? null}
-              drivers={activeDrivers}
             />
           </div>
           <AdminJobAdjustments
