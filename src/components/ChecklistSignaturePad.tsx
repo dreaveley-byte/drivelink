@@ -25,19 +25,25 @@ export default function ChecklistSignaturePad({
   // match, every touch/mouse coordinate - which is measured in on-screen
   // CSS pixels via getBoundingClientRect() - ends up mapped to the wrong
   // spot in the drawing buffer, so the line appears offset from wherever
-  // the finger actually is. That mismatch (a fixed 320x120 buffer stretched
-  // to whatever width the phone rendered it at) is why signing could feel
-  // broken or unusable. Fix: size the drawing buffer to match the actual
-  // rendered size exactly (scaled for device pixel ratio so it stays
-  // crisp), every time the pad's on-screen size changes.
+  // the finger actually is. Fix: size the drawing buffer to match the
+  // actual rendered size exactly (scaled for device pixel ratio so it
+  // stays crisp), every time the pad's on-screen size changes.
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
     const rect = container.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.round(rect.width * dpr)
-    canvas.height = Math.round(rect.height * dpr)
+    const newWidth = Math.round(rect.width * dpr)
+    const newHeight = Math.round(rect.height * dpr)
+    // Skip re-applying an identical size - setting width/height on a
+    // canvas always clears it, even to the same value, which would
+    // otherwise wipe an in-progress signature on spurious observer
+    // firings that report no real change.
+    if (canvas.width === newWidth && canvas.height === newHeight) return
+    canvas.width = newWidth
+    canvas.height = newHeight
     const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.scale(dpr, dpr)
@@ -56,18 +62,26 @@ export default function ChecklistSignaturePad({
     return () => mql.removeEventListener('change', handleOrientationChange)
   }, [])
 
-  // Resize whenever the pad mounts or actually switches between portrait
-  // and the landscape overlay (different on-screen dimensions each time) -
-  // deliberately NOT on every window resize, since a phone's browser
-  // chrome (address bar, keyboard) resizing the viewport is extremely
-  // common on mobile and would otherwise wipe out an in-progress signature
-  // for no reason.
+  // A one-time requestAnimationFrame after switching layouts (portrait vs.
+  // the landscape overlay) turned out not to be reliable: on-device
+  // rotation, the browser's own viewport/chrome adjustment can settle
+  // noticeably later than a single frame after the orientation change
+  // fires, especially on iOS Safari - so the canvas was measuring itself
+  // against a stale size and ended up calibrated to the PRE-rotation
+  // dimensions, which is exactly why touches landed nowhere near the
+  // drawn line specifically in landscape. A ResizeObserver instead reacts
+  // to the container's REAL rendered size settling, however long that
+  // actually takes, so the canvas is always calibrated to what's actually
+  // on screen rather than a one-frame guess.
   useEffect(() => {
-    // Wait a frame so the container has actually taken on its new
-    // (portrait vs. landscape-overlay) layout size before measuring it.
-    const raf = requestAnimationFrame(resizeCanvas)
-    return () => cancelAnimationFrame(raf)
-  }, [isLandscape, resizeCanvas])
+    const container = containerRef.current
+    if (!container) return
+    resizeCanvas()
+    const observer = new ResizeObserver(() => resizeCanvas())
+    observer.observe(container)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLandscape])
 
   function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect()
@@ -121,11 +135,25 @@ export default function ChecklistSignaturePad({
     }, 'image/png')
   }
 
+  // Prevents the browser's text-selection/callout behavior from
+  // triggering during a signing touch-drag. touch-action: none (the
+  // touch-none class) stops scrolling/zooming, but on some mobile
+  // browsers - Safari in particular - a press-and-drag can still be
+  // interpreted as a text-selection gesture unless selection itself is
+  // explicitly disabled, which shows up as background text getting
+  // highlighted mid-signature instead of the line actually drawing.
+  const noSelectStyle: React.CSSProperties = {
+    WebkitUserSelect: 'none',
+    userSelect: 'none',
+    WebkitTouchCallout: 'none',
+  }
+
   const canvasEl = (
-    <div ref={containerRef} className={isLandscape ? 'flex-1 min-h-0' : 'h-32'}>
+    <div ref={containerRef} className={isLandscape ? 'flex-1 min-h-0' : 'h-32'} style={noSelectStyle}>
       <canvas
         ref={canvasRef}
         className="border border-gray-300 rounded-lg bg-white w-full h-full touch-none"
+        style={noSelectStyle}
         onMouseDown={start}
         onMouseMove={move}
         onMouseUp={end}
@@ -138,7 +166,7 @@ export default function ChecklistSignaturePad({
   )
 
   const buttons = (
-    <div className="flex gap-2">
+    <div className="flex gap-2" style={noSelectStyle}>
       <button
         type="button"
         onClick={save}
@@ -155,7 +183,7 @@ export default function ChecklistSignaturePad({
 
   if (isLandscape) {
     return (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col p-4 gap-3">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col p-4 gap-3" style={noSelectStyle}>
         <p className="text-sm text-gray-500 text-center">Sign below</p>
         {canvasEl}
         {buttons}

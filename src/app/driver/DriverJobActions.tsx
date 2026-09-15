@@ -1553,7 +1553,8 @@ export default function DriverJobActions({
                     <button
                       type="button"
                       onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                      className="w-full flex items-center justify-between text-left"
+                      className="w-full flex items-center justify-between text-left select-none"
+                      style={{ WebkitTouchCallout: 'none' }}
                     >
                       <span className={`text-sm ${item.completed_at ? 'text-gray-400' : 'text-gray-700'}`}>
                         {item.completed_at ? '✓ ' : ''}{displayLabel}
