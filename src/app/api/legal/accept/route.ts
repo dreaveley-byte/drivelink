@@ -52,7 +52,16 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.from('legal_acceptances').insert(insertRow).select('id').single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    // Temporary extra detail appended to the error text itself (visible
+    // right on the driver's screen) so the next failure tells us exactly
+    // which signed-in user and which job were actually involved, without
+    // needing anyone to dig through browser dev tools on a phone. Safe to
+    // remove once this is sorted out - it's diagnostic text, not sensitive
+    // data (job IDs and a user ID, nothing secret).
+    return NextResponse.json(
+      { error: `${error.message} [debug: authedUser=${user.id}, sentJobId=${insertRow.job_id ?? 'none'}, applicationType=${insertRow.application_type}]` },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ acceptanceId: data.id })
