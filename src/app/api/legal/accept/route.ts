@@ -52,7 +52,15 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.from('legal_acceptances').insert(insertRow).select('id').single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    // Re-added temporarily: the middleware fix (src/proxy.ts -> src/
+    // middleware.ts) addressed a real bug, but this error recurring means
+    // it wasn't the whole story, or the fix hasn't rolled out to this
+    // request yet - surfacing the same detail again to get concrete facts
+    // rather than guessing further blind.
+    return NextResponse.json(
+      { error: `${error.message} [debug: authedUser=${user.id}, sentJobId=${insertRow.job_id ?? 'none'}, applicationType=${insertRow.application_type}]` },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ acceptanceId: data.id })
