@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/server'
 // gate before this endpoint is ever called.
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { documentSlug, documentVersion, applicationType, jobId, mediaConsent, mediaConsentDocumentVersion, caslMarketingConsent, signaturePath } = body
+  const { documentSlug, documentVersion, applicationType, jobId, mediaConsent, mediaConsentDocumentVersion, caslMarketingConsent, phoneMailMarketingConsent, signaturePath } = body
 
   if (!documentSlug || !documentVersion || !applicationType) {
     return NextResponse.json({ error: 'Missing documentSlug, documentVersion or applicationType.' }, { status: 400 })
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     if (typeof mediaConsent === 'boolean') insertRow.media_consent = mediaConsent
     if (typeof mediaConsentDocumentVersion === 'number') insertRow.media_consent_document_version = mediaConsentDocumentVersion
     if (typeof caslMarketingConsent === 'boolean') insertRow.casl_marketing_consent = caslMarketingConsent
+    if (typeof phoneMailMarketingConsent === 'boolean') insertRow.phone_mail_marketing_consent = phoneMailMarketingConsent
   } else {
     insertRow.user_id = user.id
     if (jobId) insertRow.job_id = jobId

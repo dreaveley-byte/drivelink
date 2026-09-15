@@ -68,7 +68,7 @@ export default async function JobReceiptPage({
 
   const { data: deliveryAcceptance } = await supabase
     .from('legal_acceptances')
-    .select('document_version, accepted_at, media_consent, media_consent_document_version, casl_marketing_consent')
+    .select('document_version, accepted_at, media_consent, media_consent_document_version, casl_marketing_consent, phone_mail_marketing_consent')
     .eq('job_id', jobId)
     .eq('document_slug', 'vehicle_delivery_acknowledgement')
     .order('accepted_at', { ascending: false })
@@ -92,7 +92,7 @@ export default async function JobReceiptPage({
   // in case it's since been revised.
   let mediaConsentDoc: { title: string; body: string; version: number } | null = null
   let mediaConsentDocIsExactVersion = false
-  if (deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent) {
+  if (deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent || deliveryAcceptance?.phone_mail_marketing_consent) {
     if (deliveryAcceptance.media_consent_document_version) {
       const { data } = await supabase
         .from('legal_documents')
@@ -1068,11 +1068,11 @@ export default async function JobReceiptPage({
               </div>
 
               <div className="mb-6 pt-6 border-t border-gray-200 receipt-print-doc print:pt-0 print:border-t-0">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent, Photo/Video Release &amp; Promotional Communications</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent, Photo/Video Release &amp; Promotional Communications (Parts A–C)</p>
                 {mediaConsentDoc && (
                   <p className="text-xs text-gray-400 mb-1">
                     Version {mediaConsentDoc.version}
-                    {(deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent) && !mediaConsentDocIsExactVersion &&
+                    {(deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent || deliveryAcceptance?.phone_mail_marketing_consent) && !mediaConsentDocIsExactVersion &&
                       ' (current version shown — this acceptance predates document-version tracking, so the exact wording shown to the customer at the time could not be confirmed)'}
                   </p>
                 )}
@@ -1085,15 +1085,23 @@ export default async function JobReceiptPage({
                       ? '✓ consented — see terms below.'
                       : '✗ declined.'}
                 </p>
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Part B — Promotional Communications:{' '}
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Part B — Electronic Messages (CASL):{' '}
                   {deliveryAcceptance?.casl_marketing_consent == null
                     ? 'not yet recorded.'
                     : deliveryAcceptance.casl_marketing_consent
                       ? '✓ consented — see terms below.'
-                      : '✗ declined — do not send promotional messages.'}
+                      : '✗ declined — do not send promotional emails/texts.'}
                 </p>
-                {(deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent) && (
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Part C — Phone Calls &amp; Mail:{' '}
+                  {deliveryAcceptance?.phone_mail_marketing_consent == null
+                    ? 'not yet recorded.'
+                    : deliveryAcceptance.phone_mail_marketing_consent
+                      ? '✓ consented — see terms below.'
+                      : '✗ declined — do not call or mail for promotional purposes.'}
+                </p>
+                {(deliveryAcceptance?.media_consent || deliveryAcceptance?.casl_marketing_consent || deliveryAcceptance?.phone_mail_marketing_consent) && (
                   <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
                     {mediaConsentDoc?.body ??
                       'No media consent document is on file yet — run the pending migration to add it, then this will populate automatically for future deliveries.'}
