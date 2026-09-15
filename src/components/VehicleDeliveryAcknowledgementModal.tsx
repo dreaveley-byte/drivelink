@@ -40,7 +40,7 @@ export default function VehicleDeliveryAcknowledgementModal({
   jobId: string
   fields: DeliveryAutoFillFields
   onClose: () => void
-  onAccepted: (result: { version: number; mediaConsent: boolean }) => void
+  onAccepted: (result: { version: number; mediaConsent: boolean; caslConsent: boolean }) => void
 }) {
   const [doc, setDoc] = useState<LegalDocument | null>(null)
   const [mediaDoc, setMediaDoc] = useState<LegalDocument | null>(null)
@@ -52,6 +52,7 @@ export default function VehicleDeliveryAcknowledgementModal({
   const [ackInspect, setAckInspect] = useState(false)
   const [ackRead, setAckRead] = useState(false)
   const [mediaConsent, setMediaConsent] = useState(false)
+  const [caslConsent, setCaslConsent] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function VehicleDeliveryAcknowledgementModal({
     setAckInspect(false)
     setAckRead(false)
     setMediaConsent(false)
+    setCaslConsent(false)
     setLoading(true)
     Promise.all([
       fetch('/api/legal/document?slug=vehicle_delivery_acknowledgement').then((res) => res.json().then((data) => ({ res, data }))),
@@ -124,11 +126,12 @@ export default function VehicleDeliveryAcknowledgementModal({
           jobId,
           mediaConsent,
           mediaConsentDocumentVersion: mediaConsent ? mediaDoc?.version ?? null : null,
+          caslMarketingConsent: caslConsent,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to record acceptance.')
-      onAccepted({ version: doc.version, mediaConsent })
+      onAccepted({ version: doc.version, mediaConsent, caslConsent })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record acceptance.')
@@ -184,9 +187,9 @@ export default function VehicleDeliveryAcknowledgementModal({
               </div>
 
               <div className="mt-4 border-t border-gray-200 pt-4">
-                <p className="text-xs font-semibold text-gray-500 mb-1">OPTIONAL MEDIA CONSENT</p>
+                <p className="text-xs font-semibold text-gray-500 mb-1">OPTIONAL: MEDIA CONSENT &amp; PROMOTIONAL MESSAGES</p>
                 <p className="text-xs text-gray-500 mb-2">
-                  This section is voluntary and is not required to receive the vehicle.
+                  Both parts below are voluntary, independent of one another, and not required to receive the vehicle.
                 </p>
                 {mediaDoc && (
                   <div className="border border-gray-200 rounded-lg p-3 mb-3 bg-gray-50 text-xs">
@@ -198,8 +201,13 @@ export default function VehicleDeliveryAcknowledgementModal({
                 )}
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={mediaConsent} onChange={(e) => setMediaConsent(e.target.checked)} />
-                  YES — I have read the above and authorize Drivflo Inc. and the selling Dealer to use photographs/video
+                  YES — I have read Part A above and authorize Drivflo Inc. and the selling Dealer to use photographs/video
                   of me taken during delivery as described.
+                </label>
+                <label className="flex items-start gap-2 text-sm text-gray-700 mt-3">
+                  <input type="checkbox" className="mt-0.5" checked={caslConsent} onChange={(e) => setCaslConsent(e.target.checked)} />
+                  YES — I have read Part B above and consent to receive promotional emails and/or text messages from
+                  Drivflo Inc. and/or the selling Dealer. I understand I can withdraw this consent at any time.
                 </label>
               </div>
             </>
