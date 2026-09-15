@@ -216,6 +216,28 @@ export default function DriverJobActions({
   const [deliveryAckModalOpen, setDeliveryAckModalOpen] = useState(false)
   const [deliveryAckAccepted, setDeliveryAckAccepted] = useState(false)
   const [deliveryAckMediaConsent, setDeliveryAckMediaConsent] = useState<boolean | null>(null)
+  const deliveryAckAutoPromptedRef = useRef(false)
+
+  // The moment ID verification clears (manually confirmed by the driver, OR
+  // auto-approved after the dealer's review window / already approved),
+  // pop the delivery acknowledgement open automatically instead of leaving
+  // it as a button the driver could easily miss below the fold — this was
+  // an easy step to forget, since nothing drew attention to it once ID
+  // verification finished. Only fires once per job per visit (ref-guarded)
+  // so it doesn't keep reopening every time this page refreshes for an
+  // unrelated reason (e.g. after uploading a checklist photo) if the
+  // driver dismissed it without signing.
+  useEffect(() => {
+    if (deliveryAckAccepted || deliveryAckAutoPromptedRef.current) return
+    const idVerificationReady =
+      job.id_verification_manual_override ||
+      (!!job.id_verification_completed_at &&
+        (!!job.id_verification_approved_at || now - new Date(job.id_verification_completed_at).getTime() >= 5 * 60 * 1000))
+    if (idVerificationReady) {
+      deliveryAckAutoPromptedRef.current = true
+      setDeliveryAckModalOpen(true)
+    }
+  }, [job.id_verification_manual_override, job.id_verification_completed_at, job.id_verification_approved_at, now, deliveryAckAccepted])
 
   const HEAVY_TYPES = ['photo', 'video', 'upload', 'signature', 'condition_report', 'trade_in_condition_report']
 
@@ -1607,15 +1629,32 @@ export default function DriverJobActions({
                                         ✓ Vehicle Delivery Acknowledgement reviewed and agreed to by the customer
                                         {deliveryAckMediaConsent ? ' (media consent given).' : ' (media consent declined).'}
                                       </p>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => setDeliveryAckModalOpen(true)}
-                                        className="w-full text-sm font-medium px-4 py-2.5 rounded-lg border border-[#378ADD] text-[#378ADD] hover:bg-blue-50"
-                                      >
-                                        Review & Sign Delivery Acknowledgement
-                                      </button>
-                                    )}
+                                    ) : (() => {
+                                      const idVerificationReady =
+                                        job.id_verification_manual_override ||
+                                        (!!job.id_verification_completed_at &&
+                                          (!!job.id_verification_approved_at || now - new Date(job.id_verification_completed_at).getTime() >= 5 * 60 * 1000))
+                                      return (
+                                        <>
+                                          {idVerificationReady && (
+                                            <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+                                              ⚠️ ID verified — the customer still needs to review and sign below before this delivery is complete.
+                                            </p>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => setDeliveryAckModalOpen(true)}
+                                            className={
+                                              idVerificationReady
+                                                ? 'w-full text-sm font-semibold px-4 py-2.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 animate-pulse'
+                                                : 'w-full text-sm font-medium px-4 py-2.5 rounded-lg border border-[#378ADD] text-[#378ADD] hover:bg-blue-50'
+                                            }
+                                          >
+                                            Review & Sign Delivery Acknowledgement
+                                          </button>
+                                        </>
+                                      )
+                                    })()}
                                     <VehicleDeliveryAcknowledgementModal
                                       open={deliveryAckModalOpen}
                                       jobId={job.id}
