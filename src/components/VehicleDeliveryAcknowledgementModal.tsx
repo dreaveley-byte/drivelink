@@ -201,13 +201,14 @@ export default function VehicleDeliveryAcknowledgementModal({
                 )}
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={mediaConsent} onChange={(e) => setMediaConsent(e.target.checked)} />
-                  YES — I have read Part A above and authorize Drivflo Inc. and the selling Dealer to use photographs/video
+                  YES — I have read Part A above and authorize Drivflo Inc., its affiliated and third-party companies,
+                  and/or the selling Dealer to use photographs/video
                   of me taken during delivery as described.
                 </label>
                 <label className="flex items-start gap-2 text-sm text-gray-700 mt-3">
                   <input type="checkbox" className="mt-0.5" checked={caslConsent} onChange={(e) => setCaslConsent(e.target.checked)} />
                   YES — I have read Part B above and consent to receive promotional emails and/or text messages from
-                  Drivflo Inc. and/or the selling Dealer. I understand I can withdraw this consent at any time.
+                  Drivflo Inc., its affiliated and third-party companies, and/or the selling Dealer. I understand I can withdraw this consent at any time.
                 </label>
               </div>
             </>
