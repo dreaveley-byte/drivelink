@@ -1068,7 +1068,7 @@ export default async function JobReceiptPage({
               </div>
 
               <div className="mb-6 pt-6 border-t border-gray-200 receipt-print-doc print:pt-0 print:border-t-0">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent, Photo/Video Release &amp; Promotional Messages (CASL)</p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Document 2 of 2 — Media Consent, Photo/Video Release &amp; Promotional Communications</p>
                 {mediaConsentDoc && (
                   <p className="text-xs text-gray-400 mb-1">
                     Version {mediaConsentDoc.version}
@@ -1086,7 +1086,7 @@ export default async function JobReceiptPage({
                       : '✗ declined.'}
                 </p>
                 <p className="text-sm font-medium text-gray-700 mb-2">
-                  Part B — Promotional Emails/Texts (CASL):{' '}
+                  Part B — Promotional Communications:{' '}
                   {deliveryAcceptance?.casl_marketing_consent == null
                     ? 'not yet recorded.'
                     : deliveryAcceptance.casl_marketing_consent

@@ -207,8 +207,9 @@ export default function VehicleDeliveryAcknowledgementModal({
                 </label>
                 <label className="flex items-start gap-2 text-sm text-gray-700 mt-3">
                   <input type="checkbox" className="mt-0.5" checked={caslConsent} onChange={(e) => setCaslConsent(e.target.checked)} />
-                  YES — I have read Part B above and consent to receive promotional emails and/or text messages from
-                  Drivflo Inc., its affiliated and third-party companies, and/or the selling Dealer. I understand I can withdraw this consent at any time.
+                  YES — I have read Part B above and consent to receive promotional communications by phone, mail,
+                  email, and/or text message from Drivflo Inc., its affiliated and third-party companies, and/or the
+                  selling Dealer. I understand I can withdraw this consent at any time.
                 </label>
               </div>
             </>
