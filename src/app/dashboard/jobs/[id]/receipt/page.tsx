@@ -11,6 +11,7 @@ import Logo from '@/components/Logo'
 import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
 import ExpenseReviewList from '@/components/ExpenseReviewList'
 import AdminJobAdjustments from '@/components/AdminJobAdjustments'
+import AdminDriverReassign from '@/components/AdminDriverReassign'
 import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 
@@ -118,6 +119,18 @@ export default async function JobReceiptPage({
         .maybeSingle()
       mediaConsentDoc = data
     }
+  }
+
+  // For the admin driver-reassignment override below.
+  let activeDrivers: { id: string; full_name: string | null }[] = []
+  if (isAdmin) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'driver')
+      .eq('is_active', true)
+      .order('full_name')
+    activeDrivers = data ?? []
   }
 
   if (jobError) {
@@ -778,6 +791,15 @@ export default async function JobReceiptPage({
 
       {isAdmin && (
         <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
+          <div className="mb-4">
+            <AdminDriverReassign
+              jobId={job.id}
+              jobStatus={job.status}
+              currentDriverId={job.driver_id}
+              currentDriverName={driverName ?? null}
+              drivers={activeDrivers}
+            />
+          </div>
           <AdminJobAdjustments
             jobId={job.id}
             driverId={job.driver_id}
