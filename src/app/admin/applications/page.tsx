@@ -92,6 +92,10 @@ export default async function AdminApplicationsPage() {
                 licenseClass={app.license_class}
                 extractedLicenseClass={app.extracted_license_class}
                 canTowTrailer={app.can_tow_trailer}
+                transmissionCapability={app.transmission_capability}
+                trailerTowingExperience={app.trailer_towing_experience}
+                vehicleTowCapacityLbs={app.vehicle_tow_capacity_lbs}
+                maxDriveRangeKm={app.max_drive_range_km}
                 preferredJobTypes={app.preferred_job_types}
                 driverFullName={app.full_name}
                 driverPhone={app.cell_phone}

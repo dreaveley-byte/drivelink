@@ -45,6 +45,10 @@ export default function DriverApplyPage() {
   const [extractedLicenseClass, setExtractedLicenseClass] = useState('')
   const [extractingLicenseClass, setExtractingLicenseClass] = useState(false)
   const [canTowTrailer, setCanTowTrailer] = useState<boolean | null>(null)
+  const [transmissionCapability, setTransmissionCapability] = useState('')
+  const [trailerTowingExperience, setTrailerTowingExperience] = useState<boolean | null>(null)
+  const [vehicleTowCapacityLbs, setVehicleTowCapacityLbs] = useState('')
+  const [maxDriveRangeKm, setMaxDriveRangeKm] = useState('')
   const [availableJobTypes, setAvailableJobTypes] = useState<{ id: string; name: string }[]>([])
   const [preferredJobTypes, setPreferredJobTypes] = useState<string[]>([])
 
@@ -104,6 +108,10 @@ export default function DriverApplyPage() {
         if (draft.licenseClass) setLicenseClass(draft.licenseClass)
         if (draft.extractedLicenseClass) setExtractedLicenseClass(draft.extractedLicenseClass)
         if (draft.canTowTrailer != null) setCanTowTrailer(draft.canTowTrailer)
+        if (draft.transmissionCapability) setTransmissionCapability(draft.transmissionCapability)
+        if (draft.trailerTowingExperience != null) setTrailerTowingExperience(draft.trailerTowingExperience)
+        if (draft.vehicleTowCapacityLbs) setVehicleTowCapacityLbs(draft.vehicleTowCapacityLbs)
+        if (draft.maxDriveRangeKm) setMaxDriveRangeKm(draft.maxDriveRangeKm)
         if (draft.preferredJobTypes) setPreferredJobTypes(draft.preferredJobTypes)
         if (draft.docs) setDocs(draft.docs)
         if (draft.acceptedDocs) setAcceptedDocs(draft.acceptedDocs)
@@ -120,7 +128,8 @@ export default function DriverApplyPage() {
     const draft = {
       fullName, address, cellPhone, homePhone, payoutMethod, companyName, gstNumber, sinNumber,
       vehicleYear, vehicleMake, vehicleModel, vehicleMileage, licenseClass, extractedLicenseClass,
-      canTowTrailer, preferredJobTypes, docs, acceptedDocs,
+      canTowTrailer, transmissionCapability, trailerTowingExperience, vehicleTowCapacityLbs, maxDriveRangeKm,
+      preferredJobTypes, docs, acceptedDocs,
     }
     try {
       localStorage.setItem(draftKey, JSON.stringify(draft))
@@ -130,7 +139,8 @@ export default function DriverApplyPage() {
   }, [
     draftKey, draftRestored, fullName, address, cellPhone, homePhone, payoutMethod, companyName,
     gstNumber, sinNumber, vehicleYear, vehicleMake, vehicleModel, vehicleMileage, licenseClass,
-    extractedLicenseClass, canTowTrailer, preferredJobTypes, docs, acceptedDocs,
+    extractedLicenseClass, canTowTrailer, transmissionCapability, trailerTowingExperience,
+    vehicleTowCapacityLbs, maxDriveRangeKm, preferredJobTypes, docs, acceptedDocs,
   ])
 
   function exitWithoutClearingDraft() {
@@ -241,6 +251,10 @@ export default function DriverApplyPage() {
       license_class: licenseClass || null,
       extracted_license_class: extractedLicenseClass || null,
       can_tow_trailer: canTowTrailer,
+      transmission_capability: transmissionCapability || null,
+      trailer_towing_experience: trailerTowingExperience,
+      vehicle_tow_capacity_lbs: vehicleTowCapacityLbs ? parseInt(vehicleTowCapacityLbs) : null,
+      max_drive_range_km: maxDriveRangeKm ? parseInt(maxDriveRangeKm) : null,
       preferred_job_types: preferredJobTypes.length > 0 ? preferredJobTypes : null,
       vehicle_walkaround_video_path: docs.vehicle_walkaround_video ?? null,
       vehicle_photo_path: docs.vehicle_photo ?? null,
@@ -433,6 +447,68 @@ export default function DriverApplyPage() {
                   No
                 </button>
               </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">Do you have prior experience towing a trailer?</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTrailerTowingExperience(true)}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm ${trailerTowingExperience === true ? 'border-[#378ADD] bg-blue-50 text-[#378ADD]' : 'border-gray-300 text-gray-600'}`}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrailerTowingExperience(false)}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm ${trailerTowingExperience === false ? 'border-[#378ADD] bg-blue-50 text-[#378ADD]' : 'border-gray-300 text-gray-600'}`}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Your vehicle's legal towing capacity (lbs), if any</label>
+              <input
+                type="number"
+                min="0"
+                value={vehicleTowCapacityLbs}
+                onChange={(e) => setVehicleTowCapacityLbs(e.target.value)}
+                placeholder="e.g. 5000"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">Leave blank if your vehicle isn't rated to tow, or you're not sure.</p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">Which transmission types can you drive?</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'automatic', label: 'Automatic only' },
+                  { value: 'manual', label: 'Manual only' },
+                  { value: 'both', label: 'Both' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTransmissionCapability(opt.value)}
+                    className={`flex-1 border rounded-lg px-3 py-2 text-sm ${transmissionCapability === opt.value ? 'border-[#378ADD] bg-blue-50 text-[#378ADD]' : 'border-gray-300 text-gray-600'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Maximum one-way drive distance you're willing to take (km)</label>
+              <input
+                type="number"
+                min="0"
+                value={maxDriveRangeKm}
+                onChange={(e) => setMaxDriveRangeKm(e.target.value)}
+                placeholder="Leave blank for no limit"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">Jobs beyond this distance won't be shown to you as available. Leave blank if you're open to any distance.</p>
             </div>
             {availableJobTypes.length > 0 && (
               <div>

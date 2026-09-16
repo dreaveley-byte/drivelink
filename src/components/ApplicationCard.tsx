@@ -23,6 +23,10 @@ export default function ApplicationCard({
   licenseClass,
   extractedLicenseClass,
   canTowTrailer,
+  transmissionCapability,
+  trailerTowingExperience,
+  vehicleTowCapacityLbs,
+  maxDriveRangeKm,
   preferredJobTypes,
   driverFullName,
   driverPhone,
@@ -47,6 +51,10 @@ export default function ApplicationCard({
   licenseClass?: string | null
   extractedLicenseClass?: string | null
   canTowTrailer?: boolean | null
+  transmissionCapability?: string | null
+  trailerTowingExperience?: boolean | null
+  vehicleTowCapacityLbs?: number | null
+  maxDriveRangeKm?: number | null
   preferredJobTypes?: string[] | null
   driverFullName?: string | null
   driverPhone?: string | null
@@ -120,11 +128,15 @@ export default function ApplicationCard({
         if (vehicleYear || vehicleMake || vehicleModel) {
           await supabase.from('profiles').update({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }).eq('id', userId)
         }
-        if (licenseClass || extractedLicenseClass || canTowTrailer != null || preferredJobTypes) {
+        if (licenseClass || extractedLicenseClass || canTowTrailer != null || transmissionCapability || trailerTowingExperience != null || vehicleTowCapacityLbs != null || maxDriveRangeKm != null || preferredJobTypes) {
           await supabase.from('profiles').update({
             license_class: licenseClass ?? null,
             extracted_license_class: extractedLicenseClass ?? null,
             can_tow_trailer: canTowTrailer ?? null,
+            transmission_capability: transmissionCapability ?? null,
+            trailer_towing_experience: trailerTowingExperience ?? null,
+            vehicle_tow_capacity_lbs: vehicleTowCapacityLbs ?? null,
+            max_drive_range_km: maxDriveRangeKm ?? null,
             preferred_job_types: preferredJobTypes ?? null,
           }).eq('id', userId)
         }
