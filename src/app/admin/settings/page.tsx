@@ -503,7 +503,7 @@ export default function PricingSettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Admin alert phone number</label>
-              <p className="text-xs text-gray-400 mb-1">Gets a text if a driver appears to be idle too long on an active job. Leave blank to disable idle alerts.</p>
+              <p className="text-xs text-gray-400 mb-1">Gets a text if a driver appears to be idle too long on an active job, and whenever a new driver or dealer application is submitted. Leave blank to disable both.</p>
               <input type="tel" value={settings.admin_alert_phone ?? ''}
                 onChange={(e) => updateTextField('admin_alert_phone', e.target.value)}
                 placeholder="+1 604 555 0123"
