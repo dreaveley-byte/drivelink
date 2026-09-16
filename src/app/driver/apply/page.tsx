@@ -268,6 +268,14 @@ export default function DriverApplyPage() {
       return
     }
 
+    // Best-effort - a missing/failed SMS shouldn't block the applicant's
+    // own submission from succeeding.
+    fetch('/api/notify-admin-new-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationType: 'driver', name: fullName }),
+    }).catch(() => {})
+
     if (draftKey) localStorage.removeItem(draftKey)
     setSubmitted(true)
     setLoading(false)

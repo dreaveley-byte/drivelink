@@ -120,6 +120,14 @@ export default function DealerApplyPage() {
       return
     }
 
+    // Best-effort - a missing/failed SMS shouldn't block the applicant's
+    // own submission from succeeding.
+    fetch('/api/notify-admin-new-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationType: 'dealer', name: businessName }),
+    }).catch(() => {})
+
     setSubmitted(true)
     setLoading(false)
   }
