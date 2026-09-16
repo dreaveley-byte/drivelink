@@ -121,7 +121,7 @@ type Route = {
 }
 
 export async function POST(req: NextRequest) {
-  const { originAddress, destinationAddress } = await req.json()
+  const { originAddress, destinationAddress, actualDrivingKm } = await req.json()
   if (!originAddress || !destinationAddress) {
     return NextResponse.json({ error: 'Missing origin or destination address.' }, { status: 400 })
   }
@@ -131,6 +131,27 @@ export async function POST(req: NextRequest) {
   if (!originCoords || !destCoords) {
     const failed = !originCoords && !destCoords ? 'both addresses' : !originCoords ? `origin ("${originAddress}")` : `destination ("${destinationAddress}")`
     return NextResponse.json({ error: `Could not geocode ${failed}.` }, { status: 404 })
+  }
+
+  // The real bug behind false-positive ferry pricing: matching each address
+  // to its NEAREST terminal and checking those two terminals have a
+  // scheduled sailing between them only proves both points are near water -
+  // it never actually confirms the real driving route between the two
+  // addresses needs that ferry at all. Two points can each sit within 60km
+  // of some terminal while still being perfectly road-connected to each
+  // other with no water crossing involved. A genuine ferry-only route
+  // detours a driver miles out of a direct line to reach a terminal, so its
+  // real driving distance comes out much longer than the straight-line
+  // distance between the two addresses - a normal continuous road route
+  // doesn't. When the caller supplies the already-computed real driving
+  // distance, use that as a gate before ever consulting the terminal list.
+  if (typeof actualDrivingKm === 'number') {
+    const straightLineKm = haversineKm(originCoords.lat, originCoords.lng, destCoords.lat, destCoords.lng)
+    if (straightLineKm > 0 && actualDrivingKm / straightLineKm < 1.4) {
+      return NextResponse.json({
+        error: `A direct driving route already exists (${actualDrivingKm}km driving vs ${Math.round(straightLineKm)}km straight-line) - too direct to plausibly require a ferry detour, so skipping the terminal check.`,
+      }, { status: 404 })
+    }
   }
 
   const originCandidates = rankedTerminals(originCoords).filter((t) => t.distanceKm <= 60).slice(0, 4)
