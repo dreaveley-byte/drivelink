@@ -18,6 +18,7 @@ export default function PostJobPage() {
   const router = useRouter()
   const [jobTypes, setJobTypes] = useState<JobType[]>([])
   const [jobTypeId, setJobTypeId] = useState('')
+  const [pickupDropoffMode, setPickupDropoffMode] = useState<'one_way' | 'vehicle_exchange'>('one_way')
   const [isAdmin, setIsAdmin] = useState(false)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrgId, setSelectedOrgId] = useState('')
@@ -34,6 +35,7 @@ export default function PostJobPage() {
   const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
+  const [vehicleTransmission, setVehicleTransmission] = useState('')
   const [stockNumber, setStockNumber] = useState('')
   const [vin, setVin] = useState('')
   const [mileage, setMileage] = useState('')
@@ -65,6 +67,7 @@ export default function PostJobPage() {
   const [secondVehicleYear, setSecondVehicleYear] = useState('')
   const [secondVehicleMake, setSecondVehicleMake] = useState('')
   const [secondVehicleModel, setSecondVehicleModel] = useState('')
+  const [secondVehicleTransmission, setSecondVehicleTransmission] = useState('')
   const [secondVehicleStockNumber, setSecondVehicleStockNumber] = useState('')
   const [secondVehicleVin, setSecondVehicleVin] = useState('')
   const [secondTradeInYear, setSecondTradeInYear] = useState('')
@@ -1053,6 +1056,8 @@ export default function PostJobPage() {
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
       vin: isDealerToDealerMultiVehicle ? (primaryVehicle?.vin || null) : (vin || null),
+      vehicle_transmission: vehicleTransmission || null,
+      pickup_dropoff_mode: isVehiclePickupDropoff ? pickupDropoffMode : null,
       mileage: mileage ? parseInt(mileage) : null,
       key_count: keyCount ? parseInt(keyCount) : null,
       has_wheel_lock: hasWheelLock,
@@ -1198,6 +1203,7 @@ export default function PostJobPage() {
         vehicle_model: chaseVehicle ? null : (secondVehicleModel || null),
         stock_number: chaseVehicle ? null : (secondVehicleStockNumber || null),
         vin: chaseVehicle ? null : (secondVehicleVin || null),
+        vehicle_transmission: chaseVehicle ? null : (secondVehicleTransmission || null),
         mileage: null,
         key_count: chaseVehicle ? null : (keyCount ? parseInt(keyCount) : null),
         has_wheel_lock: chaseVehicle ? false : hasWheelLock,
@@ -1390,6 +1396,8 @@ export default function PostJobPage() {
   }
 
   const jobTypeName = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+  const isVehiclePickupDropoff = jobTypeName === 'Vehicle Pick / Drop Off' || jobTypeName === 'Vehicle Pick Up / Drop Off'
+  const isVehicleExchange = isVehiclePickupDropoff && pickupDropoffMode === 'vehicle_exchange'
   const isCourier = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPartsJob = ['Parts Delivery', 'Parts Pickup'].includes(jobTypeName ?? '')
   const isPaperworkSigning = jobTypeName === 'Paperwork Signing'
@@ -1475,6 +1483,29 @@ export default function PostJobPage() {
               ))}
             </select>
           </div>
+
+          {isVehiclePickupDropoff && (
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Pick up / drop off type</label>
+              <select
+                value={pickupDropoffMode}
+                onChange={(e) => {
+                  const value = e.target.value as typeof pickupDropoffMode
+                  setPickupDropoffMode(value)
+                  if (value === 'vehicle_exchange') setAutoSelectReturnMethod(false)
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="one_way">One Way</option>
+                <option value="vehicle_exchange">Vehicle Exchange</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {pickupDropoffMode === 'one_way'
+                  ? 'One Way — move a vehicle from point A to point B, or vice versa.'
+                  : 'Vehicle Exchange — take one vehicle and bring another back.'}
+              </p>
+            </div>
+          )}
 
           {jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Sold Vehicle Delivery' && (
             <div>
@@ -1746,6 +1777,16 @@ export default function PostJobPage() {
               <input value={vin} onChange={(e) => setVin(e.target.value)} required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Transmission</label>
+              <select value={vehicleTransmission} onChange={(e) => setVehicleTransmission(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">Not specified</option>
+                <option value="automatic">Automatic</option>
+                <option value="manual">Manual</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">The driver needs to know before accepting if this vehicle is a manual.</p>
+            </div>
 
             <div className="pt-2 border-t border-gray-100">
               <p className="text-xs text-gray-500 mb-2">Included with vehicle</p>
@@ -1787,6 +1828,11 @@ export default function PostJobPage() {
                   </div>
                   <input value={secondVehicleStockNumber} onChange={(e) => setSecondVehicleStockNumber(e.target.value)} placeholder="Stock #" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   <input value={secondVehicleVin} onChange={(e) => setSecondVehicleVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <select value={secondVehicleTransmission} onChange={(e) => setSecondVehicleTransmission(e.target.value)} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">Transmission not specified</option>
+                    <option value="automatic">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
                 </div>
               )}
 
@@ -1945,15 +1991,19 @@ export default function PostJobPage() {
                 <input value={tradeInVin} onChange={(e) => setTradeInVin(e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
               </div>
             )}
-            <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-              <input type="checkbox" checked={autoSelectReturnMethod} onChange={(e) => setAutoSelectReturnMethod(e.target.checked)} />
-              Auto-select cheapest return method (Uber, chase vehicle, flight, or bus)
-            </label>
-            {!autoSelectReturnMethod && !flyingBack && !(secondDriver && chaseVehicle) && (
-              <label className="flex items-center gap-2 text-sm text-gray-700 ml-6">
-                <input type="checkbox" checked={uberBackRequested} onChange={(e) => setUberBackRequested(e.target.checked)} />
-                Uber back requested (leave unchecked if the booking dealer is picking the driver up themselves)
-              </label>
+            {!isVehicleExchange && (
+              <>
+                <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  <input type="checkbox" checked={autoSelectReturnMethod} onChange={(e) => setAutoSelectReturnMethod(e.target.checked)} />
+                  Auto-select cheapest return method (Uber, chase vehicle, flight, or bus)
+                </label>
+                {!autoSelectReturnMethod && !flyingBack && !(secondDriver && chaseVehicle) && (
+                  <label className="flex items-center gap-2 text-sm text-gray-700 ml-6">
+                    <input type="checkbox" checked={uberBackRequested} onChange={(e) => setUberBackRequested(e.target.checked)} />
+                    Uber back requested (leave unchecked if the booking dealer is picking the driver up themselves)
+                  </label>
+                )}
+              </>
             )}
             <label className="flex items-center gap-2 text-sm text-gray-700">
               <input
