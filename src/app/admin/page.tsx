@@ -265,11 +265,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               : null
             const cardBody = (
               <>
-                {job.scheduled_for && (
-                  <p className="text-xs font-semibold text-blue-700">
-                    {new Date(job.scheduled_for).toLocaleString('en-CA', { timeZone: 'America/Vancouver', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                  </p>
-                )}
+                {(() => {
+                  // For a completed job, show when it actually finished
+                  // rather than when it was scheduled for - those can
+                  // differ (a job can complete earlier or later than
+                  // planned), and showing the scheduled time made it look
+                  // like a job belonged to a different payroll week than
+                  // it actually did.
+                  const displayDate = job.status === 'completed' && job.completed_at ? job.completed_at : job.scheduled_for
+                  if (!displayDate) return null
+                  return (
+                    <p className="text-xs font-semibold text-blue-700">
+                      {job.status === 'completed' && job.completed_at && <span className="font-normal text-gray-400">Completed </span>}
+                      {new Date(displayDate).toLocaleString('en-CA', { timeZone: 'America/Vancouver', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                  )
+                })()}
                 <p className="text-sm font-medium text-gray-900">
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
