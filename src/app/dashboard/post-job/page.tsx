@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
+import AddressAutocompleteInput from '@/components/AddressAutocompleteInput'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
@@ -1593,10 +1594,10 @@ export default function PostJobPage() {
                   {i === 0 ? 'Pickup address' : i === stops.length - 1 ? 'Dropoff address' : `Stop ${i}`}
                 </label>
                 <div className="flex gap-2">
-                  <input
+                  <AddressAutocompleteInput
                     required={i === 0 || i === stops.length - 1}
                     value={stop}
-                    onChange={(e) => updateStop(i, e.target.value)}
+                    onChange={(value) => updateStop(i, value)}
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   />
                   {i !== 0 && i !== stops.length - 1 && (
