@@ -80,6 +80,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
     .select('completed_at, final_driver_pay_cents, estimated_driver_pay_cents')
     .eq('driver_id', driverId)
     .eq('status', 'completed')
+    .is('archived_at', null)
 
   const nowForDriver = new Date()
   const monthlyEarnings: { label: string; earningsCents: number }[] = []
@@ -114,6 +115,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
     .select('status, completed_at, final_driver_pay_cents, estimated_driver_pay_cents')
     .eq('driver_id', driverId)
     .eq('status', 'completed')
+    .is('archived_at', null)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)

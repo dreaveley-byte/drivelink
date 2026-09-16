@@ -81,6 +81,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     .from('jobs')
     .select('id, status, created_at, completed_at, estimated_dealer_cost_cents, approved_expenses_cents, customer_rating, dealer_paid_at')
     .eq('organization_id', dealerId)
+    .is('archived_at', null)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
