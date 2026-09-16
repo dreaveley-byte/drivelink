@@ -9,6 +9,7 @@ import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import AdminQuoteEditor from '@/components/AdminQuoteEditor'
 import AdminDriverReassign from '@/components/AdminDriverReassign'
+import AdminForceComplete from '@/components/AdminForceComplete'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
@@ -1280,6 +1281,11 @@ export default function EditJobPage() {
                 setJobStatus((s) => (driverId ? (s === 'awaiting_driver' ? 'assigned' : s) : (['delivered', 'completed', 'cancelled'].includes(s) ? s : 'awaiting_driver')))
               }}
             />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="mb-6">
+            <AdminForceComplete jobId={jobId} jobStatus={jobStatus} hasDriver={!!currentDriverId} />
           </div>
         )}
         {isAdmin && savedPricing && (savedPricing.dealerCostCents != null || savedPricing.charges.length > 0) && (

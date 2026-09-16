@@ -12,6 +12,7 @@ import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButto
 import ExpenseReviewList from '@/components/ExpenseReviewList'
 import AdminJobAdjustments from '@/components/AdminJobAdjustments'
 import AdminDriverReassign from '@/components/AdminDriverReassign'
+import AdminForceComplete from '@/components/AdminForceComplete'
 import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 
@@ -786,6 +787,9 @@ export default async function JobReceiptPage({
               currentDriverId={job.driver_id}
               currentDriverName={driverName ?? null}
             />
+          </div>
+          <div className="mb-4">
+            <AdminForceComplete jobId={job.id} jobStatus={job.status} hasDriver={!!job.driver_id} />
           </div>
           <AdminJobAdjustments
             jobId={job.id}
