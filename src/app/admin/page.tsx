@@ -127,7 +127,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .from('jobs')
     .select('estimated_dealer_cost_cents, estimated_driver_pay_cents, final_driver_pay_cents')
     .eq('status', 'completed')
-    .gte('updated_at', monthStart)
+    .gte('completed_at', monthStart)
 
   let dealerSpendMtd = 0
   let driverEarningsMtd = 0

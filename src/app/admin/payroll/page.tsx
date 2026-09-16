@@ -56,7 +56,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     .from('jobs')
     .select('final_driver_pay_cents, estimated_driver_pay_cents')
     .eq('status', 'completed')
-    .gte('updated_at', yearStart)
+    .gte('completed_at', yearStart)
   const yearTotalCents = (ytdJobs ?? []).reduce((sum, j) => sum + (j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0), 0)
 
   return (

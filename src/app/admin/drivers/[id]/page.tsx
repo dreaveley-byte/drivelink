@@ -77,7 +77,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
   // the same "not including reimbursements" view used on the payroll page.
   const { data: earningsJobs } = await supabase
     .from('jobs')
-    .select('updated_at, final_driver_pay_cents, estimated_driver_pay_cents')
+    .select('completed_at, final_driver_pay_cents, estimated_driver_pay_cents')
     .eq('driver_id', driverId)
     .eq('status', 'completed')
 
@@ -88,8 +88,8 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
     const mEnd = new Date(nowForDriver.getFullYear(), nowForDriver.getMonth() - i + 1, 1)
     let earnings = 0
     for (const job of earningsJobs ?? []) {
-      if (job.updated_at) {
-        const d = new Date(job.updated_at)
+      if (job.completed_at) {
+        const d = new Date(job.completed_at)
         if (d >= mStart && d < mEnd) earnings += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
       }
     }
@@ -111,7 +111,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
 
   const { data: monthJobs } = await supabase
     .from('jobs')
-    .select('status, updated_at, final_driver_pay_cents, estimated_driver_pay_cents')
+    .select('status, completed_at, final_driver_pay_cents, estimated_driver_pay_cents')
     .eq('driver_id', driverId)
     .eq('status', 'completed')
 
@@ -120,7 +120,7 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
   let jobsThisMonth = 0
   let earnedThisMonth = 0
   for (const job of monthJobs ?? []) {
-    if (job.updated_at && new Date(job.updated_at) >= monthStart) {
+    if (job.completed_at && new Date(job.completed_at) >= monthStart) {
       jobsThisMonth += 1
       earnedThisMonth += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
     }

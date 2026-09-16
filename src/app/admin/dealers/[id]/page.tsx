@@ -79,7 +79,7 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
 
   const { data: statsJobs } = await supabase
     .from('jobs')
-    .select('id, status, created_at, updated_at, estimated_dealer_cost_cents, approved_expenses_cents, customer_rating, dealer_paid_at')
+    .select('id, status, created_at, completed_at, estimated_dealer_cost_cents, approved_expenses_cents, customer_rating, dealer_paid_at')
     .eq('organization_id', dealerId)
 
   const now = new Date()
@@ -105,11 +105,11 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
         ratingSum += job.customer_rating
         ratingCount += 1
       }
-      if (job.updated_at && new Date(job.updated_at) >= monthStart) {
+      if (job.completed_at && new Date(job.completed_at) >= monthStart) {
         completedThisMonth += 1
         spentThisMonth += job.estimated_dealer_cost_cents ?? 0
       }
-      if (job.updated_at && new Date(job.updated_at) >= yearStart) {
+      if (job.completed_at && new Date(job.completed_at) >= yearStart) {
         completedYtd += 1
         spentYtd += job.estimated_dealer_cost_cents ?? 0
       }
@@ -129,8 +129,8 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     let count = 0
     let spent = 0
     for (const job of statsJobs ?? []) {
-      if (job.status === 'completed' && job.updated_at) {
-        const d = new Date(job.updated_at)
+      if (job.status === 'completed' && job.completed_at) {
+        const d = new Date(job.completed_at)
         if (d >= mStart && d < mEnd) {
           count += 1
           spent += job.estimated_dealer_cost_cents ?? 0
