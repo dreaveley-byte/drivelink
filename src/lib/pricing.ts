@@ -80,6 +80,13 @@ export type PricingInput = {
   markupPercentOverride?: number | null
   useSimpleJobRates?: boolean
   ferryRequired: boolean
+  // For short local vehicle pick-up/drop-off jobs: don't bake a fuel
+  // estimate into the dealer's price at all. The driver can still submit
+  // a real fuel receipt for reimbursement afterward - with no baseline to
+  // offset against (baseline_fuel_cents ends up $0), it just gets billed
+  // to the dealer and reimbursed to the driver in full, same as any other
+  // no-baseline expense category.
+  excludeFuelAccrual?: boolean
   useGarageInsurance: boolean
   includeTowDeductibleCoverage: boolean
   additionalCharges: AdditionalCharge[]
@@ -131,7 +138,7 @@ export type PricingResult = {
 export function calculatePricing(input: PricingInput, settings: PricingSettings): PricingResult {
   const {
     distanceKm, durationMinutes, vehicleMode, numDrivers,
-    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack, markupPercentOverride, useSimpleJobRates,
+    outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: rawAdditionalCharges, oneWayFlightBack, markupPercentOverride, useSimpleJobRates,
   } = input
 
   // Safety net: a single corrupted charge (bad data, a stale entry, anything
@@ -248,7 +255,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const outboundVehicles = input.outboundVehicleCount ?? numDrivers
   const returnVehicles = oneWayFlightBack ? 0 : (input.returnVehicleCount ?? numDrivers)
   const perLegGasCents = Math.round((distanceKm / 100) * fuelEconomy * settings.fuel_price_cents_per_litre)
-  const gasCostCents = perLegGasCents * outboundVehicles + perLegGasCents * returnVehicles
+  const gasCostCents = excludeFuelAccrual ? 0 : perLegGasCents * outboundVehicles + perLegGasCents * returnVehicles
 
   // Wear & tear only applies when the driver uses their own vehicle to do the job —
   // that's only true for towed jobs (their own truck pulling the trailer). On a

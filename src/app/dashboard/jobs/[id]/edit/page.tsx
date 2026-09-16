@@ -440,6 +440,7 @@ export default function EditJobPage() {
     const isCourierJob = ['Courier / Package', 'Parts Delivery', 'Parts Pickup'].includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
     const jobTypeNameForCalc = jobTypes.find((jt) => jt.id === jobTypeId)?.name
     const isCustomerRideJob = jobTypeNameForCalc === 'Customer Pick Up' || jobTypeNameForCalc === 'Customer Drop Off'
+    const excludeFuelAccrual = jobTypeNameForCalc === 'Vehicle Pick / Drop Off' || jobTypeNameForCalc === 'Vehicle Pick Up / Drop Off'
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setCalcError('Enter at least a pickup and dropoff address.')
@@ -747,7 +748,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -757,7 +758,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -767,7 +768,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -886,6 +887,9 @@ export default function EditJobPage() {
   useEffect(() => {
     if (distanceKm == null || durationMinutes == null || !pricingSettings) return
 
+    const jobTypeNameForSummary = jobTypes.find((jt) => jt.id === jobTypeId)?.name
+    const excludeFuelAccrual = jobTypeNameForSummary === 'Vehicle Pick / Drop Off' || jobTypeNameForSummary === 'Vehicle Pick Up / Drop Off'
+
     // Rides-along vehicles don't get their own transport bill — that cost lives
     // on the linked job that actually carries the multi-vehicle arrangement.
     if (ridesAlongWithLinked) {
@@ -899,6 +903,7 @@ export default function EditJobPage() {
           registryVisit,
         insuranceVisit,
           ferryRequired: false,
+          excludeFuelAccrual,
           useGarageInsurance,
           includeTowDeductibleCoverage,
           additionalCharges: additionalCharges.filter((c) => !c.kind),
@@ -933,6 +938,7 @@ export default function EditJobPage() {
         registryVisit,
         insuranceVisit,
         ferryRequired: false,
+        excludeFuelAccrual,
         useGarageInsurance,
         includeTowDeductibleCoverage,
         additionalCharges,
@@ -979,6 +985,7 @@ export default function EditJobPage() {
               registryVisit,
             insuranceVisit,
               ferryRequired: false,
+              excludeFuelAccrual,
               useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
               additionalCharges: additionalCharges.filter((c) => !c.kind),
@@ -1114,6 +1121,7 @@ export default function EditJobPage() {
           registryVisit,
         insuranceVisit,
           ferryRequired: false,
+          excludeFuelAccrual,
           useGarageInsurance: false,
           includeTowDeductibleCoverage: false,
           additionalCharges: additionalCharges.filter((c) => !c.kind),
