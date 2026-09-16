@@ -1761,9 +1761,9 @@ export default function EditJobPage() {
               <input type="checkbox" checked={insuranceVisit} onChange={(e) => setInsuranceVisit(e.target.checked)} />
               Insurance visit required (for insurance transfer)
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className={`flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 -mx-2 ${ferryRequired ? 'bg-amber-50 border border-amber-300 text-amber-800 font-medium' : 'text-gray-700'}`}>
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
-              Force ferry crossing (if not detected automatically)
+              {ferryRequired ? '⚠️ Ferry crossing forced on — this adds the ferry fee regardless of the addresses' : 'Force ferry crossing (if not detected automatically)'}
             </label>
             <p className="text-xs text-gray-400 -mt-1 ml-6">
               Ferries are detected and priced automatically based on the pickup/dropoff addresses — only check this if you know a ferry is needed and it wasn't picked up.
