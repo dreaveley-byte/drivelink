@@ -19,6 +19,7 @@ export default function JobTypesToggle() {
   const [jobTypes, setJobTypes] = useState<JobType[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -34,18 +35,22 @@ export default function JobTypesToggle() {
 
   async function toggle(jt: JobType) {
     setSavingId(jt.id)
+    setError('')
     const supabase = createClient()
-    const { error } = await supabase.from('job_types').update({ active: !jt.active }).eq('id', jt.id)
+    const { error: updateError } = await supabase.from('job_types').update({ active: !jt.active }).eq('id', jt.id)
     setSavingId(null)
-    if (!error) {
-      setJobTypes((prev) => prev.map((j) => (j.id === jt.id ? { ...j, active: !j.active } : j)))
+    if (updateError) {
+      setError(`Could not save: ${updateError.message}`)
+      return
     }
+    setJobTypes((prev) => prev.map((j) => (j.id === jt.id ? { ...j, active: !j.active } : j)))
   }
 
   if (loading) return null
 
   return (
     <div className="space-y-2">
+      {error && <p className="text-xs text-red-600">{error}</p>}
       {jobTypes.map((jt) => (
         <label key={jt.id} className="flex items-start gap-3 py-1.5 cursor-pointer">
           <input
