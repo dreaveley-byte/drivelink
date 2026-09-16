@@ -490,7 +490,7 @@ export default function EditJobPage() {
           const ferryRes = await fetch('/api/ferry/schedule', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1], actualDrivingKm: data.distanceKm }),
+            body: JSON.stringify({ originAddress: filledStops[0], destinationAddress: filledStops[filledStops.length - 1], actualDrivingKm: data.distanceKm, actualDrivingMinutes: data.durationMinutes }),
           })
           const ferryBody = await ferryRes.json().catch(() => ({}))
           if (ferryRes.ok && ferryBody.sailingDurationMinutes != null) {

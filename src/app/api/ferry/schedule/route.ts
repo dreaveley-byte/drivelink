@@ -121,7 +121,7 @@ type Route = {
 }
 
 export async function POST(req: NextRequest) {
-  const { originAddress, destinationAddress, actualDrivingKm } = await req.json()
+  const { originAddress, destinationAddress, actualDrivingKm, actualDrivingMinutes } = await req.json()
   if (!originAddress || !destinationAddress) {
     return NextResponse.json({ error: 'Missing origin or destination address.' }, { status: 400 })
   }
@@ -134,22 +134,33 @@ export async function POST(req: NextRequest) {
   }
 
   // The real bug behind false-positive ferry pricing: matching each address
-  // to its NEAREST terminal and checking those two terminals have a
-  // scheduled sailing between them only proves both points are near water -
-  // it never actually confirms the real driving route between the two
-  // addresses needs that ferry at all. Two points can each sit within 60km
-  // of some terminal while still being perfectly road-connected to each
-  // other with no water crossing involved. A genuine ferry-only route
-  // detours a driver miles out of a direct line to reach a terminal, so its
-  // real driving distance comes out much longer than the straight-line
-  // distance between the two addresses - a normal continuous road route
-  // doesn't. When the caller supplies the already-computed real driving
-  // distance, use that as a gate before ever consulting the terminal list.
-  if (typeof actualDrivingKm === 'number') {
+  // to its nearest terminal (within 60km straight-line) and checking those
+  // two terminals have a scheduled sailing between them only proves both
+  // points are near water somewhere - it never confirms the real driving
+  // route between the two addresses actually needs that ferry. A first
+  // attempt gated on distance ratio (driving distance vs. straight-line)
+  // alone wasn't strict enough: BC's coastal roads (Marine Drive, Sea-to-
+  // Sky) are naturally curvy even with zero water crossings, so a moderate
+  // ratio threshold let real false positives through (a 43.6km/36min drive
+  // - obviously a normal, unbroken trip - still matched Horseshoe Bay to
+  // Bowen Island).
+  //
+  // Average driving speed is a far more direct, geography-independent
+  // signal: a route that genuinely includes a ferry loses real time to
+  // boarding and the wait between sailings, which drags its average speed
+  // well below anything achievable on a normal, unbroken drive - a curvy
+  // coastal road doesn't do that on its own, it just adds distance, not a
+  // multi-minute-per-km time penalty. Requires BOTH signals (a real
+  // detour AND a speed consistent with lost ferry time) before trusting a
+  // terminal match, rather than either alone.
+  if (typeof actualDrivingKm === 'number' && typeof actualDrivingMinutes === 'number' && actualDrivingMinutes > 0) {
     const straightLineKm = haversineKm(originCoords.lat, originCoords.lng, destCoords.lat, destCoords.lng)
-    if (straightLineKm > 0 && actualDrivingKm / straightLineKm < 1.4) {
+    const avgSpeedKmh = actualDrivingKm / (actualDrivingMinutes / 60)
+    const looksLikeNormalDrive = avgSpeedKmh >= 45
+    const notMuchOfADetour = straightLineKm > 0 && actualDrivingKm / straightLineKm < 1.8
+    if (looksLikeNormalDrive || notMuchOfADetour) {
       return NextResponse.json({
-        error: `A direct driving route already exists (${actualDrivingKm}km driving vs ${Math.round(straightLineKm)}km straight-line) - too direct to plausibly require a ferry detour, so skipping the terminal check.`,
+        error: `Route looks like a normal continuous drive (${actualDrivingKm}km in ${actualDrivingMinutes}min, ~${Math.round(avgSpeedKmh)}km/h avg, vs ${Math.round(straightLineKm)}km straight-line) - too direct/too fast to plausibly include a ferry wait, so skipping the terminal check.`,
       }, { status: 404 })
     }
   }
