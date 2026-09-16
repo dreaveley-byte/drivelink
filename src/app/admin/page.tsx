@@ -125,18 +125,32 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { data: mtdJobs } = await supabase
     .from('jobs')
-    .select('estimated_dealer_cost_cents, estimated_driver_pay_cents, final_driver_pay_cents')
+    .select('id, estimated_dealer_cost_cents, approved_expenses_cents, estimated_driver_pay_cents, final_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible')
     .eq('status', 'completed')
     .is('archived_at', null)
     .gte('completed_at', monthStart)
 
+  const mtdJobIds = (mtdJobs ?? []).map((j) => j.id)
+  // Full reimbursement amount, not just what's actually billed to the
+  // dealer (approved_expenses_cents) - a baseline-covered expense (fuel,
+  // hotel, etc. already priced into the estimate) still gets paid to the
+  // driver in full even though little or nothing extra gets billed for
+  // it, so this is a real cost that has to come out of profit, same as
+  // the per-job breakdown on the receipt page already accounts for.
+  const { data: mtdExpenses } = mtdJobIds.length
+    ? await supabase.from('job_expenses').select('job_id, amount_cents').eq('status', 'approved').in('job_id', mtdJobIds)
+    : { data: [] }
+  const reimbursementsMtd = (mtdExpenses ?? []).reduce((sum, e) => sum + e.amount_cents, 0)
+
   let dealerSpendMtd = 0
   let driverEarningsMtd = 0
+  let bonusMtd = 0
   for (const job of mtdJobs ?? []) {
-    dealerSpendMtd += job.estimated_dealer_cost_cents ?? 0
+    dealerSpendMtd += (job.estimated_dealer_cost_cents ?? 0) + (job.approved_expenses_cents ?? 0)
     driverEarningsMtd += job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? 0
+    bonusMtd += job.performance_bonus_override_cents ?? (job.performance_bonus_eligible ? job.performance_bonus_cents ?? 0 : 0)
   }
-  const drivfloProfitMtd = dealerSpendMtd - driverEarningsMtd
+  const drivfloProfitMtd = dealerSpendMtd - driverEarningsMtd - reimbursementsMtd - bonusMtd
 
   return (
     <div className="min-h-screen bg-white">
