@@ -9,7 +9,7 @@ export default function DeleteAccountPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
-        <Link href="/"><Logo height={22} /></Link>
+        <Logo height={22} />
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-12 text-sm text-gray-700 leading-relaxed space-y-8">

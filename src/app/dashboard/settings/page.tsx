@@ -45,7 +45,7 @@ export default async function DealerSettingsPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Link href="/dashboard"><Logo height={22} /></Link>
+          <Logo height={22} />
           <span className="text-sm text-gray-400">— Settings</span>
         </div>
         <div className="flex items-center gap-4">

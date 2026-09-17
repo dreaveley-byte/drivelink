@@ -64,7 +64,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <Link href="/admin"><Logo height={22} /></Link>
+          <Logo height={22} />
           <div className="flex items-center gap-3">
             <SettingsGearLink href="/admin/settings" />
             <SignOutButton />

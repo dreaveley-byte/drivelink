@@ -183,7 +183,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div>
-          <Link href="/dashboard"><Logo height={24} /></Link>
+          <Logo height={24} />
           <p className="text-xs text-gray-500 mt-1">{org?.name}</p>
         </div>
         <div className="flex items-center gap-4">

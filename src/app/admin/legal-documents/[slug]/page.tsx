@@ -41,7 +41,7 @@ export default async function AdminEditLegalDocumentPage({ params }: { params: P
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <Link href="/admin"><Logo height={22} /></Link>
+          <Logo height={22} />
           <SignOutButton />
         </div>
       </header>
