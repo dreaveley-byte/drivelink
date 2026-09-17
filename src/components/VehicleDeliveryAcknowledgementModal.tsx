@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export type DeliveryAutoFillFields = {
   recipientName?: string | null
@@ -145,7 +146,12 @@ export default function VehicleDeliveryAcknowledgementModal({
 
   if (!open) return null
 
-  return (
+  // Rendered via a portal straight to document.body - same reasoning as
+  // SimpleCameraCapture: a fixed-position full-screen overlay nested deep
+  // in the component tree can get clipped or fail to appear at all in
+  // some Android WebViews if any ancestor has its own stacking/transform
+  // context, even one that looks harmless on its own.
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-6">
       <div className="bg-white w-full sm:max-w-2xl sm:rounded-xl rounded-t-xl flex flex-col max-h-[92vh]">
         <div className="border-b border-gray-200 px-5 py-4 flex items-start justify-between gap-4">
@@ -244,6 +250,7 @@ export default function VehicleDeliveryAcknowledgementModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 // A simple, reliable in-app camera capture using getUserMedia — the same
 // approach already proven working in GuidedCaptureModal and the customer
@@ -69,7 +70,13 @@ export default function SimpleCameraCapture({
 
   if (!open) return null
 
-  return (
+  // Rendered via a portal straight to document.body rather than inline in
+  // the component tree - a fixed-position full-screen overlay can get
+  // clipped or mispositioned in some Android WebViews if it ends up
+  // nested inside any ancestor with its own stacking/transform context,
+  // even one that looks harmless. A portal sidesteps that class of bug
+  // entirely instead of chasing down which ancestor might be the cause.
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
       <button
         type="button"
@@ -107,6 +114,7 @@ export default function SimpleCameraCapture({
         </>
       )}
       <canvas ref={canvasRef} className="hidden" />
-    </div>
+    </div>,
+    document.body
   )
 }
