@@ -117,7 +117,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-gray-900 mb-2">Almost there</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Your account isn&apos;t linked to an organization yet. This gets set up once by an admin — let Dan know your email so he can connect it.
+            Your account isn&apos;t linked to an organization yet. This gets set up once by an admin — reach out to support with your email so it can be connected.
           </p>
           <SignOutButton />
         </div>
