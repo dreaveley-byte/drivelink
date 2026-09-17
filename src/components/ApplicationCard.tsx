@@ -214,6 +214,20 @@ export default function ApplicationCard({
       alert(`Could not update the application status: ${statusError.message}`)
       return
     }
+
+    if (newStatus === 'approved') {
+      const notifiedUserId = table === 'driver_applications' ? userId : dealerSubmittedBy
+      if (notifiedUserId) {
+        // Best-effort - the approval itself has already succeeded above
+        // regardless of whether this email goes out.
+        fetch('/api/notify-application-approved', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationType: table === 'driver_applications' ? 'driver' : 'dealer', userId: notifiedUserId }),
+        }).catch(() => {})
+      }
+    }
+
     router.refresh()
   }
 
