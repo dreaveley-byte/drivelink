@@ -57,7 +57,20 @@ export default async function HomePage() {
     {/* pickup / tracking / delivered strip */}
     <div style={{position: 'relative', width: '100%', maxWidth: '920px', height: '120px', marginTop: '64px'}}>
       <svg width="100%" height="120" viewBox="0 0 920 120" style={{position: 'absolute', top: '0', left: '0'}}>
-        <path d="M 60 90 Q 300 10 460 60 T 860 90" fill="none" stroke="#bfdbfe" strokeWidth="2" strokeDasharray="6 6"/>
+        {/* Road surface */}
+        <path d="M 60 90 Q 300 10 460 60 T 860 90" fill="none" stroke="#2563eb" strokeWidth="10" strokeLinecap="round"/>
+        {/* Lane markings */}
+        <path className="lane-dash" d="M 60 90 Q 300 10 460 60 T 860 90" fill="none" stroke="#dbeafe" strokeWidth="2" strokeDasharray="10 10" strokeLinecap="round"/>
+        {/* Live-tracking car, matching the marker used on the actual job-tracking map */}
+        <g className="route-car">
+          <circle r="13" fill="#ffffff" stroke="#2563eb" strokeWidth="2"/>
+          <g transform="scale(0.85)">
+            <path d="M-9,2 L-8,-4 Q-7,-8 -3,-8 L3,-8 Q7,-8 8,-4 L9,2 Q9,5 6,5 L-6,5 Q-9,5 -9,2 Z" fill="#2563eb" stroke="#1D1D1F" strokeWidth="0.5"/>
+            <path d="M-6,-3.5 L-5,-6.5 Q-4,-7.5 -2,-7.5 L2,-7.5 Q4,-7.5 5,-6.5 L6,-3.5 Z" fill="#ffffff" opacity="0.85"/>
+            <circle cx="-5.5" cy="5" r="2" fill="#1D1D1F"/>
+            <circle cx="5.5" cy="5" r="2" fill="#1D1D1F"/>
+          </g>
+        </g>
       </svg>
       <div style={{position: 'absolute', left: '0', top: '64px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 16px', boxShadow: '0 4px 10px rgba(15,23,42,0.06)', textAlign: 'left'}}>
         <div style={{fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: '#94a3b8', textTransform: 'uppercase'}}>01 / Pickup</div>
@@ -111,6 +124,23 @@ export default async function HomePage() {
       <style>{`
         .navlink:hover { color: #2563eb; }
         .card-link:hover { transform: translateY(-2px); }
+        @keyframes route-car-travel {
+          0% { offset-distance: 0%; }
+          100% { offset-distance: 100%; }
+        }
+        .route-car {
+          offset-path: path('M 60 90 Q 300 10 460 60 T 860 90');
+          animation: route-car-travel 6s linear infinite;
+        }
+        .lane-dash {
+          animation: lane-dash-travel 1.2s linear infinite;
+        }
+        @keyframes lane-dash-travel {
+          to { stroke-dashoffset: -20; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .route-car, .lane-dash { animation: none; offset-distance: 50%; }
+        }
       `}</style>
     </>
   );
