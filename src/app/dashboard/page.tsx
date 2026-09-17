@@ -158,11 +158,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
   const jobs = sortJobsActiveFirst(jobsRaw ?? [], ascending)
+
+  // Month-to-date counts for the summary cards at the top of the dashboard -
+  // scheduled (still in the queue, no driver working it yet), in action
+  // (actively being driven), and completed, all scoped to jobs created
+  // this calendar month.
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const jobsThisMonth = (jobs ?? []).filter((j) => j.created_at && new Date(j.created_at) >= monthStart)
+  const mtdScheduled = jobsThisMonth.filter((j) => j.status === 'awaiting_driver').length
+  const mtdInAction = jobsThisMonth.filter((j) => ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(j.status)).length
+  const mtdCompleted = jobsThisMonth.filter((j) => j.status === 'completed').length
 
   const trackableJobIds = (jobs ?? [])
     .filter((j) => ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(j.status))
@@ -211,6 +221,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           + Post a new job
         </Link>
         <SortSelect />
+      </div>
+
+      <div className="max-w-3xl mx-auto px-6 pt-6 grid grid-cols-3 gap-4">
+        <div className="border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">Scheduled (MTD)</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-0.5">{mtdScheduled}</p>
+        </div>
+        <div className="border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">In Action (MTD)</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-0.5">{mtdInAction}</p>
+        </div>
+        <div className="border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">Completed (MTD)</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-0.5">{mtdCompleted}</p>
+        </div>
       </div>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
@@ -272,6 +297,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     {driverInfo.phone && <span className="text-gray-400">· {driverInfo.phone}</span>}
                   </p>
                 )}
+                {job.idle_since && (
+                  <p className="text-xs text-amber-700 font-medium mt-1 flex items-center gap-1">
+                    ⚠ Driver has been idle since {new Date(job.idle_since).toLocaleTimeString('en-CA', { timeZone: 'America/Vancouver', hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                )}
+                {['picked_up', 'in_progress'].includes(job.status) && job.pickup_gps_at && job.estimated_duration_minutes && (() => {
+                  // A time-based estimate (elapsed time since pickup vs. planned
+                  // driving duration), not a true GPS-distance calculation - the
+                  // target dropoff location isn't geocoded/persisted anywhere
+                  // today, so this is the practical estimate available without
+                  // adding a live-routing lookup on every dashboard render.
+                  const elapsedMin = (Date.now() - new Date(job.pickup_gps_at).getTime()) / 60000
+                  const pct = Math.max(2, Math.min(96, Math.round((elapsedMin / job.estimated_duration_minutes) * 100)))
+                  return (
+                    <div className="mt-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
+                        <span>In progress</span>
+                        <span>Delivered</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#378ADD] rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })()}
                 {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (job.customer_full_name || job.customer_phone) && (
                   <p className="text-xs text-gray-400 mt-0.5">
                     Customer: {job.customer_full_name}
