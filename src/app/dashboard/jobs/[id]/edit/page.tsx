@@ -960,6 +960,8 @@ export default function EditJobPage() {
     if (loading) return // guards against a double-click/double-submit race that could otherwise duplicate stops (delete+insert running twice concurrently)
     setError('')
 
+    const excludeFuelAccrual = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Pick / Drop Off' || jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Pick Up / Drop Off'
+
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setError('Enter at least a pickup and dropoff address.')

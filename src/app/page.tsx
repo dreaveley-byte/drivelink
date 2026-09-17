@@ -108,7 +108,7 @@ export default async function HomePage() {
 
 </div>
 
-      <style jsx global>{`
+      <style>{`
         .navlink:hover { color: #2563eb; }
         .card-link:hover { transform: translateY(-2px); }
       `}</style>

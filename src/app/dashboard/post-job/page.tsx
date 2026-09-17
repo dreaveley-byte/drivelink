@@ -951,6 +951,8 @@ export default function PostJobPage() {
     e.preventDefault()
     setError('')
 
+    const excludeFuelAccrual = jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Pick / Drop Off' || jobTypes.find((jt) => jt.id === jobTypeId)?.name === 'Vehicle Pick Up / Drop Off'
+
     const filledStops = stops.map((s) => s.trim()).filter(Boolean)
     if (filledStops.length < 2) {
       setError('Enter at least a pickup and dropoff address.')
