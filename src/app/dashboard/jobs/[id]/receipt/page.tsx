@@ -8,7 +8,6 @@ import { buildDeliveryDisclosureText } from '@/lib/checklist'
 import DealerFeedbackForm from '@/components/DealerFeedbackForm'
 import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
-import ApproveIdVerificationButton from '@/components/ApproveIdVerificationButton'
 import ExpenseReviewList from '@/components/ExpenseReviewList'
 import AdminJobAdjustments from '@/components/AdminJobAdjustments'
 import AdminDriverReassign from '@/components/AdminDriverReassign'
@@ -769,10 +768,8 @@ export default async function JobReceiptPage({
             {job.id_verification_match_notes && (
               <p className="text-xs text-gray-400 mt-3 whitespace-pre-line">AI check: {job.id_verification_match_notes}</p>
             )}
-            {job.id_verification_approved_at ? (
-              <p className="text-xs text-green-600 mt-3">✓ Approved {fmtDateTime(job.id_verification_approved_at)}</p>
-            ) : (
-              <ApproveIdVerificationButton jobId={job.id} />
+            {job.id_verification_approved_at && (
+              <p className="text-xs text-green-600 mt-3">✓ Verified {fmtDateTime(job.id_verification_approved_at)}</p>
             )}
           </div>
         </div>

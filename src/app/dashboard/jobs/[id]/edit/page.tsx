@@ -149,6 +149,7 @@ export default function EditJobPage() {
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [notEditable, setNotEditable] = useState(false)
+  const [viewOnlyJob, setViewOnlyJob] = useState<any>(null)
   // A cancelled job is editable too, but saving it means something different
   // than an ordinary edit — it needs to go back to 'awaiting_driver' (and lose
   // any stale driver_id from before it was cancelled, and any archived_at) so
@@ -197,6 +198,12 @@ export default function EditJobPage() {
       // could cause real confusion/disputes), but admin needs the
       // flexibility to make corrections after the fact.
       if (profile?.role !== 'platform_admin' && job.status !== 'awaiting_driver' && job.status !== 'cancelled') {
+        const stopRows = (job.job_stops ?? []).slice().sort((a: { stop_order: number }, b: { stop_order: number }) => a.stop_order - b.stop_order)
+        setViewOnlyJob({
+          ...job,
+          stopAddresses: stopRows.length >= 2 ? stopRows.map((s: { address: string }) => s.address) : [job.pickup_address, job.dropoff_address],
+          driverName: Array.isArray(job.driver) ? job.driver[0]?.full_name ?? null : job.driver?.full_name ?? null,
+        })
         setNotEditable(true)
         setPageLoading(false)
         return
@@ -1215,16 +1222,73 @@ export default function EditJobPage() {
   if (pageLoading) return null
 
   if (notEditable) {
+    const j = viewOnlyJob
+    const jobTypeName = j ? jobTypes.find((jt) => jt.id === j.job_type_id)?.name : null
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-6">
-        <div className="max-w-sm text-center">
-          <h1 className="text-lg font-semibold text-gray-900 mb-2">This job can no longer be edited</h1>
-          <p className="text-sm text-gray-500 mb-6">
-            Once a driver has been assigned, the job details are locked. If this job is already done or no longer needed, cancel it first from the dashboard — a cancelled job can be reopened and reposted.
+      <div className="min-h-screen bg-white">
+        <div className="max-w-2xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-lg font-semibold text-gray-900">{jobTypeName ?? 'Job'} details</h1>
+            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-600 hover:text-gray-900 underline">
+              Back to dashboard
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mb-6">
+            This job&apos;s details are locked for viewing only — once a driver is assigned, changes here could cause real confusion or disputes.
           </p>
-          <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-600 hover:text-gray-900 underline">
-            Back to dashboard
-          </button>
+
+          {j && (
+            <div className="space-y-4">
+              {(j.vehicle_year || j.vehicle_make || j.vehicle_model || j.vin || j.stock_number) && (
+                <div className="border border-gray-200 rounded-xl p-4 text-sm space-y-1">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Vehicle</p>
+                  <p className="text-gray-900">{[j.vehicle_year, j.vehicle_make, j.vehicle_model].filter(Boolean).join(' ') || '—'}</p>
+                  {j.stock_number && <p className="text-gray-500">Stock #{j.stock_number}</p>}
+                  {j.vin && <p className="text-gray-500">VIN {j.vin}</p>}
+                </div>
+              )}
+
+              <div className="border border-gray-200 rounded-xl p-4 text-sm space-y-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Route</p>
+                {(j.stopAddresses ?? []).filter(Boolean).map((addr: string, i: number) => (
+                  <p key={i} className="text-gray-900">{i === 0 ? 'Pickup: ' : i === (j.stopAddresses?.length ?? 0) - 1 ? 'Dropoff: ' : 'Stop: '}{addr}</p>
+                ))}
+              </div>
+
+              {(j.recipient_name || j.customer_full_name || j.customer_phone) && (
+                <div className="border border-gray-200 rounded-xl p-4 text-sm space-y-1">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Customer</p>
+                  <p className="text-gray-900">{j.customer_full_name || j.recipient_name || '—'}</p>
+                  {j.customer_phone && <p className="text-gray-500">{j.customer_phone}</p>}
+                </div>
+              )}
+
+              <div className="border border-gray-200 rounded-xl p-4 text-sm space-y-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                <p className="text-gray-900 capitalize">{String(j.status).replace(/_/g, ' ')}</p>
+                <p className="text-gray-500">{j.driverName ? `Driver: ${j.driverName}` : 'No driver assigned yet'}</p>
+                {j.estimated_dealer_cost_cents != null && (
+                  <p className="text-gray-500">Estimated cost: {formatCents(j.estimated_dealer_cost_cents)}</p>
+                )}
+              </div>
+
+              {j.special_instructions && (
+                <div className="border border-gray-200 rounded-xl p-4 text-sm">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-gray-900 whitespace-pre-line">{j.special_instructions}</p>
+                </div>
+              )}
+
+              <div className="flex gap-4 pt-2">
+                <Link href={`/dashboard/jobs/${jobId}/track`} className="text-sm text-blue-600 hover:underline">
+                  Track &amp; message driver →
+                </Link>
+                <Link href={`/dashboard/jobs/${jobId}/receipt`} className="text-sm text-blue-600 hover:underline">
+                  View receipt →
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )

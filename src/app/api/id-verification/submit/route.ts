@@ -228,7 +228,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not complete verification. Please try again.' }, { status: 500 })
   }
 
-  await supabase.from('jobs').update({ id_verification_match_notes: identityCheck.notes }).eq('id_verification_token', token)
+  await supabase.from('jobs').update({
+    id_verification_match_notes: identityCheck.notes,
+    // The AI check passing IS the approval now - no dealer action needed,
+    // and no waiting period before the driver can proceed. A failed AI
+    // check never reaches this point at all (it returns earlier, handed
+    // off to the driver for manual verification instead).
+    id_verification_approved_at: new Date().toISOString(),
+  }).eq('id_verification_token', token)
 
   // Let the dealer know verification is done, through the job's own chat thread
   // (which also triggers their normal SMS chat notification) rather than a
@@ -237,11 +244,9 @@ export async function POST(req: NextRequest) {
     const host = req.headers.get('host')
     const protocol = host?.includes('localhost') ? 'http' : 'https'
     const vehicleDesc = [job.vehicle_year, job.vehicle_make, job.vehicle_model].filter(Boolean).join(' ')
-    const { data: settings } = await supabase.from('pricing_settings').select('id_verification_approval_wait_minutes').eq('id', 1).single()
-    const waitMinutes = settings?.id_verification_approval_wait_minutes ?? 5
     const chatBody =
       `✅ ${job.customer_full_name || 'The customer'}'s identity has been verified for the ${vehicleDesc || 'vehicle'} delivery. ` +
-      `Please approve within ${waitMinutes} minutes — after that the driver will proceed automatically. Review: ${protocol}://${host}/dashboard/jobs/${job.job_id}/receipt`
+      `Review: ${protocol}://${host}/dashboard/jobs/${job.job_id}/receipt`
 
     await supabase.rpc('post_id_verification_chat_message', { p_token: token, p_body: chatBody })
 

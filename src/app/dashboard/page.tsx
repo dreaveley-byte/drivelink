@@ -285,13 +285,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   </p>
                 )}
                 {isFinished && <p className="text-xs text-blue-600 mt-1">View receipt →</p>}
-                {isTrackable && <p className="text-xs text-blue-600 mt-1">Track &amp; message driver →</p>}
+                {isTrackable && <p className="text-xs text-blue-600 mt-1">View details →</p>}
               </>
             )
             const linkHref = isFinished
               ? `/dashboard/jobs/${job.id}/receipt`
               : isTrackable
-              ? `/dashboard/jobs/${job.id}/track`
+              ? `/dashboard/jobs/${job.id}/edit`
               : null
             return (
             <div
