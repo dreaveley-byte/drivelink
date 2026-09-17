@@ -25,6 +25,20 @@ export default function DriverApplyPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
 
+  // Two-step signup: 'basic_info' (name/address/phone/email, no account
+  // yet) -> 'verify_code' (the texted code) -> 'check_email' (account
+  // created, waiting on the confirmation-email click) -> 'full_form' (back
+  // here already logged in, via the emailed link, to set a real password
+  // and finish the rest of the application).
+  const [step, setStep] = useState<'basic_info' | 'verify_code' | 'check_email' | 'full_form'>('basic_info')
+  const [leadId, setLeadId] = useState<string | null>(null)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [startingSignup, setStartingSignup] = useState(false)
+  const [verifyingCode, setVerifyingCode] = useState(false)
+  const [stepError, setStepError] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+
   // Personal info
   const [fullName, setFullName] = useState('')
   const [address, setAddress] = useState('')
@@ -65,10 +79,29 @@ export default function DriverApplyPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const params = new URLSearchParams(window.location.search)
+    const leadFromUrl = params.get('lead')
+    if (leadFromUrl) setLeadId(leadFromUrl)
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUserId(user.id)
         setEmail(user.email ?? '')
+        setStep('full_form')
+        // Arriving here logged-in with a lead id in the URL means this is
+        // the confirmation-email click completing the two-step signup -
+        // pre-fill what was already collected in step one rather than
+        // asking for it twice.
+        if (leadFromUrl) {
+          const { data: leadData } = await supabase.rpc('get_verified_driver_lead', { p_lead_id: leadFromUrl })
+          const lead = leadData?.[0]
+          if (lead) {
+            setFullName(lead.full_name ?? '')
+            setAddress(lead.home_address ?? '')
+            setCellPhone(lead.cell_phone ?? '')
+            setHomePhone(lead.home_phone ?? '')
+          }
+        }
       }
     })
     supabase.from('job_types').select('id, name').eq('active', true).order('name').then(({ data }) => {
@@ -196,6 +229,66 @@ export default function DriverApplyPage() {
     }
   }
 
+  async function handleStartSignup(e: React.FormEvent) {
+    e.preventDefault()
+    setStepError('')
+    if (!fullName || !address || !cellPhone || !email) {
+      setStepError('Please fill in your name, home address, cell number, and email.')
+      return
+    }
+    setStartingSignup(true)
+    try {
+      const res = await fetch('/api/signup-leads/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'driver', fullName, homeAddress: address, cellPhone, homePhone, email }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setStepError(data.error || 'Something went wrong starting your application.')
+        return
+      }
+      setLeadId(data.leadId)
+      setStep('verify_code')
+    } catch {
+      setStepError('Could not reach the server. Please try again.')
+    } finally {
+      setStartingSignup(false)
+    }
+  }
+
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault()
+    setStepError('')
+    if (!leadId) return
+    setVerifyingCode(true)
+    try {
+      const supabase = createClient()
+      const { data: verified } = await supabase.rpc('verify_driver_signup_code', { p_lead_id: leadId, p_code: verificationCode.trim() })
+      if (!verified) {
+        setStepError("That code doesn't match or has expired. Double-check it, or go back to re-send.")
+        return
+      }
+      // A random, never-shown password - just enough to create the account
+      // so Supabase's own confirmation email goes out. The applicant sets
+      // their real password once they click that email and land back here.
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: crypto.randomUUID(),
+        options: { emailRedirectTo: `${window.location.origin}/driver/apply?lead=${leadId}` },
+      })
+      if (signUpError) {
+        setStepError(signUpError.message)
+        return
+      }
+      setStep('check_email')
+    } catch {
+      setStepError('Could not verify that code. Please try again.')
+    } finally {
+      setVerifyingCode(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -213,9 +306,29 @@ export default function DriverApplyPage() {
       setError('Please sign the contract at the bottom before submitting.')
       return
     }
+    // Only required when arriving via the two-step signup (a lead id is
+    // present) - an already-logged-in user filling this out directly has
+    // no reason to be asked for a new password.
+    if (leadId && (!newPassword || newPassword.length < 8)) {
+      setError('Please set a password (at least 8 characters) to finish creating your account.')
+      return
+    }
+    if (leadId && newPassword !== newPasswordConfirm) {
+      setError('Those passwords don\u2019t match.')
+      return
+    }
 
     setLoading(true)
     const supabase = createClient()
+
+    if (leadId && newPassword) {
+      const { error: pwError } = await supabase.auth.updateUser({ password: newPassword })
+      if (pwError) {
+        setError(`Could not set your password: ${pwError.message}`)
+        setLoading(false)
+        return
+      }
+    }
 
     // Upload the signature image
     const signatureBlob = await (await fetch(signatureDataUrl)).blob()
@@ -290,6 +403,10 @@ export default function DriverApplyPage() {
       body: JSON.stringify({ applicationType: 'driver', name: fullName }),
     }).catch(() => {})
 
+    if (leadId) {
+      await supabase.rpc('mark_driver_lead_converted', { p_lead_id: leadId, p_user_id: userId })
+    }
+
     if (draftKey) localStorage.removeItem(draftKey)
     setSubmitted(true)
     setLoading(false)
@@ -302,6 +419,99 @@ export default function DriverApplyPage() {
           <h1 className="text-lg font-semibold text-gray-900 mb-2">Application submitted</h1>
           <p className="text-sm text-gray-500">
             Thanks — your application is being reviewed. We&apos;ll be in touch once it&apos;s approved.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'basic_info') {
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-200 px-6 py-4">
+          <Logo height={18} />
+          <h1 className="text-lg font-semibold text-gray-900 mt-2">Become a driver</h1>
+        </header>
+        <main className="max-w-lg mx-auto px-6 py-8">
+          <p className="text-sm text-gray-500 mb-6">
+            Start with a few basics — we&apos;ll text a code to confirm your number, then email you a link to finish the rest.
+          </p>
+          <form onSubmit={handleStartSignup} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Full legal name</label>
+              <input required value={fullName} onChange={(e) => setFullName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Home address</label>
+              <input required value={address} onChange={(e) => setAddress(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Cell number</label>
+                <input required value={cellPhone} onChange={(e) => setCellPhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Home number</label>
+                <input value={homePhone} onChange={(e) => setHomePhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Email address</label>
+              <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            {stepError && <p className="text-sm text-red-600">{stepError}</p>}
+            <button type="submit" disabled={startingSignup}
+              className="w-full bg-[#378ADD] text-white text-sm font-semibold py-3 rounded-lg disabled:opacity-50">
+              {startingSignup ? 'Sending code…' : 'Text me a code'}
+            </button>
+          </form>
+        </main>
+      </div>
+    )
+  }
+
+  if (step === 'verify_code') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-sm w-full">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Check your phone</h1>
+          <p className="text-sm text-gray-500 mb-6">We texted a 6-digit code to {cellPhone}. Enter it below.</p>
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <input
+              required
+              inputMode="numeric"
+              maxLength={6}
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center text-lg tracking-widest"
+            />
+            {stepError && <p className="text-sm text-red-600">{stepError}</p>}
+            <button type="submit" disabled={verifyingCode}
+              className="w-full bg-[#378ADD] text-white text-sm font-semibold py-3 rounded-lg disabled:opacity-50">
+              {verifyingCode ? 'Verifying…' : 'Verify'}
+            </button>
+            <button type="button" onClick={() => setStep('basic_info')} className="w-full text-xs text-gray-400 underline">
+              Wrong number? Go back
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'check_email') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-sm text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Check your email</h1>
+          <p className="text-sm text-gray-500">
+            We sent a link to {email} — open it to finish your application, including setting a password.
           </p>
         </div>
       </div>
@@ -334,34 +544,53 @@ export default function DriverApplyPage() {
           {/* Personal Info */}
           <section className="space-y-4">
             <h2 className="text-sm font-semibold text-gray-900">Personal Information</h2>
+            {leadId && (
+              <p className="text-xs text-gray-400">Confirmed via text — editing these here won&apos;t change your account email.</p>
+            )}
             <div>
               <label className="block text-sm text-gray-700 mb-1">Full legal name</label>
-              <input required value={fullName} onChange={(e) => setFullName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input required disabled={!!leadId} value={fullName} onChange={(e) => setFullName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Home address</label>
-              <input required value={address} onChange={(e) => setAddress(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input required disabled={!!leadId} value={address} onChange={(e) => setAddress(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Cell number</label>
-                <input required value={cellPhone} onChange={(e) => setCellPhone(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <input required disabled={!!leadId} value={cellPhone} onChange={(e) => setCellPhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Home number</label>
-                <input value={homePhone} onChange={(e) => setHomePhone(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <input disabled={!!leadId} value={homePhone} onChange={(e) => setHomePhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Email address</label>
-              <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input required type="email" disabled={!!leadId} value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </section>
+
+          {leadId && (
+            <section className="space-y-4">
+              <h2 className="text-sm font-semibold text-gray-900">Set your password</h2>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Password</label>
+                <input required type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Confirm password</label>
+                <input required type="password" minLength={8} value={newPasswordConfirm} onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </section>
+          )}
 
           {/* Payment / Tax */}
           <section className="space-y-4">
