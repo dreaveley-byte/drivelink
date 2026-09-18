@@ -64,9 +64,12 @@ export default function DealerApplyPage() {
     const params = new URLSearchParams(window.location.search)
     const leadFromUrl = params.get('lead')
     if (leadFromUrl) setLeadId(leadFromUrl)
+    let settled = false
 
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    async function run() {
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        settled = true
         setStep('basic_info')
         return
       }
@@ -92,14 +95,17 @@ export default function DealerApplyPage() {
         .maybeSingle()
 
       if (existingApp?.status === 'approved') {
+        settled = true
         router.replace('/dashboard')
         return
       }
       if (existingApp?.status === 'rejected') {
+        settled = true
         setStep('rejected')
         return
       }
       if (existingApp) {
+        settled = true
         setStep('under_review')
         return
       }
@@ -115,11 +121,32 @@ export default function DealerApplyPage() {
           setStorePhone(lead.store_phone ?? '')
           setContactCellPhone(lead.contact_cell_phone ?? '')
         }
+        settled = true
         setStep('set_password')
       } else {
+        settled = true
         setStep('full_form')
       }
+    }
+
+    run().catch((err) => {
+      settled = true
+      console.error('Dealer apply page failed to load:', err)
+      setStepError('Something went wrong loading your application. Please refresh the page.')
+      setStep('basic_info')
     })
+
+    // A safety net against ever hanging on a blank page forever, whatever
+    // the exact cause - this exact situation (stuck blank after clicking
+    // the confirmation email) is what prompted adding it.
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        setStepError('This is taking longer than expected. Please refresh the page, or log in directly if you already set a password.')
+        setStep('basic_info')
+      }
+    }, 8000)
+
+    return () => clearTimeout(timeout)
   }, [router])
 
   async function handleStartSignup(e: React.FormEvent) {

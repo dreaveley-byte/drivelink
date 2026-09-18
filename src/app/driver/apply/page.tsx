@@ -83,9 +83,12 @@ export default function DriverApplyPage() {
     const params = new URLSearchParams(window.location.search)
     const leadFromUrl = params.get('lead')
     if (leadFromUrl) setLeadId(leadFromUrl)
+    let settled = false
 
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    async function run() {
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        settled = true
         setStep('basic_info')
         return
       }
@@ -104,14 +107,17 @@ export default function DriverApplyPage() {
         .maybeSingle()
 
       if (existingApp?.status === 'approved') {
+        settled = true
         router.replace('/driver')
         return
       }
       if (existingApp?.status === 'rejected') {
+        settled = true
         setStep('rejected')
         return
       }
       if (existingApp) {
+        settled = true
         setStep('under_review')
         return
       }
@@ -129,14 +135,36 @@ export default function DriverApplyPage() {
           setCellPhone(lead.cell_phone ?? '')
           setHomePhone(lead.home_phone ?? '')
         }
+        settled = true
         setStep('set_password')
       } else {
+        settled = true
         setStep('full_form')
       }
+    }
+
+    run().catch((err) => {
+      settled = true
+      console.error('Driver apply page failed to load:', err)
+      setStepError('Something went wrong loading your application. Please refresh the page.')
+      setStep('basic_info')
     })
+
+    // A safety net against ever hanging on a blank page forever, whatever
+    // the exact cause - this exact situation (stuck blank after clicking
+    // the confirmation email) is what prompted adding it.
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        setStepError('This is taking longer than expected. Please refresh the page, or log in directly if you already set a password.')
+        setStep('basic_info')
+      }
+    }, 8000)
+
     supabase.from('job_types').select('id, name').eq('active', true).order('name').then(({ data }) => {
       if (data) setAvailableJobTypes(data)
     })
+
+    return () => clearTimeout(timeout)
   }, [router])
 
   // Auto-save/restore draft progress to localStorage, so navigating away
