@@ -305,7 +305,7 @@ export default function DriverApplyPage() {
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password: crypto.randomUUID(),
-        options: { emailRedirectTo: `${window.location.origin}/driver/apply?lead=${leadId}` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/driver/apply?lead=${leadId}`)}` },
       })
       if (signUpError) {
         setStepError(signUpError.message)

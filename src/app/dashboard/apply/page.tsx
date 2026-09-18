@@ -168,7 +168,7 @@ export default function DealerApplyPage() {
       const { error: signUpError } = await supabase.auth.signUp({
         email: contactEmail,
         password: crypto.randomUUID(),
-        options: { emailRedirectTo: `${window.location.origin}/dashboard/apply?lead=${leadId}` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/dashboard/apply?lead=${leadId}`)}` },
       })
       if (signUpError) {
         setStepError(signUpError.message)
