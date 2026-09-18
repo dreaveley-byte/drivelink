@@ -28,7 +28,7 @@ export default function DealerApplyPage() {
   // waiting on the confirmation-email click) -> 'full_form' (back here
   // already logged in, via the emailed link, to set a real password and
   // finish the rest of the application).
-  const [step, setStep] = useState<'basic_info' | 'verify_code' | 'check_email' | 'set_password' | 'full_form' | 'under_review' | 'rejected' | 'loading'>('loading')
+  const [step, setStep] = useState<'basic_info' | 'verify_code' | 'check_email' | 'set_password' | 'password_set' | 'full_form' | 'under_review' | 'rejected' | 'loading'>('loading')
   const [leadId, setLeadId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [startingSignup, setStartingSignup] = useState(false)
@@ -201,7 +201,7 @@ export default function DealerApplyPage() {
         setStepError(pwError.message)
         return
       }
-      setStep('full_form')
+      setStep('password_set')
     } catch {
       setStepError('Could not set your password. Please try again.')
     } finally {
@@ -435,6 +435,26 @@ export default function DealerApplyPage() {
               {verifyingCode ? 'Saving…' : 'Continue'}
             </button>
           </form>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'password_set') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="max-w-sm text-center">
+          <Logo height={22} className="mx-auto mb-6" />
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">You&apos;re all set</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Your login is ready. Continue now to finish the rest of your application, or come back anytime by logging in with {contactEmail} and the password you just set.
+          </p>
+          <button
+            onClick={() => setStep('full_form')}
+            className="w-full bg-[#378ADD] text-white text-sm font-semibold py-3 rounded-lg"
+          >
+            Continue to your application →
+          </button>
         </div>
       </div>
     )
