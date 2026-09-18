@@ -33,6 +33,16 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     .single()
 
   if (profile?.role !== 'driver') {
+    // A brand-new driver's profile role doesn't actually become 'driver'
+    // until their application is approved (that happens as part of the
+    // approval action, not at signup) - without this check, someone who
+    // just created their account would get bounced straight to /dashboard
+    // instead of being sent to continue the application they were in the
+    // middle of. Scoped to intended_role specifically so this can't affect
+    // any dealer/admin account, which would never have it set.
+    if (user.user_metadata?.intended_role === 'driver') {
+      redirect('/driver/apply')
+    }
     redirect('/dashboard')
   }
 

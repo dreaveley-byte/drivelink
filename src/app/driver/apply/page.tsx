@@ -33,6 +33,7 @@ export default function DriverApplyPage() {
   // and finish the rest of the application).
   const [step, setStep] = useState<'basic_info' | 'verify_code' | 'check_email' | 'set_password' | 'password_set' | 'full_form' | 'under_review' | 'rejected' | 'loading'>('loading')
   const [leadId, setLeadId] = useState<string | null>(null)
+  const [setupToken, setSetupToken] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [startingSignup, setStartingSignup] = useState(false)
   const [verifyingCode, setVerifyingCode] = useState(false)
@@ -82,10 +83,32 @@ export default function DriverApplyPage() {
     const supabase = createClient()
     const params = new URLSearchParams(window.location.search)
     const leadFromUrl = params.get('lead')
+    const tokenFromUrl = params.get('token')
     if (leadFromUrl) setLeadId(leadFromUrl)
     let settled = false
 
     async function run() {
+      // A custom setup-email link (?lead=&token=) needs no session at all -
+      // whoever has both values proves they own this signup, checked
+      // server-side when the password is actually submitted. This has to
+      // be checked before any auth lookup, since there's deliberately no
+      // session established at this point yet.
+      if (leadFromUrl && tokenFromUrl) {
+        setSetupToken(tokenFromUrl)
+        const { data: leadData } = await supabase.rpc('get_verified_driver_lead', { p_lead_id: leadFromUrl })
+        const lead = leadData?.[0]
+        if (lead) {
+          setFullName(lead.full_name ?? '')
+          setAddress(lead.home_address ?? '')
+          setCellPhone(lead.cell_phone ?? '')
+          setHomePhone(lead.home_phone ?? '')
+          setEmail(lead.email ?? '')
+        }
+        settled = true
+        setStep('set_password')
+        return
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         settled = true
@@ -122,25 +145,8 @@ export default function DriverApplyPage() {
         return
       }
 
-      // No application yet. Arriving here via the confirmation-email link
-      // (a lead id in the URL) means the password still needs to be set
-      // before the rest of the form - pre-fill what was already collected
-      // in step one rather than asking for it twice.
-      if (leadFromUrl) {
-        const { data: leadData } = await supabase.rpc('get_verified_driver_lead', { p_lead_id: leadFromUrl })
-        const lead = leadData?.[0]
-        if (lead) {
-          setFullName(lead.full_name ?? '')
-          setAddress(lead.home_address ?? '')
-          setCellPhone(lead.cell_phone ?? '')
-          setHomePhone(lead.home_phone ?? '')
-        }
-        settled = true
-        setStep('set_password')
-      } else {
-        settled = true
-        setStep('full_form')
-      }
+      settled = true
+      setStep('full_form')
     }
 
     run().catch((err) => {
@@ -327,22 +333,21 @@ export default function DriverApplyPage() {
         setStepError("That code doesn't match or has expired. Double-check it, or go back to re-send.")
         return
       }
-      // A random, never-shown password - just enough to create the account
-      // so Supabase's own confirmation email goes out. The applicant sets
-      // their real password once they click that email and land back here.
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password: crypto.randomUUID(),
-        // Not pre-encoding the ?lead=... part here - Supabase encodes this
-        // whole emailRedirectTo value itself when it embeds it as its own
-        // redirect_to param, so pre-encoding it here resulted in the lead
-        // id ending up double-encoded (%252F instead of %2F) in the
-        // actual link sent - unnecessary and fragile even where it
-        // happens to still unwind correctly.
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/driver/apply?lead=${leadId}` },
+      // A custom email with our own link/token, not Supabase's own
+      // signup-confirmation email - that mechanism required a PKCE code
+      // exchange no matter how the client was configured, which in turn
+      // needed a locally-stored verifier from the exact browser/session
+      // that started the signup. Fragile across the realistic gap between
+      // filling out the form and clicking the email, and confirmed
+      // failing repeatedly in practice.
+      const res = await fetch('/api/signup-leads/send-setup-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'driver', leadId, origin: window.location.origin }),
       })
-      if (signUpError) {
-        setStepError(signUpError.message)
+      const data = await res.json()
+      if (!res.ok || !data.sent) {
+        setStepError(data.error || 'Could not send the setup email. Please try again.')
         return
       }
       setStep('check_email')
@@ -353,7 +358,7 @@ export default function DriverApplyPage() {
     }
   }
 
-  async function handleSetPassword(e: React.FormEvent) {
+  async function handleCompleteSignup(e: React.FormEvent) {
     e.preventDefault()
     setStepError('')
     if (newPassword.length < 8) {
@@ -364,12 +369,17 @@ export default function DriverApplyPage() {
       setStepError('Those passwords don\u2019t match.')
       return
     }
+    if (!leadId || !setupToken) return
     setVerifyingCode(true)
     try {
-      const supabase = createClient()
-      const { error: pwError } = await supabase.auth.updateUser({ password: newPassword })
-      if (pwError) {
-        setStepError(pwError.message)
+      const res = await fetch('/api/signup-leads/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'driver', leadId, token: setupToken, password: newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setStepError(data.error || 'Could not set your password. Please try again.')
         return
       }
       setStep('password_set')
@@ -601,7 +611,7 @@ export default function DriverApplyPage() {
           <p className="text-sm text-gray-500 mb-6">
             You&apos;re confirmed — pick a password to finish setting up your login. You can come back anytime to finish the rest of your application.
           </p>
-          <form onSubmit={handleSetPassword} className="space-y-4">
+          <form onSubmit={handleCompleteSignup} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-700 mb-1">Password</label>
               <input required type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
@@ -628,16 +638,16 @@ export default function DriverApplyPage() {
       <div className="min-h-screen flex items-center justify-center bg-white px-6">
         <div className="max-w-sm text-center">
           <Logo height={22} className="mx-auto mb-6" />
-          <h1 className="text-lg font-semibold text-gray-900 mb-2">You&apos;re all set</h1>
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Account created</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Your login is ready. Continue now to finish the rest of your application, or come back anytime by logging in with {email} and the password you just set.
+            Log in with {email} and the password you just set to finish the rest of your application.
           </p>
-          <button
-            onClick={() => setStep('full_form')}
-            className="w-full bg-[#378ADD] text-white text-sm font-semibold py-3 rounded-lg"
+          <a
+            href="/login"
+            className="block w-full bg-[#378ADD] text-white text-sm font-semibold py-3 rounded-lg"
           >
-            Continue to your application →
-          </button>
+            Log in to complete your application →
+          </a>
         </div>
       </div>
     )
