@@ -195,7 +195,13 @@ export default function DealerApplyPage() {
       const { error: signUpError } = await supabase.auth.signUp({
         email: contactEmail,
         password: crypto.randomUUID(),
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/dashboard/apply?lead=${leadId}`)}` },
+        // Not pre-encoding the ?lead=... part here - Supabase encodes this
+        // whole emailRedirectTo value itself when it embeds it as its own
+        // redirect_to param, so pre-encoding it here resulted in the lead
+        // id ending up double-encoded (%252F instead of %2F) in the
+        // actual link sent - unnecessary and fragile even where it
+        // happens to still unwind correctly.
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/apply?lead=${leadId}` },
       })
       if (signUpError) {
         setStepError(signUpError.message)
