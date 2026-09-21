@@ -493,15 +493,6 @@ export default function PricingSettingsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Return-to-pickup radius for marking a job complete (km)</label>
-              <p className="text-xs text-gray-400 mb-1">
-                A driver must be within this distance of where they actually started the job (their real GPS position when they marked it picked up, not just the address) before they can mark it complete. Confirms they&apos;ve genuinely made it back rather than trusting an unverified tap from anywhere. If their location can&apos;t be read for some reason, this check is skipped rather than permanently blocking them.
-              </p>
-              <input type="number" step="0.5" min="0" value={settings.return_to_pickup_radius_km}
-                onChange={(e) => updateNumberField('return_to_pickup_radius_km', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
               <label className="block text-sm text-gray-700 mb-1">Admin alert phone number</label>
               <p className="text-xs text-gray-400 mb-1">Gets a text if a driver appears to be idle too long on an active job, and whenever a new driver or dealer application is submitted. Leave blank to disable both.</p>
               <input type="tel" value={settings.admin_alert_phone ?? ''}

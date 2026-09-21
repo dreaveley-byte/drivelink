@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 import { formatCents, type AdditionalCharge } from '@/lib/pricing'
-import { haversineKm } from '@/lib/geo'
 import { getDefaultChecklist, getDocumentTextForLabel, buildDeliveryDisclosureText, type ChecklistItemType, type IncludedItems } from '@/lib/checklist'
 import ChecklistSignaturePad from '@/components/ChecklistSignaturePad'
 import ConditionReportCard, { type ConditionData } from '@/components/ConditionReportCard'
@@ -655,34 +654,17 @@ export default function DriverJobActions({
         }
       }
 
-      if (newStatus === 'completed' && job.pickup_gps_lat != null && job.pickup_gps_lng != null) {
-        const pos = await getCurrentPositionSafe()
-        if (pos) {
-          const { data: settings } = await supabase
-            .from('pricing_settings')
-            .select('return_to_pickup_radius_km')
-            .eq('id', 1)
-            .single()
-          const radiusKm = settings?.return_to_pickup_radius_km ?? 5
-          const distanceKm = haversineKm(pos.coords.latitude, pos.coords.longitude, job.pickup_gps_lat, job.pickup_gps_lng)
-          if (distanceKm > radiusKm) {
-            alert(
-              `You're about ${distanceKm.toFixed(1)}km from where you started this job - you need to be within ${radiusKm}km to mark it complete. This confirms you've actually made it back before wrapping up.`
-            )
-            return
-          }
-        }
-        // If a position genuinely couldn't be obtained (permission denied,
-        // device issue), fall through and allow completion rather than
-        // permanently blocking the driver from ever finishing this job.
-      }
+      // Note: this used to also block marking a job complete unless the
+      // driver's current position was within a configurable radius of
+      // where they'd started the job (return_to_pickup_radius_km in
+      // Admin Settings). Removed - it was preventing legitimate
+      // completions (GPS accuracy, drivers genuinely elsewhere for a
+      // valid reason, etc.) more than it was catching anything real.
 
       // "Delivered" means the vehicle reached the customer — it doesn't mean the
       // driver's day is done necessarily, so we still capture when/where they
-      // actually wrap up for real hours tracking. As of the check above, this
-      // step IS now gated on actually being back near where the driver started
-      // (when a position is available) - this block just records the final
-      // GPS/hours data once that's confirmed.
+      // actually wrap up for real hours tracking - just recording data here,
+      // no completion gate tied to it anymore.
       if (newStatus === 'completed') {
         const pos = await getCurrentPositionSafe()
         if (pos) {
