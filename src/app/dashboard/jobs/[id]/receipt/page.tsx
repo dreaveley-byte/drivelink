@@ -14,6 +14,7 @@ import AdminDriverReassign from '@/components/AdminDriverReassign'
 import AdminForceComplete from '@/components/AdminForceComplete'
 import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
+import AdminJobPhotos from '@/components/AdminJobPhotos'
 
 export const dynamic = 'force-dynamic'
 
@@ -165,7 +166,7 @@ export default async function JobReceiptPage({
     .order('sort_order')
 
   // Generate short-lived signed URLs for any uploaded evidence, since job-media is a private bucket.
-  const checklistWithUrls = await Promise.all(
+  const rawChecklistWithUrls = await Promise.all(
     (checklist ?? []).map(async (item) => {
       const urls = await Promise.all(
         (item.file_paths ?? []).map(async (path: string) => {
@@ -175,6 +176,23 @@ export default async function JobReceiptPage({
       )
       return { ...item, files: urls.filter((u) => u.url) as { path: string; url: string }[] }
     })
+  )
+
+  // Defensive de-duplication by label, preferring a completed item over an
+  // incomplete duplicate of the same label. A job that's been edited and
+  // recalculated has been seen ending up with its checklist duplicated
+  // (still tracking down the exact root cause) - this makes the receipt
+  // display correct either way rather than showing the same steps twice,
+  // and specifically stops an already-signed delivery from appearing
+  // unsigned just because an incomplete duplicate happened to sort first.
+  const checklistWithUrls = Object.values(
+    rawChecklistWithUrls.reduce((byLabel, item) => {
+      const existing = byLabel[item.label]
+      if (!existing || (!existing.completed_at && item.completed_at)) {
+        byLabel[item.label] = item
+      }
+      return byLabel
+    }, {} as Record<string, (typeof rawChecklistWithUrls)[number]>)
   )
 
   // The id-verification bucket's storage policy only grants signed URLs to
@@ -189,6 +207,18 @@ export default async function JobReceiptPage({
     if (!face.data?.signedUrl || !license.data?.signedUrl) return null
     return { face: face.data.signedUrl, license: license.data.signedUrl }
   })()
+
+  const { data: rawAdminPhotos } = await supabase
+    .from('job_admin_photos')
+    .select('id, storage_path, caption')
+    .eq('job_id', job.id)
+    .order('created_at', { ascending: false })
+  const adminPhotos = await Promise.all(
+    (rawAdminPhotos ?? []).map(async (photo) => {
+      const { data } = await supabase.storage.from('job-media').createSignedUrl(photo.storage_path, 60 * 60)
+      return { ...photo, url: data?.signedUrl ?? null }
+    })
+  )
 
   const driverInfo = Array.isArray(job.driver) ? job.driver[0] : job.driver
 
@@ -232,7 +262,13 @@ export default async function JobReceiptPage({
   const deliveredEvent = events?.find((e) => e.status === 'delivered' || e.status === 'completed')
 
   const conditionItems = checklistWithUrls.filter((i) => CONDITION_LABEL_MATCH.test(i.label))
-  const disclosureItem = checklistWithUrls.find((i) => DISCLOSURE_LABEL_MATCH.test(i.label))
+  // If a job somehow ended up with more than one matching item (e.g. a
+  // duplicated checklist), prefer whichever one is actually completed/
+  // signed over an incomplete duplicate - otherwise a genuinely-signed
+  // delivery could show as unsigned just because the unsigned duplicate
+  // happened to come first.
+  const disclosureMatches = checklistWithUrls.filter((i) => DISCLOSURE_LABEL_MATCH.test(i.label))
+  const disclosureItem = disclosureMatches.find((i) => i.completed_at) ?? disclosureMatches[0]
   const otherItems = checklistWithUrls.filter((i) => i !== disclosureItem && !conditionItems.includes(i))
 
   function isImagePath(path: string) {
@@ -534,6 +570,12 @@ export default async function JobReceiptPage({
                 </div>
               )})}
             </div>
+          </div>
+        )}
+
+        {job.status === 'completed' && (
+          <div className="mb-6">
+            <AdminJobPhotos jobId={job.id} photos={adminPhotos} isAdmin={isAdmin} />
           </div>
         )}
 

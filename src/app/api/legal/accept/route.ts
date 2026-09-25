@@ -46,6 +46,12 @@ export async function POST(req: NextRequest) {
     if (typeof mediaConsentDocumentVersion === 'number') insertRow.media_consent_document_version = mediaConsentDocumentVersion
     if (typeof caslMarketingConsent === 'boolean') insertRow.casl_marketing_consent = caslMarketingConsent
     if (typeof phoneMailMarketingConsent === 'boolean') insertRow.phone_mail_marketing_consent = phoneMailMarketingConsent
+    // Was missing entirely from this branch - the customer's actual drawn
+    // signature (captured client-side, sent in this same request) was
+    // being silently dropped on every single customer acceptance,
+    // regardless of whether it was ever drawn. That's the real bug behind
+    // a genuinely-signed delivery acknowledgement showing as unsigned.
+    if (signaturePath) insertRow.signature_path = signaturePath
   } else {
     insertRow.user_id = user.id
     if (jobId) insertRow.job_id = jobId
