@@ -383,6 +383,22 @@ export default async function JobReceiptPage({
     ['extrasDealerCents', 'Other extras'],
   ]
 
+  // A readable version of what actually drove the "approved additional
+  // expenses" total, instead of the generic "over accrued baseline"
+  // wording - only categories that genuinely pushed the dealer's bill
+  // above the baseline already priced in (approved_addition_cents > 0),
+  // not just any approved expense in that category.
+  const CATEGORY_NAMES: Record<string, string> = {
+    fuel: 'Fuel', inspection: 'Inspection', hotel: 'Hotel', ferry: 'Ferry',
+    return_transport: 'Return transport', food: 'Food', wait_time: 'Wait time', other: 'Other',
+  }
+  const overageCategories = [...new Set(
+    expenses.filter((e) => e.status === 'approved' && (e.approved_addition_cents ?? 0) > 0).map((e) => e.category)
+  )]
+  const approvedExpensesLabel = overageCategories.length
+    ? `Approved additional expenses (${overageCategories.map((c) => CATEGORY_NAMES[c] ?? c).join(', ')})`
+    : 'Approved additional expenses'
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-2xl mx-auto px-6 py-8 print:px-0 print:py-0">
@@ -596,7 +612,7 @@ export default async function JobReceiptPage({
               )}
               {job.approved_expenses_cents > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Approved additional expenses (over accrued baseline)</span>
+                  <span className="text-gray-600">{approvedExpensesLabel}</span>
                   <span className="text-gray-900 font-medium">+{formatCents(job.approved_expenses_cents)}</span>
                 </div>
               )}
@@ -756,7 +772,7 @@ export default async function JobReceiptPage({
                 </div>
                 {job.approved_expenses_cents > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-base text-gray-700">Approved additional expenses (over accrued baseline)</span>
+                    <span className="text-base text-gray-700">{approvedExpensesLabel}</span>
                     <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
                   </div>
                 )}

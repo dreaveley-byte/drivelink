@@ -1817,7 +1817,16 @@ export default function EditJobPage() {
               Chase vehicle required
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => setOutOfProvinceInspection(e.target.checked)} />
+              <input type="checkbox" checked={outOfProvinceInspection} onChange={(e) => {
+                setOutOfProvinceInspection(e.target.checked)
+                // An out-of-province inspection always requires the registry
+                // paperwork/visit too - auto-check it as a convenience so the
+                // $25 registry fee doesn't get missed, since it's easy to
+                // forget these are two separate checkboxes. Only auto-CHECKS
+                // it, never auto-unchecks - a registry visit can still be
+                // needed for other reasons even without an O/P inspection.
+                if (e.target.checked) setRegistryVisit(true)
+              }} />
               Out-of-province inspection required
             </label>
             {outOfProvinceInspection && scheduledFor && [5, 6].includes(new Date(`${scheduledFor}:00Z`).getUTCDay()) && (
