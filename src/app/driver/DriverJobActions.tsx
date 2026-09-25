@@ -558,9 +558,22 @@ export default function DriverJobActions({
       hasChargingCables: !!job.has_charging_cables,
       otherItems: job.other_included_items,
     }, !!job.out_of_province_inspection, !!job.is_chase_vehicle_job)
-    await supabase.from('job_checklist_items').insert(
-      defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i }))
+    const { error: backfillError } = await supabase.from('job_checklist_items').upsert(
+      defaults.map((d, i) => ({ job_id: job.id, label: d.label, item_type: d.type, sort_order: i })),
+      { onConflict: 'job_id,label', ignoreDuplicates: true }
     )
+    // ignoreDuplicates means a row that already exists for this (job,
+    // label) is silently skipped rather than erroring or overwriting it -
+    // safe to call this with a full default set even if some of those
+    // items already exist (e.g. if this ever runs again after a job's
+    // requirements changed and added new steps), since only genuinely
+    // new labels actually get inserted. Any error here still isn't
+    // surfaced to the driver - this whole path already has its own
+    // retry-safe design and shouldn't block them from continuing - but
+    // worth logging.
+    if (backfillError) {
+      console.error('Checklist backfill failed:', backfillError)
+    }
 
     router.refresh()
     setLoading(false)
