@@ -151,11 +151,28 @@ export default function ChatPanel({ jobId, currentUserId, currentUserName, curre
     if (error) {
       setDraft(body)
     } else {
-      fetch('/api/job-chat/notify-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, senderRole: currentUserRole, senderName: currentUserName, body }),
-      }).catch(() => {})
+      // sendBeacon instead of fetch specifically because this fires right
+      // after someone hits send - a moment when they very often
+      // immediately navigate away or close the tab (especially on
+      // mobile). A plain fetch's request can get silently cancelled
+      // mid-flight when that happens, which would explain a driver not
+      // getting notified even though the message itself sent fine.
+      // sendBeacon is built for exactly this - the browser guarantees the
+      // request gets sent even if the page is unloading right after.
+      const payload = new Blob(
+        [JSON.stringify({ jobId, senderRole: currentUserRole, senderName: currentUserName, body })],
+        { type: 'application/json' }
+      )
+      const beaconQueued = navigator.sendBeacon?.('/api/job-chat/notify-sms', payload)
+      if (!beaconQueued) {
+        // Older/unsupported browsers - fall back to the previous approach
+        // rather than not attempting a notification at all.
+        fetch('/api/job-chat/notify-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId, senderRole: currentUserRole, senderName: currentUserName, body }),
+        }).catch(() => {})
+      }
     }
     setSending(false)
   }
