@@ -42,6 +42,24 @@ export default function PublicChatWidget({ token, driverName }: { token: string;
     }
     setDraft('')
     loadMessages()
+
+    // The message itself only ever reached the driver via Supabase
+    // Realtime, which only works while the driver's app happens to be
+    // open on this exact screen at this exact moment - nothing notified
+    // them otherwise. Reuses the same notify route the dealer<->driver
+    // chat already uses, which already supports resolving a job by
+    // tracking token and already recognizes 'customer' as a sender role.
+    const payload = new Blob(
+      [JSON.stringify({ token, senderRole: 'customer', senderName: null, body })],
+      { type: 'application/json' }
+    )
+    if (!navigator.sendBeacon?.('/api/job-chat/notify-sms', payload)) {
+      fetch('/api/job-chat/notify-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, senderRole: 'customer', senderName: null, body }),
+      }).catch(() => {})
+    }
   }
 
   return (

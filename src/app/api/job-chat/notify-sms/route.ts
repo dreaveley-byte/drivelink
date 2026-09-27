@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendSms } from '@/lib/sms'
 
 const roleLabels: Record<string, string> = {
@@ -10,8 +10,30 @@ const roleLabels: Record<string, string> = {
   customer: 'The customer',
 }
 
+// Uses the service role rather than the caller's own session throughout -
+// this route is reached by both authenticated callers (the dealer<->driver
+// chat) and a genuinely anonymous one (a customer on their public tracking
+// page, with no session at all). profiles is only ever granted to
+// 'authenticated', not 'anon', so an anonymous caller's own session client
+// would silently get nothing back from the phone-number lookups below -
+// the route itself is the trust boundary here (it only ever notifies
+// whoever a valid token/jobId's own driver or dealer actually is, not
+// anything the caller can influence), so bypassing RLS for these specific,
+// narrow lookups is the same pattern already used elsewhere for this kind
+// of server-only notification logic.
+function serviceClient() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY is not set — chat notifications cannot be looked up without it.')
+    return null
+  }
+  return createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+}
+
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  const supabase = serviceClient()
+  if (!supabase) {
+    return NextResponse.json({ sent: [] })
+  }
 
   const { jobId, token, senderRole, senderName, body: messageBody } = await req.json()
   if ((!jobId && !token) || !senderRole) {
