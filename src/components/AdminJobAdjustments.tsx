@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { computeExpenseAddAmount, type ExpenseBaselines } from '@/lib/expenses'
+import SimpleCameraCapture from '@/components/SimpleCameraCapture'
 
 function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
@@ -46,6 +47,9 @@ export default function AdminJobAdjustments({
   const [expAmount, setExpAmount] = useState('')
   const [expDescription, setExpDescription] = useState('')
   const [expReceiptFile, setExpReceiptFile] = useState<File | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [scanningReceipt, setScanningReceipt] = useState(false)
+  const [receiptScanNote, setReceiptScanNote] = useState('')
   const [paidByAdminDirectly, setPaidByAdminDirectly] = useState(false)
   const [savingExpense, setSavingExpense] = useState(false)
   const [error, setError] = useState('')
@@ -127,6 +131,53 @@ export default function AdminJobAdjustments({
     router.refresh()
   }
 
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Same receipt reader the driver's expense form uses - fills in the
+  // amount, category, and notes from the photo so they don't have to be
+  // typed by hand. Everything stays editable, and anything already typed
+  // into the notes field is kept rather than overwritten.
+  async function handleReceiptSelected(file: File | null) {
+    setExpReceiptFile(file)
+    setReceiptScanNote('')
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setReceiptScanNote('Attached. PDFs can\'t be read automatically - enter the details yourself.')
+      return
+    }
+    setScanningReceipt(true)
+    try {
+      const base64 = await fileToBase64(file)
+      const res = await fetch('/api/expense-receipt-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: base64 }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        if (data.amount) setExpAmount(String(data.amount))
+        if (data.category) setExpCategory(data.category)
+        if (data.description || data.vendor) {
+          const scanned = [data.vendor, data.description].filter(Boolean).join(' — ')
+          setExpDescription((current) => current || scanned)
+        }
+        setReceiptScanNote('Filled in from the receipt - double check before adding.')
+      } else {
+        setReceiptScanNote('Could not read the receipt automatically - enter the details yourself.')
+      }
+    } catch {
+      setReceiptScanNote('Could not read the receipt automatically - enter the details yourself.')
+    }
+    setScanningReceipt(false)
+  }
+
   async function addExpense() {
     setError('')
     const amountCents = Math.round(parseFloat(expAmount || '0') * 100)
@@ -142,10 +193,15 @@ export default function AdminJobAdjustments({
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Generated up front so the receipt can be stored under this expense's
+    // own folder - that's what the storage rules check before letting the
+    // dealer or driver see a receipt (the previous job-id folder meant only
+    // platform admin could ever open an admin-attached receipt).
+    const expenseId = crypto.randomUUID()
     let receiptPath: string | null = null
     if (expReceiptFile) {
       const ext = expReceiptFile.name.split('.').pop() || 'jpg'
-      const path = `${jobId}/${Date.now()}-admin.${ext}`
+      const path = `${expenseId}/receipt.${ext}`
       const { error: uploadError } = await supabase.storage.from('expense-receipts').upload(path, expReceiptFile)
       if (uploadError) {
         setError(`Could not upload receipt photo: ${uploadError.message}`)
@@ -161,6 +217,7 @@ export default function AdminJobAdjustments({
     const addAmountCents = computeExpenseAddAmount(expCategory, amountCents, priorApprovedSameCategoryCents, baselines)
 
     const { error: insertError } = await supabase.from('job_expenses').insert({
+      id: expenseId,
       job_id: jobId,
       // If admin paid this directly, it shouldn't flow into the driver's
       // reimbursement (payroll sums expenses by who submitted them) - keep
@@ -200,6 +257,7 @@ export default function AdminJobAdjustments({
     setExpAmount('')
     setExpDescription('')
     setExpReceiptFile(null)
+    setReceiptScanNote('')
     router.refresh()
   }
 
@@ -275,7 +333,7 @@ export default function AdminJobAdjustments({
             onClick={() => setShowAddExpense(true)}
             className="text-sm text-gray-700 hover:text-gray-900 underline"
           >
-            + Add a charge directly (no receipt needed)
+            + Add a charge or receipt
           </button>
         ) : (
           <div className="space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -324,15 +382,42 @@ export default function AdminJobAdjustments({
               placeholder="Notes (optional)"
               className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
             />
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Receipt photo (optional)</label>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setExpReceiptFile(e.target.files?.[0] ?? null)}
-                className="w-full text-xs"
-              />
+            <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
+              {expReceiptFile ? (
+                <>
+                  <p className="text-xs text-green-700 font-medium">✓ Receipt attached: {expReceiptFile.name}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleReceiptSelected(null)}
+                    className="text-xs text-gray-400 underline mt-1"
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCameraOpen(true)}
+                    className="text-sm font-semibold text-gray-900"
+                  >
+                    📸 Take a photo of the receipt
+                  </button>
+                  <p className="text-xs text-gray-400 mt-0.5">The amount, category, and details get filled in automatically (optional)</p>
+                  <label className="block cursor-pointer mt-2">
+                    <span className="text-xs text-gray-400 underline">or upload a photo / PDF</span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => handleReceiptSelected(e.target.files?.[0] ?? null)}
+                      className="hidden"
+                    />
+                  </label>
+                </>
+              )}
             </div>
+            {scanningReceipt && <p className="text-xs text-gray-500 text-center">🔎 Reading the receipt…</p>}
+            {receiptScanNote && !scanningReceipt && <p className="text-xs text-amber-600 text-center">{receiptScanNote}</p>}
             <label className="flex items-start gap-2 text-xs text-gray-600">
               <input
                 type="checkbox"
@@ -354,7 +439,7 @@ export default function AdminJobAdjustments({
                 {savingExpense ? 'Adding…' : 'Add expense'}
               </button>
               <button
-                onClick={() => setShowAddExpense(false)}
+                onClick={() => { setShowAddExpense(false); handleReceiptSelected(null) }}
                 className="text-xs text-gray-500 hover:text-gray-700"
               >
                 Cancel
@@ -363,6 +448,16 @@ export default function AdminJobAdjustments({
           </div>
         )}
       </div>
+
+      <SimpleCameraCapture
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        filenamePrefix="receipt"
+        onCapture={(file) => {
+          setCameraOpen(false)
+          handleReceiptSelected(file)
+        }}
+      />
     </div>
   )
 }
