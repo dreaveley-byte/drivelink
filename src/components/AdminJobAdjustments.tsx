@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { computeExpenseAddAmount, type ExpenseBaselines } from '@/lib/expenses'
 import SimpleCameraCapture from '@/components/SimpleCameraCapture'
+import { compressImage, DOCUMENT_COMPRESSION } from '@/lib/compressImage'
 
 function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
@@ -144,15 +145,17 @@ export default function AdminJobAdjustments({
   // amount, category, and notes from the photo so they don't have to be
   // typed by hand. Everything stays editable, and anything already typed
   // into the notes field is kept rather than overwritten.
-  async function handleReceiptSelected(file: File | null) {
-    setExpReceiptFile(file)
+  async function handleReceiptSelected(rawFile: File | null) {
+    setExpReceiptFile(rawFile)
     setReceiptScanNote('')
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!rawFile) return
+    if (!rawFile.type.startsWith('image/')) {
       setReceiptScanNote('Attached. PDFs can\'t be read automatically - enter the details yourself.')
       return
     }
     setScanningReceipt(true)
+    const file = await compressImage(rawFile, DOCUMENT_COMPRESSION)
+    setExpReceiptFile(file)
     try {
       const base64 = await fileToBase64(file)
       const res = await fetch('/api/expense-receipt-extract', {

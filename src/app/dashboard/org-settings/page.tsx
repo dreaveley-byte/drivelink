@@ -14,6 +14,8 @@ export default function OrgSettingsPage() {
   const [phone, setPhone] = useState('')
   const [googleReviewLink, setGoogleReviewLink] = useState('')
   const [sendGoogleReviewDefault, setSendGoogleReviewDefault] = useState(true)
+  const [mediaRetentionDays, setMediaRetentionDays] = useState(90)
+  const [saveError, setSaveError] = useState('')
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -48,6 +50,14 @@ export default function OrgSettingsPage() {
         setPhone(org.phone ?? '')
         setGoogleReviewLink(org.google_review_link ?? '')
         setSendGoogleReviewDefault(org.send_google_review_default ?? true)
+        // Loaded separately so this page keeps working if the retention
+        // column isn't there yet.
+        const { data: retention } = await supabase
+          .from('organizations')
+          .select('media_retention_days')
+          .eq('id', org.id)
+          .maybeSingle()
+        if (retention?.media_retention_days) setMediaRetentionDays(retention.media_retention_days)
       }
       setLoading(false)
     })
@@ -56,11 +66,17 @@ export default function OrgSettingsPage() {
   async function handleSave() {
     if (!orgId) return
     setSaving(true)
+    setSaveError('')
     const supabase = createClient()
     await supabase
       .from('organizations')
       .update({ address, phone, google_review_link: googleReviewLink || null, send_google_review_default: sendGoogleReviewDefault })
       .eq('id', orgId)
+    const { error: retentionError } = await supabase
+      .from('organizations')
+      .update({ media_retention_days: mediaRetentionDays })
+      .eq('id', orgId)
+    if (retentionError) setSaveError("Your other changes were saved, but the photo & video retention setting couldn't be.")
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -141,6 +157,25 @@ export default function OrgSettingsPage() {
           </label>
           <p className="text-xs text-gray-400 mt-1">Can still be turned off for an individual delivery when it's booked.</p>
         </div>
+
+        <div className="pt-2 border-t border-gray-100">
+          <label className="block text-sm text-gray-700 mb-1">Keep drive photos &amp; videos for</label>
+          <select
+            value={mediaRetentionDays}
+            onChange={(e) => setMediaRetentionDays(Number(e.target.value))}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+          >
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1.5">
+            After this many days from completion, a drive&apos;s photos, videos and signatures are no longer available in your account.
+            The drive&apos;s details, pricing and receipt stay. Drivflo keeps its own archive of delivery records for 2 years &mdash; contact Drivflo if you need something from it.
+          </p>
+        </div>
+
+        {saveError && <p className="text-xs text-red-600">{saveError}</p>}
 
         <button
           onClick={handleSave}

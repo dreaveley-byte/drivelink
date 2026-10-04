@@ -12,6 +12,7 @@ import ConditionReportView from '@/components/ConditionReportView'
 import GuidedCaptureModal from '@/components/GuidedCaptureModal'
 import VehicleDeliveryAcknowledgementModal from '@/components/VehicleDeliveryAcknowledgementModal'
 import SimpleCameraCapture from '@/components/SimpleCameraCapture'
+import { compressImage, DOCUMENT_COMPRESSION } from '@/lib/compressImage'
 import { addCalendarEventNative } from '@/lib/nativeCalendarBridge'
 
 type Job = {
@@ -384,9 +385,13 @@ export default function DriverJobActions({
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Documents (registration, inspection reports, etc.) keep more detail
+    // so small print stays readable; ordinary vehicle photos get shrunk
+    // harder. Videos and PDFs pass through compressImage untouched.
+    const isDocument = item.item_type === 'upload' || /registration|inspection report|bill of sale|transfer form|APV9T/i.test(item.label)
     const newPaths: string[] = []
     for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+      const file = await compressImage(files[i], isDocument ? DOCUMENT_COMPRESSION : undefined)
       const ext = file.name.split('.').pop() || 'jpg'
       const path = `${job.id}/${item.id}-${Date.now()}-${i}.${ext}`
       const { error } = await supabase.storage.from('job-media').upload(path, file, { upsert: true })
@@ -837,11 +842,16 @@ export default function DriverJobActions({
     })
   }
 
-  async function handleReceiptFileSelected(file: File | null) {
-    setExpenseReceiptFile(file)
+  async function handleReceiptFileSelected(rawFile: File | null) {
+    setExpenseReceiptFile(rawFile)
     setReceiptScanNote('')
-    if (!file) return
+    if (!rawFile) return
     setScanningReceipt(true)
+    // Shrunk before it's read and stored: a full-size phone photo can exceed
+    // the request size limit on the reading step, and is needlessly heavy
+    // to keep either way.
+    const file = await compressImage(rawFile, DOCUMENT_COMPRESSION)
+    setExpenseReceiptFile(file)
     try {
       const base64 = await fileToBase64(file)
       const res = await fetch('/api/expense-receipt-extract', {

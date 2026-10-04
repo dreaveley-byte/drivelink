@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { compressImage, DOCUMENT_COMPRESSION } from '@/lib/compressImage'
 
 type Photo = {
   id: string
@@ -28,7 +29,10 @@ export default function AdminJobPhotos({ jobId, photos, isAdmin }: { jobId: stri
     const supabase = createClient()
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      for (const file of Array.from(files)) {
+      for (const original of Array.from(files)) {
+        // These are usually registrations and other paperwork, so they get
+        // the more generous document setting rather than the photo one.
+        const file = await compressImage(original, DOCUMENT_COMPRESSION)
         const path = `${jobId}/admin-photos/${Date.now()}-${file.name}`
         const { error: uploadError } = await supabase.storage.from('job-media').upload(path, file)
         if (uploadError) {

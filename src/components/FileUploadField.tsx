@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { compressImage, DOCUMENT_COMPRESSION } from '@/lib/compressImage'
 
 export default function FileUploadField({
   label,
@@ -25,10 +26,13 @@ export default function FileUploadField({
   const [error, setError] = useState('')
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const rawFile = e.target.files?.[0]
+    if (!rawFile) return
     setError('')
     setUploading(true)
+    // Photos of licences, abstracts etc. - kept readable, but not at full
+    // phone-camera size. PDFs and videos pass through untouched.
+    const file = await compressImage(rawFile, DOCUMENT_COMPRESSION)
 
     const supabase = createClient()
     const ext = file.name.split('.').pop()

@@ -165,10 +165,30 @@ export default async function JobReceiptPage({
     .eq('job_id', jobId)
     .order('sort_order')
 
+  // Dealer media window. Only dealer logins are subject to it - drivers and
+  // platform admin never are. The storage rules enforce it as well; this
+  // just avoids asking for links that would be refused, and lets the page
+  // explain why the photos aren't there. Both lookups tolerate the retention
+  // migration not having been run yet (they just come back empty).
+  const isDealerViewer = !isAdmin && !isDriver
+  let mediaExpiresAt: Date | null = null
+  let retentionDays: number | null = null
+  if (job.completed_at) {
+    const { data: expiresRaw } = await supabase.rpc('job_media_expires_at', { p_job_id: job.id })
+    if (expiresRaw) mediaExpiresAt = new Date(expiresRaw)
+    const { data: orgRetention } = await supabase
+      .from('organizations')
+      .select('media_retention_days')
+      .eq('id', job.organization_id)
+      .maybeSingle()
+    retentionDays = orgRetention?.media_retention_days ?? null
+  }
+  const mediaExpiredForViewer = isDealerViewer && !!mediaExpiresAt && mediaExpiresAt.getTime() < Date.now()
+
   // Generate short-lived signed URLs for any uploaded evidence, since job-media is a private bucket.
   const rawChecklistWithUrls = await Promise.all(
     (checklist ?? []).map(async (item) => {
-      const urls = await Promise.all(
+      const urls: { path: string; url: string | null }[] = mediaExpiredForViewer ? [] : await Promise.all(
         (item.file_paths ?? []).map(async (path: string) => {
           const { data } = await supabase.storage.from('job-media').createSignedUrl(path, 60 * 60)
           return { path, url: data?.signedUrl ?? null }
@@ -199,6 +219,7 @@ export default async function JobReceiptPage({
   // platform admin or the job's own dealer (org admin) — anyone else, this
   // naturally comes back null and nothing renders, no extra check needed here.
   const idVerificationUrls = await (async () => {
+    if (mediaExpiredForViewer) return null
     if (!job.id_verification_face_path || !job.id_verification_license_path) return null
     const [face, license] = await Promise.all([
       supabase.storage.from('id-verification').createSignedUrl(job.id_verification_face_path, 60 * 15),
@@ -213,7 +234,7 @@ export default async function JobReceiptPage({
     .select('id, storage_path, caption')
     .eq('job_id', job.id)
     .order('created_at', { ascending: false })
-  const adminPhotos = await Promise.all(
+  const adminPhotos: { id: string; storage_path: string; caption: string | null; url: string | null }[] = mediaExpiredForViewer ? [] : await Promise.all(
     (rawAdminPhotos ?? []).map(async (photo) => {
       const { data } = await supabase.storage.from('job-media').createSignedUrl(photo.storage_path, 60 * 60)
       return { ...photo, url: data?.signedUrl ?? null }
@@ -558,6 +579,13 @@ export default async function JobReceiptPage({
         )}
 
 
+        {mediaExpiredForViewer && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 print:hidden">
+            Photos, videos and signatures for this drive are no longer available in your account
+            {retentionDays ? ` (your ${retentionDays}-day retention setting)` : ''}. If you need them, contact Drivflo.
+          </div>
+        )}
+
         {/* Full checklist for reference */}
         {otherItems.length > 0 && (
           <div className="mb-6">
@@ -588,6 +616,22 @@ export default async function JobReceiptPage({
             </div>
           </div>
         )}
+
+        {isAdmin && job.completed_at && (() => {
+          const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium' })
+          const archiveUntil = new Date(job.completed_at)
+          archiveUntil.setFullYear(archiveUntil.getFullYear() + 2)
+          return (
+            <p className="mb-3 text-xs text-gray-500 print:hidden">
+              {job.media_purged_at
+                ? `Photos and videos were removed from the archive on ${fmtDate(job.media_purged_at)}, 2 years after completion.`
+                : `Photos and videos archived until ${fmtDate(archiveUntil)}.`}
+              {mediaExpiresAt && !job.media_purged_at
+                ? ` Dealer access ${mediaExpiresAt.getTime() < Date.now() ? 'ended' : 'ends'} ${fmtDate(mediaExpiresAt)}${retentionDays ? ` (their ${retentionDays}-day setting)` : ''}.`
+                : ''}
+            </p>
+          )
+        })()}
 
         {job.status === 'completed' && (
           <div className="mb-6">

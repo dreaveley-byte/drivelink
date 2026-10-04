@@ -160,7 +160,10 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
     chunksRef.current = []
     setSeconds(0)
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm'
-    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    // Capped bitrate. Left to its own defaults, some devices record this at
+    // several times the size for no visible gain at 720p. ~2 Mbps video plus
+    // 64 kbps audio works out to roughly 15 MB a minute.
+    const recorder = new MediaRecorder(streamRef.current, { mimeType, videoBitsPerSecond: 2000000, audioBitsPerSecond: 64000 })
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data)
     }

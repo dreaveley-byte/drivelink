@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/purge-archived-media", "schedule": "0 11 * * *" }
+  ]
+}
