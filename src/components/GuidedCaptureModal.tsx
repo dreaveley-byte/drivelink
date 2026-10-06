@@ -116,8 +116,24 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
 
   useEffect(() => {
     if (showingDemo) return
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: mode === 'walkaround' })
+    const media = navigator.mediaDevices
+    if (!media?.getUserMedia) {
+      setError('This device or app can\u2019t open the camera here. Use the button below to add it the regular way instead.')
+      return
+    }
+    const videoConstraints = { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    const wantAudio = mode === 'walkaround'
+    media
+      .getUserMedia({ video: videoConstraints, audio: wantAudio })
+      // The walkaround asks for the microphone as well. If that's the only
+      // thing refused (e.g. the app has no microphone permission), a
+      // walkaround without sound is far better than no walkaround at all -
+      // retry with video only. A genuine camera failure just fails again
+      // and is reported below as before.
+      .catch((e) => {
+        if (!wantAudio) throw e
+        return media.getUserMedia({ video: videoConstraints, audio: false })
+      })
       .then((stream) => {
         streamRef.current = stream
         if (videoRef.current) {
@@ -134,7 +150,7 @@ export default function GuidedCaptureModal({ mode, onCapture, onClose }: Props) 
         // and offer a fallback since a driver shouldn't be stuck either way.
         const name = e?.name as string | undefined
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-          setError('Camera access was denied for this site. Open your browser’s site settings for drivflo.ca and allow Camera, or use the fallback below.')
+          setError('Camera access is blocked. In the Drivflo app: phone Settings → Apps → Drivflo → Permissions → Camera → Allow. In a web browser: allow Camera in the site settings for drivflo.ca. Or use the button below to add it the regular way.')
         } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
           setError('No camera was found on this device.')
         } else if (name === 'NotReadableError' || name === 'TrackStartError') {

@@ -3,6 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+// Plain-language reason for a camera failure, so a driver (or whoever is
+// helping them) can tell "the app isn't allowed to use the camera" apart from
+// "no camera" or "another app has it".
+function cameraErrorMessage(e: unknown): string {
+  const name = (e as { name?: string } | null)?.name
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
+    return 'The camera is blocked for this app. You can still add the photo with the button below. To fix it for good: phone Settings \u2192 Apps \u2192 Drivflo \u2192 Permissions \u2192 Camera \u2192 Allow.'
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No camera was found on this device. You can still add a photo with the button below.'
+  if (name === 'NotReadableError' || name === 'TrackStartError') return 'Another app is using the camera. Close other camera apps and try again, or add the photo with the button below.'
+  return 'Could not open the camera. You can still add the photo with the button below.'
+}
+
 // A simple, reliable in-app camera capture using getUserMedia — the same
 // approach already proven working in GuidedCaptureModal and the customer
 // /verify page. This replaces the plain <input type="file" capture> pattern,
@@ -30,8 +43,14 @@ export default function SimpleCameraCapture({
     if (!open) return
     setReady(false)
     setError('')
+    // Some in-app browsers don't expose the camera API at all - without this
+    // the screen just stayed black with a dead capture button and no message.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(cameraErrorMessage(null))
+      return
+    }
     navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } } })
+      .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } } })
       .then((stream) => {
         streamRef.current = stream
         if (videoRef.current) {
@@ -40,7 +59,7 @@ export default function SimpleCameraCapture({
         }
         setReady(true)
       })
-      .catch(() => setError('Could not access your camera. Please allow camera access and try again.'))
+      .catch((e) => setError(cameraErrorMessage(e)))
 
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -89,6 +108,22 @@ export default function SimpleCameraCapture({
       {error ? (
         <div className="text-center px-6">
           <p className="text-white text-sm">{error}</p>
+          {/* Hands off to the phone's own camera / photo picker, which doesn't
+              depend on the in-app camera permission, so a driver is never stuck. */}
+          <label className="mt-4 inline-block bg-[#378ADD] text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer">
+            Take or choose a photo
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) onCapture(file)
+              }}
+            />
+          </label>
           <button
             type="button"
             onClick={onClose}
