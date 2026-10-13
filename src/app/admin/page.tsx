@@ -6,6 +6,7 @@ import SettingsGearLink from '@/components/SettingsGearLink'
 import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
+import AdminJobLookup from '@/components/AdminJobLookup'
 import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import LiveChecklistViewer from '@/components/LiveChecklistViewer'
@@ -217,7 +218,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 pt-4 flex justify-end">
+      <div className="max-w-4xl mx-auto px-6 pt-4 flex items-start justify-between gap-4">
+        <AdminJobLookup />
         <SortSelect />
       </div>
 
