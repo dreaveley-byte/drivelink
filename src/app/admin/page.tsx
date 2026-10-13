@@ -152,6 +152,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const drivfloProfitMtd = dealerSpendMtd - driverEarningsMtd - reimbursementsMtd - bonusMtd
 
+  // Claimed jobs where the dealer isn't being billed or the driver isn't
+  // being paid (missing or $0). Tolerates migration 177 not being run yet -
+  // the call just errors and the banner simply doesn't show.
+  const { data: billingProblems } = await supabase.rpc('jobs_needing_billing_attention')
+  const billingProblemJobs = (billingProblems ?? []) as {
+    id: string
+    status: string
+    organization_name: string | null
+    driver_name: string | null
+    pickup_address: string | null
+    dropoff_address: string | null
+    problem: string
+  }[]
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -209,6 +223,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         <AutoRefresh />
+        {billingProblemJobs.length > 0 && (
+          <div className="border-2 border-red-500 bg-red-50 rounded-xl px-4 py-3 mb-4">
+            <p className="text-sm font-semibold text-red-700 mb-1">
+              ⚠️ {billingProblemJobs.length} job{billingProblemJobs.length === 1 ? '' : 's'} with a billing or pay problem
+            </p>
+            <p className="text-xs text-red-600 mb-2">
+              A driver is on these, but the dealer isn&apos;t being billed or the driver isn&apos;t being paid. Open each one and use &quot;Billing &amp; pay check&quot; to fix it.
+            </p>
+            <div className="space-y-1.5">
+              {billingProblemJobs.map((j) => (
+                <Link
+                  key={j.id}
+                  href={`/dashboard/jobs/${j.id}/receipt`}
+                  className="block bg-white border border-red-200 rounded-lg px-3 py-2 hover:border-red-400"
+                >
+                  <p className="text-sm text-gray-900 font-medium">{j.problem}</p>
+                  <p className="text-xs text-gray-500">
+                    {[j.organization_name, j.driver_name && `Driver: ${j.driver_name}`, statusLabels[j.status] ?? j.status].filter(Boolean).join(' · ')}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">{j.pickup_address} → {j.dropoff_address}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-5 gap-4 mb-4">
           {[
             { label: 'Total Jobs', value: total },

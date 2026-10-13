@@ -15,6 +15,7 @@ import AdminForceComplete from '@/components/AdminForceComplete'
 import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 import AdminJobPhotos from '@/components/AdminJobPhotos'
+import AdminBillingCorrection from '@/components/AdminBillingCorrection'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,6 +152,45 @@ export default async function JobReceiptPage({
   if (isAdmin) {
     const { data: rateSettings } = await supabase.from('pricing_settings').select('hourly_rate_cents').eq('id', 1).single()
     hourlyRateCents = rateSettings?.hourly_rate_cents ?? 0
+  }
+
+  // Correction history for the admin billing/pay panel. Tolerates the
+  // billing-corrections migration (177) not having been run yet - the query
+  // just comes back empty and the panel still works once it is.
+  let billingAudit: {
+    id: string
+    changed_at: string
+    reason: string
+    old_dealer_cost_cents: number | null
+    new_dealer_cost_cents: number | null
+    old_driver_pay_cents: number | null
+    new_driver_pay_cents: number | null
+    cleared_pay_override: boolean
+    changed_by_name: string | null
+  }[] = []
+  if (isAdmin) {
+    const { data: auditRows } = await supabase
+      .from('job_billing_audit')
+      .select('id, changed_at, reason, changed_by, old_dealer_cost_cents, new_dealer_cost_cents, old_driver_pay_cents, new_driver_pay_cents, cleared_pay_override')
+      .eq('job_id', jobId)
+      .order('changed_at', { ascending: false })
+      .limit(20)
+    const changerIds = [...new Set((auditRows ?? []).map((r) => r.changed_by).filter(Boolean))] as string[]
+    const { data: changers } = changerIds.length
+      ? await supabase.from('profiles').select('id, full_name').in('id', changerIds)
+      : { data: [] as { id: string; full_name: string | null }[] }
+    const nameById = new Map((changers ?? []).map((p) => [p.id, p.full_name]))
+    billingAudit = (auditRows ?? []).map((r) => ({
+      id: r.id,
+      changed_at: r.changed_at,
+      reason: r.reason,
+      old_dealer_cost_cents: r.old_dealer_cost_cents,
+      new_dealer_cost_cents: r.new_dealer_cost_cents,
+      old_driver_pay_cents: r.old_driver_pay_cents,
+      new_driver_pay_cents: r.new_driver_pay_cents,
+      cleared_pay_override: r.cleared_pay_override,
+      changed_by_name: r.changed_by ? nameById.get(r.changed_by) ?? null : null,
+    }))
   }
 
   const { data: events } = await supabase
@@ -879,6 +919,20 @@ export default async function JobReceiptPage({
 
       {isAdmin && (
         <div className="max-w-2xl mx-auto px-6 pb-8 print:hidden">
+          <AdminBillingCorrection
+            jobId={job.id}
+            jobStatus={job.status}
+            hasDriver={!!job.driver_id}
+            dealerCostCents={job.estimated_dealer_cost_cents ?? null}
+            driverPayCents={job.admin_pay_override_cents ?? job.final_driver_pay_cents ?? job.estimated_driver_pay_cents ?? null}
+            suggestedDealerCents={pricingBreakdown?.estimatedDealerCostCents ?? null}
+            // With a 2nd driver the saved breakdown holds the combined
+            // 2-driver pay, not what each driver's own job pays - so it's
+            // not a meaningful comparison for this job's driver.
+            suggestedDriverCents={job.second_driver_required ? null : pricingBreakdown?.estimatedDriverPayCents ?? null}
+            hasPayOverride={job.admin_pay_override_cents != null}
+            audit={billingAudit}
+          />
           <div className="mb-4">
             <AdminDriverReassign
               jobId={job.id}

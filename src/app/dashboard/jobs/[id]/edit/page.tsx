@@ -1004,7 +1004,33 @@ export default function EditJobPage() {
           )
         : pricing
 
-    const { error: jobError } = await supabase.from('jobs').update({
+    // Everything below that comes out of the pricing calculation is only
+    // written when there actually IS a calculated price. Before this, saving
+    // while pricing was empty (e.g. a recalculation that hadn't finished or
+    // had failed) quietly overwrote the job's existing dealer charge and
+    // driver pay with NULL - leaving a started job billing nobody and paying
+    // nobody, with no error shown. Leaving these fields out keeps whatever
+    // is already stored.
+    const pricedFields = pricing
+      ? {
+          overnight_required: pricing.overnightRequired ?? false,
+          estimated_distance_km: pricing.tripDistanceKm ?? null,
+          estimated_duration_minutes: durationMinutes,
+          driver_paid_hours: primaryDriverPricing?.driverPaidHours ?? null,
+          estimated_dealer_cost_cents: pricing.estimatedDealerCostCents ?? null,
+          estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
+          estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
+          baseline_fuel_cents: pricing.gasCostCents ?? 0,
+          baseline_inspection_cents: pricing.inspectionFeeCents ?? 0,
+          baseline_food_cents: pricing.mealCostCents ?? 0,
+          baseline_hotel_cents: pricing.hotelCents ?? 0,
+          baseline_ferry_cents: pricing.ferryFeeCents ?? 0,
+          baseline_return_transport_cents: pricing.groundHomeCents ?? 0,
+          pricing_breakdown: JSON.stringify(pricing),
+        }
+      : {}
+
+    const { data: updatedRows, error: jobError } = await supabase.from('jobs').update({
       job_type_id: jobTypeId,
       pickup_address: filledStops[0],
       dropoff_address: filledStops[filledStops.length - 1],
@@ -1048,20 +1074,7 @@ export default function EditJobPage() {
       multi_vehicle_arrangement: multiVehicleArrangement,
       rides_along_with_linked: ridesAlongWithLinked,
       additional_charges: additionalCharges,
-      overnight_required: pricing?.overnightRequired ?? false,
-      estimated_distance_km: pricing?.tripDistanceKm ?? null,
-      estimated_duration_minutes: durationMinutes,
-      driver_paid_hours: primaryDriverPricing?.driverPaidHours ?? null,
-      estimated_dealer_cost_cents: pricing?.estimatedDealerCostCents ?? null,
-      estimated_driver_pay_cents: primaryDriverPricing?.estimatedDriverPayCents ?? null,
-      estimated_driver_reimbursement_cents: primaryDriverPricing?.reimbursementCents ?? null,
-      baseline_fuel_cents: pricing?.gasCostCents ?? 0,
-      baseline_inspection_cents: pricing?.inspectionFeeCents ?? 0,
-      baseline_food_cents: pricing?.mealCostCents ?? 0,
-      baseline_hotel_cents: pricing?.hotelCents ?? 0,
-      baseline_ferry_cents: pricing?.ferryFeeCents ?? 0,
-      baseline_return_transport_cents: pricing?.groundHomeCents ?? 0,
-      pricing_breakdown: pricing ? JSON.stringify(pricing) : null,
+      ...pricedFields,
       trade_in_year: isTradeIn && tradeInYear ? parseInt(tradeInYear) : null,
       trade_in_make: isTradeIn ? tradeInMake || null : null,
       trade_in_model: isTradeIn ? tradeInModel || null : null,
@@ -1073,12 +1086,26 @@ export default function EditJobPage() {
       // cancelled has no bearing on this new posting, and leaving it set
       // would incorrectly tie the job to them without them ever re-claiming it.
       ...(isRepost ? { status: 'awaiting_driver', driver_id: null, archived_at: null } : {}),
-    }).eq('id', jobId)
+    }).eq('id', jobId).select('id')
 
     if (jobError) {
       setError(jobError.message)
       setLoading(false)
       return
+    }
+    // A blocked or no-match update comes back with no error and zero rows -
+    // which used to look exactly like a successful save. Surface it.
+    if (!updatedRows || updatedRows.length === 0) {
+      setError('Nothing was saved - the database accepted the request but changed no rows (this job may be locked for editing). Your changes were NOT applied. Use the "Billing & pay check" panel on the job\'s receipt page to correct the amounts directly.')
+      setLoading(false)
+      return
+    }
+
+    // Already-completed jobs have their final driver pay locked in at the
+    // moment of completion and never revisited, so a recalculation here
+    // would otherwise leave the driver's final pay stuck on the old figure.
+    if (jobStatus === 'completed') {
+      await supabase.rpc('recompute_final_driver_pay', { p_job_id: jobId })
     }
 
     // Editing the job just recalculated and overwrote the baseline_*_cents
