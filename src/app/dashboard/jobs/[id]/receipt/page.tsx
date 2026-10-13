@@ -16,6 +16,7 @@ import MarkDealerPaidButton from '@/components/MarkDealerPaidButton'
 import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 import AdminJobPhotos from '@/components/AdminJobPhotos'
 import AdminBillingCorrection from '@/components/AdminBillingCorrection'
+import AdminBaselineRestore from '@/components/AdminBaselineRestore'
 
 export const dynamic = 'force-dynamic'
 
@@ -932,6 +933,26 @@ export default async function JobReceiptPage({
             suggestedDriverCents={job.second_driver_required ? null : pricingBreakdown?.estimatedDriverPayCents ?? null}
             hasPayOverride={job.admin_pay_override_cents != null}
             audit={billingAudit}
+          />
+          <AdminBaselineRestore
+            jobId={job.id}
+            current={{
+              fuel: job.baseline_fuel_cents ?? 0,
+              inspection: job.baseline_inspection_cents ?? 0,
+              food: job.baseline_food_cents ?? 0,
+              hotel: job.baseline_hotel_cents ?? 0,
+              ferry: job.baseline_ferry_cents ?? 0,
+              return_transport: job.baseline_return_transport_cents ?? 0,
+            }}
+            saved={pricingBreakdown ? {
+              fuel: pricingBreakdown.gasCostCents ?? 0,
+              inspection: pricingBreakdown.inspectionFeeCents ?? 0,
+              food: pricingBreakdown.mealCostCents ?? 0,
+              hotel: pricingBreakdown.hotelCents ?? 0,
+              ferry: pricingBreakdown.ferryFeeCents ?? 0,
+              return_transport: pricingBreakdown.groundHomeCents ?? 0,
+            } : null}
+            dealerPaid={!!job.dealer_paid_at}
           />
           <div className="mb-4">
             <AdminDriverReassign
