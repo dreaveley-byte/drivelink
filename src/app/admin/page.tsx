@@ -7,6 +7,7 @@ import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import AdminJobLookup from '@/components/AdminJobLookup'
+import { shortJobId } from '@/lib/shortId'
 import Logo from '@/components/Logo'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
 import LiveChecklistViewer from '@/components/LiveChecklistViewer'
@@ -339,6 +340,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <p className="text-sm font-medium text-gray-900">
                   {job.job_types?.name}
                   <span className="text-gray-400 font-normal"> · {job.organizations?.name}</span>
+                  <span className="text-gray-300 font-mono text-[11px] font-normal"> · {shortJobId(job.id)}</span>
                 </p>
                 {['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Paperwork Signing'].includes(job.job_types?.name ?? '') ? (
                   <>

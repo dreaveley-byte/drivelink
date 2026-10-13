@@ -17,6 +17,7 @@ import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 import AdminJobPhotos from '@/components/AdminJobPhotos'
 import AdminBillingCorrection from '@/components/AdminBillingCorrection'
 import AdminBaselineRestore from '@/components/AdminBaselineRestore'
+import { shortJobId } from '@/lib/shortId'
 
 export const dynamic = 'force-dynamic'
 
@@ -491,7 +492,10 @@ export default async function JobReceiptPage({
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Delivery Receipt</p>
           <Logo height={28} />
           <p className="text-sm text-gray-500 mt-2">{orgName}</p>
-          <p className="text-xs text-gray-400 mt-2">Job ID: {job.id}</p>
+          <p className="text-xs text-gray-400 mt-2">
+            Drive ID: <span className="font-mono font-medium text-gray-600">{shortJobId(job.id)}</span>
+            {isAdmin && <span className="block text-[10px] text-gray-300 print:hidden">Full ID: {job.id}</span>}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-8 mb-6">
