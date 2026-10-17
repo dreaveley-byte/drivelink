@@ -71,6 +71,8 @@ type Props = {
   publicToken?: string
   onEtaChange?: (eta: string) => void
   trackWhilePickedUp?: boolean
+  /** Only platform admin sees why Google failed - everyone else gets a plain message. */
+  isAdmin?: boolean
 }
 
 export default function GoogleMapView({
@@ -84,6 +86,7 @@ export default function GoogleMapView({
   publicToken,
   onEtaChange,
   trackWhilePickedUp = false,
+  isAdmin = false,
 }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -91,8 +94,7 @@ export default function GoogleMapView({
   const trailPolylineRef = useRef<any>(null)
   const [mapError, setMapError] = useState('')
   // Non-fatal problems (route line / pins couldn't be drawn). Only ever shown
-  // to signed-in viewers (admin, dealer, driver) - never to the public
-  // customer link, where it would just be confusing.
+  // to platform admin - dealers, drivers and customers never see these.
   const [mapIssues, setMapIssues] = useState<string[]>([])
   const trailLoadedRef = useRef(false)
   const addIssue = useCallback((msg: string) => {
@@ -130,14 +132,16 @@ export default function GoogleMapView({
   useEffect(() => {
     function onAuthFailure() {
       setMapError(
-        publicToken
-          ? 'The map is temporarily unavailable. Your driver is still on the way.'
-          : "Google rejected the Maps key, so the map can't load. This is usually billing not active on the Google Cloud account, the key's restrictions, or a Maps API that isn't enabled."
+        isAdmin
+          ? "Google rejected the Maps key, so the map can't load. This is usually billing not active on the Google Cloud account, the key's restrictions, or a Maps API that isn't enabled."
+          : publicToken
+            ? 'The map is temporarily unavailable. Your driver is still on the way.'
+            : 'The map is temporarily unavailable.'
       )
     }
     window.addEventListener('drivflo-maps-auth-failure', onAuthFailure)
     return () => window.removeEventListener('drivflo-maps-auth-failure', onAuthFailure)
-  }, [publicToken])
+  }, [publicToken, isAdmin])
 
   useEffect(() => {
     let cancelled = false
@@ -328,7 +332,7 @@ export default function GoogleMapView({
       ) : (
         <div ref={mapDivRef} className="w-full h-80 rounded-lg border border-gray-200" />
       )}
-      {!publicToken && mapIssues.length > 0 && !mapError && (
+      {isAdmin && mapIssues.length > 0 && !mapError && (
         <div className="mt-2 text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2">
           {mapIssues.map((m) => <p key={m}>⚠️ {m}</p>)}
           <p className="mt-1 text-amber-700">

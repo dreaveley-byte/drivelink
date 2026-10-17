@@ -127,6 +127,7 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           driverPhotoUrl={driverPhoto}
           statusLabel={statusLabels[job.status] ?? job.status}
           trackWhilePickedUp={jobTypeName === 'Customer Pick Up' || jobTypeName === 'Customer Drop Off'}
+          isAdmin={myProfile?.role === 'platform_admin'}
         />
 
         <div className="mt-4">
