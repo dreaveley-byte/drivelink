@@ -5,6 +5,7 @@ import PublicChatWidget from '@/components/PublicChatWidget'
 import ShareRideButton from '@/components/ShareRideButton'
 import CustomerFeedbackForm from '@/components/CustomerFeedbackForm'
 import Logo from '@/components/Logo'
+import AutoRefresh from '@/components/AutoRefresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,11 @@ export default async function PublicTrackPage({ params }: { params: Promise<{ to
               </div>
             </div>
           )}
+          {/* Re-checks the job every 30s so a customer who opens the link early
+              (e.g. from the text when the job is assigned) sees live tracking
+              start by itself, instead of staying on the waiting message. This
+              branch only renders until delivery, so it stops on its own. */}
+          <AutoRefresh intervalMs={30000} />
           <TrackingPanel
             jobId=""
             pickupAddress={info.pickup_address}

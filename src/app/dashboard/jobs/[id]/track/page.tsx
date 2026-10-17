@@ -8,6 +8,7 @@ import CollapsibleSection from '@/components/CollapsibleSection'
 import CloseButton from '@/components/CloseButton'
 import CopyLinkButton from '@/components/CopyLinkButton'
 import Logo from '@/components/Logo'
+import AutoRefresh from '@/components/AutoRefresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,6 +111,10 @@ export default async function TrackJobPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
+        {/* Re-checks the job every 30s so the map switches to live tracking by
+            itself when the driver starts, instead of staying on "starts once
+            your driver is on the way" until the page is reloaded by hand. */}
+        {job.status !== 'completed' && job.status !== 'cancelled' && <AutoRefresh intervalMs={30000} />}
         <TrackingPanel
           jobId={job.id}
           pickupAddress={job.pickup_address}

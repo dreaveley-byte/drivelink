@@ -7,6 +7,7 @@ declare global {
   interface Window {
     google: any
     __driveLinkMapsLoading?: Promise<void>
+    gm_authFailure?: () => void
   }
 }
 
@@ -44,6 +45,10 @@ function loadGoogleMaps(): Promise<void> {
       reject(new Error('missing_key'))
       return
     }
+    // Google calls this global when it rejects the key (invalid key, billing
+    // not active, referrer not allowed, or an API not enabled for it). Nothing
+    // listened before, so the map just rendered blank with no explanation.
+    window.gm_authFailure = () => window.dispatchEvent(new Event('drivflo-maps-auth-failure'))
     const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geocoding`
     script.async = true
@@ -85,6 +90,14 @@ export default function GoogleMapView({
   const driverMarkerRef = useRef<any>(null)
   const trailPolylineRef = useRef<any>(null)
   const [mapError, setMapError] = useState('')
+  // Non-fatal problems (route line / pins couldn't be drawn). Only ever shown
+  // to signed-in viewers (admin, dealer, driver) - never to the public
+  // customer link, where it would just be confusing.
+  const [mapIssues, setMapIssues] = useState<string[]>([])
+  const trailLoadedRef = useRef(false)
+  const addIssue = useCallback((msg: string) => {
+    setMapIssues((prev) => (prev.includes(msg) ? prev : [...prev, msg]))
+  }, [])
   const [locationUpdatedAt, setLocationUpdatedAt] = useState(initialLocationUpdatedAt)
   const [eta, setEta] = useState<string>('')
   const isTerminal = jobStatus === 'completed' || jobStatus === 'cancelled'
@@ -113,6 +126,18 @@ export default function GoogleMapView({
       // ETA is a nice-to-have; fail silently if it doesn't come back.
     }
   }, [dropoffAddress, onEtaChange])
+
+  useEffect(() => {
+    function onAuthFailure() {
+      setMapError(
+        publicToken
+          ? 'The map is temporarily unavailable. Your driver is still on the way.'
+          : "Google rejected the Maps key, so the map can't load. This is usually billing not active on the Google Cloud account, the key's restrictions, or a Maps API that isn't enabled."
+      )
+    }
+    window.addEventListener('drivflo-maps-auth-failure', onAuthFailure)
+    return () => window.removeEventListener('drivflo-maps-auth-failure', onAuthFailure)
+  }, [publicToken])
 
   useEffect(() => {
     let cancelled = false
@@ -147,6 +172,8 @@ export default function GoogleMapView({
           (result: any, status: string) => {
             if (status === 'OK' && result) {
               directionsRenderer.setDirections(result)
+            } else {
+              addIssue(`Planned route line couldn't be drawn (Google Directions: ${status}).`)
             }
           }
         )
@@ -160,6 +187,8 @@ export default function GoogleMapView({
             new google.maps.Marker({ position: loc, map, label: 'P', title: 'Pickup' })
             bounds.extend(loc)
             map.fitBounds(bounds)
+          } else {
+            addIssue(`Pickup pin couldn't be placed (Google Geocoding: ${status}).`)
           }
         })
 
@@ -169,6 +198,8 @@ export default function GoogleMapView({
             new google.maps.Marker({ position: loc, map, label: 'D', title: 'Dropoff' })
             bounds.extend(loc)
             map.fitBounds(bounds)
+          } else {
+            addIssue(`Dropoff pin couldn't be placed (Google Geocoding: ${status}).`)
           }
         })
 
@@ -201,7 +232,9 @@ export default function GoogleMapView({
             ? supabase.rpc('get_job_location_trail', { p_token: publicToken })
             : supabase.rpc('get_job_location_trail_by_id', { p_job_id: jobId })
           trailQuery.then(({ data }: { data: any }) => {
-            if (cancelled || !Array.isArray(data) || data.length === 0) return
+            if (cancelled) return
+            trailLoadedRef.current = true
+            if (!Array.isArray(data) || data.length === 0) return
             const path = data.map((p: any) => ({ lat: p.lat, lng: p.lng }))
             trailPolylineRef.current?.setPath(path)
           })
@@ -244,6 +277,19 @@ export default function GoogleMapView({
         updatedAt = data?.driver_location_updated_at ?? null
       }
 
+      // If tracking only began after this page was already open, the trail
+      // wasn't loaded at mount - load what's been driven so far, once.
+      if (!trailLoadedRef.current && trailPolylineRef.current) {
+        trailLoadedRef.current = true
+        const trailQuery = publicToken
+          ? supabase.rpc('get_job_location_trail', { p_token: publicToken })
+          : supabase.rpc('get_job_location_trail_by_id', { p_job_id: jobId })
+        trailQuery.then(({ data }: { data: { lat: number; lng: number }[] | null }) => {
+          if (!Array.isArray(data) || data.length === 0) return
+          trailPolylineRef.current?.setPath(data.map((p) => ({ lat: p.lat, lng: p.lng })))
+        })
+      }
+
       if (driverLat != null && driverLng != null && window.google?.maps) {
         const pos = { lat: driverLat, lng: driverLng }
         if (driverMarkerRef.current) {
@@ -281,6 +327,14 @@ export default function GoogleMapView({
         <div className="border border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">{mapError}</div>
       ) : (
         <div ref={mapDivRef} className="w-full h-80 rounded-lg border border-gray-200" />
+      )}
+      {!publicToken && mapIssues.length > 0 && !mapError && (
+        <div className="mt-2 text-xs bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-3 py-2">
+          {mapIssues.map((m) => <p key={m}>⚠️ {m}</p>)}
+          <p className="mt-1 text-amber-700">
+            Usually means that Google API isn&apos;t enabled for the Maps key, the key&apos;s restrictions don&apos;t list it, or billing isn&apos;t active.
+          </p>
+        </div>
       )}
       <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
         <span>
