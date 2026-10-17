@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isNativeApp, startBackgroundTracking, stopBackgroundTracking } from '@/lib/nativeLocationBridge'
 
 const UPDATE_INTERVAL_MS = 20000
+const MIN_SAVE_GAP_MS = 10000
 
 function getDeviceInstructions(): string {
   if (typeof navigator === 'undefined') return ''
@@ -112,9 +113,7 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
       }
     }, 15000)
 
-    async function recordPing(lat: number, lng: number) {
-      resolved = true
-      clearTimeout(stuckTimeout)
+    async function saveLocation(lat: number, lng: number) {
       const { error: updateError } = await supabase
         .from('jobs')
         .update({ driver_lat: lat, driver_lng: lng, driver_location_updated_at: new Date().toISOString() })
@@ -134,6 +133,21 @@ export default function LocationSharer({ jobId }: { jobId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, lat, lng }),
       }).catch(() => {})
+    }
+
+    // Every location source funnels through here. At most one save is in
+    // flight and at most one every 10s, so a watcher that fires in a burst
+    // can't flood the database (one phone sent ~9,600 saves in 10 minutes).
+    let lastSaveAt = 0
+    let saving = false
+    function recordPing(lat: number, lng: number) {
+      resolved = true
+      clearTimeout(stuckTimeout)
+      const t = Date.now()
+      if (saving || t - lastSaveAt < MIN_SAVE_GAP_MS) return
+      saving = true
+      lastSaveAt = t
+      saveLocation(lat, lng).finally(() => { saving = false })
     }
 
     // Inside the native app shell, try real background GPS tracking — it's

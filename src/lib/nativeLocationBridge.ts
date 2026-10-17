@@ -37,7 +37,17 @@ let activeWatcherId: string | null = null
 // Starts native background tracking for a job. The callback fires on every
 // location update, including while the app is backgrounded — call the same
 // Supabase insert logic the web app already uses for foreground tracking.
-export async function startBackgroundTracking(onLocation: (loc: LocationUpdate) => void): Promise<void> {
+// Start/stop calls run one at a time. Two overlapping starts (e.g. a driver
+// with two open jobs) both saw "no watcher yet" and each added one, leaving
+// an orphaned watcher that could never be removed and kept firing.
+let queue: Promise<void> = Promise.resolve()
+
+export function startBackgroundTracking(onLocation: (loc: LocationUpdate) => void): Promise<void> {
+  queue = queue.then(() => doStart(onLocation))
+  return queue
+}
+
+async function doStart(onLocation: (loc: LocationUpdate) => void): Promise<void> {
   if (!isNativeApp()) return
   try {
     if (activeWatcherId) {
@@ -67,7 +77,12 @@ export async function startBackgroundTracking(onLocation: (loc: LocationUpdate) 
   }
 }
 
-export async function stopBackgroundTracking(): Promise<void> {
+export function stopBackgroundTracking(): Promise<void> {
+  queue = queue.then(doStop)
+  return queue
+}
+
+async function doStop(): Promise<void> {
   if (!isNativeApp() || !activeWatcherId) return
   try {
     await BackgroundGeolocation.removeWatcher({ id: activeWatcherId })

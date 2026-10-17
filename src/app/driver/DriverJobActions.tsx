@@ -362,6 +362,35 @@ export default function DriverJobActions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.status, checklist.length])
 
+  // Saves one checklist row and confirms it really saved. The result used to
+  // be ignored, so a failed save (expired login, dropped signal, or a row the
+  // driver isn't allowed to change, which comes back as "success" with zero
+  // rows) left the driver's screen showing a tick that never reached the
+  // database - and admin saw nothing done. Retries once with a fresh login,
+  // and if it still fails, restores the screen to what is really saved and
+  // tells the driver.
+  async function saveChecklistRow(id: string, patch: Record<string, unknown>) {
+    const supabase = createClient()
+    const attempt = async () => {
+      const { data, error } = await supabase.from('job_checklist_items').update(patch).eq('id', id).select('id')
+      if (error) return error.message
+      return !data || data.length === 0 ? 'no matching row' : null
+    }
+    let failure = await attempt()
+    if (failure) {
+      await supabase.auth.refreshSession().catch(() => {})
+      failure = await attempt()
+    }
+    if (!failure) return
+    const { data: saved } = await supabase
+      .from('job_checklist_items')
+      .select('id, label, item_type, completed_at, file_paths, notes, condition_data')
+      .eq('job_id', job.id)
+      .order('sort_order')
+    if (saved && saved.length > 0) setChecklist(saved)
+    alert(`That checklist change did NOT save (${failure}). Check your signal and try again - the office can't see it until it saves.`)
+  }
+
   async function toggleChecklistItem(item: ChecklistItem) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -371,13 +400,10 @@ export default function DriverJobActions({
       prev.map((i) => (i.id === item.id ? { ...i, completed_at: nowCompleting ? new Date().toISOString() : null } : i))
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({
+    await saveChecklistRow(item.id, {
         completed_at: nowCompleting ? new Date().toISOString() : null,
         completed_by: nowCompleting ? user?.id : null,
       })
-      .eq('id', item.id)
   }
 
   async function uploadFilesForItem(item: ChecklistItem, files: File[]) {
@@ -411,13 +437,10 @@ export default function DriverJobActions({
       )
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({
+    await saveChecklistRow(item.id, {
         file_paths: updatedPaths,
         ...(shouldComplete ? { completed_at: new Date().toISOString(), completed_by: user?.id } : {}),
       })
-      .eq('id', item.id)
 
     refreshFileUrls(newPaths)
     setUploadingItemId(null)
@@ -437,10 +460,7 @@ export default function DriverJobActions({
       setChecklist((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, file_paths: updatedPaths, completed_at: new Date().toISOString() } : i))
       )
-      await supabase
-        .from('job_checklist_items')
-        .update({ file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
-        .eq('id', item.id)
+      await saveChecklistRow(item.id, { file_paths: updatedPaths, completed_at: new Date().toISOString(), completed_by: user?.id })
       refreshFileUrls([path])
     }
     setUploadingItemId(null)
@@ -460,15 +480,12 @@ export default function DriverJobActions({
       )
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({
+    await saveChecklistRow(item.id, {
         notes,
         ...(shouldComplete && !item.completed_at
           ? { completed_at: new Date().toISOString(), completed_by: user?.id }
           : {}),
       })
-      .eq('id', item.id)
   }
 
   async function deleteFileFromItem(item: ChecklistItem, path: string) {
@@ -490,10 +507,7 @@ export default function DriverJobActions({
       )
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({ file_paths: updatedPaths, ...(stillComplete ? {} : { completed_at: null, completed_by: null }) })
-      .eq('id', item.id)
+    await saveChecklistRow(item.id, { file_paths: updatedPaths, ...(stillComplete ? {} : { completed_at: null, completed_by: null }) })
   }
 
   async function setTristateValue(item: ChecklistItem, value: string) {
@@ -504,16 +518,12 @@ export default function DriverJobActions({
       prev.map((i) => (i.id === item.id ? { ...i, notes: value, completed_at: new Date().toISOString() } : i))
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({ notes: value, completed_at: new Date().toISOString(), completed_by: user?.id })
-      .eq('id', item.id)
+    await saveChecklistRow(item.id, { notes: value, completed_at: new Date().toISOString(), completed_by: user?.id })
   }
 
   async function saveConditionData(item: ChecklistItem, conditionData: ConditionData) {
-    const supabase = createClient()
     setChecklist((prev) => prev.map((i) => (i.id === item.id ? { ...i, condition_data: conditionData } : i)))
-    await supabase.from('job_checklist_items').update({ condition_data: conditionData }).eq('id', item.id)
+    await saveChecklistRow(item.id, { condition_data: conditionData })
   }
 
   async function saveSimpleTextValue(item: ChecklistItem, value: string) {
@@ -529,14 +539,11 @@ export default function DriverJobActions({
       )
     )
 
-    await supabase
-      .from('job_checklist_items')
-      .update({
+    await saveChecklistRow(item.id, {
         notes: value,
         completed_at: shouldComplete ? new Date().toISOString() : null,
         completed_by: shouldComplete ? user?.id : null,
       })
-      .eq('id', item.id)
   }
 
   async function claimJob() {
