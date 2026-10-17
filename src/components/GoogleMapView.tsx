@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { decodePolyline } from '@/lib/polyline'
 
 declare global {
   interface Window {
@@ -161,26 +162,31 @@ export default function GoogleMapView({
         // Draw the actual planned driving route as a line between pickup and
         // dropoff — this is what lets the customer see the driver visibly
         // progressing along a real road path, not just two disconnected pins.
-        const directionsService = new google.maps.DirectionsService()
-        const directionsRenderer = new google.maps.DirectionsRenderer({
-          map,
-          suppressMarkers: true,
-          polylineOptions: { strokeColor: '#2563eb', strokeOpacity: 0.6, strokeWeight: 4 },
+        // Fetched from our own server (Routes API) rather than the browser-side
+        // Directions service, which Google refuses on newer Cloud projects.
+        fetch('/api/route-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin: pickupAddress, destination: dropoffAddress }),
         })
-        directionsService.route(
-          {
-            origin: pickupAddress,
-            destination: dropoffAddress,
-            travelMode: google.maps.TravelMode.DRIVING,
-          },
-          (result: any, status: string) => {
-            if (status === 'OK' && result) {
-              directionsRenderer.setDirections(result)
-            } else {
-              addIssue(`Planned route line couldn't be drawn (Google Directions: ${status}).`)
+          .then(async (res) => {
+            const data = await res.json()
+            if (cancelled) return
+            if (!res.ok || !data.encodedPolyline) {
+              addIssue(`Planned route line couldn't be drawn (Google Routes: ${data.error || res.status}).`)
+              return
             }
-          }
-        )
+            new google.maps.Polyline({
+              map,
+              path: decodePolyline(data.encodedPolyline),
+              strokeColor: '#2563eb',
+              strokeOpacity: 0.6,
+              strokeWeight: 4,
+            })
+          })
+          .catch(() => {
+            if (!cancelled) addIssue("Planned route line couldn't be drawn (couldn't reach the route service).")
+          })
 
         const geocoder = new google.maps.Geocoder()
         const bounds = new google.maps.LatLngBounds()
