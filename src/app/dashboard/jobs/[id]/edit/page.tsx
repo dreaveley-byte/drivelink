@@ -1399,6 +1399,9 @@ export default function EditJobPage() {
               jobId={jobId}
               initialBreakdown={savedPricing.breakdown}
               initialCharges={savedPricing.charges}
+              markupPercent={(isCustomerRide ? pricingSettings?.customer_pickup_dropoff_markup_percent : pricingSettings?.dealer_markup_percent) ?? 100}
+              minimumDriverPayCents={((isCourier || isPaperworkSigning || isCustomerRide) ? pricingSettings?.simple_job_minimum_pay_cents : pricingSettings?.minimum_driver_pay_cents) ?? 0}
+              initialDriverPayCents={savedPricing.driverPayCents}
             />
 
             <p className="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-200">

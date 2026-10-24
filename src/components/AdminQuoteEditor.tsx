@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCents, type AdditionalCharge } from '@/lib/pricing'
 
-type BreakdownLine = { key: string; label: string; amountCents: number; fromBreakdown: boolean }
+type BreakdownLine = { key: string; label: string; amountCents: number; fromBreakdown: boolean; charge?: AdditionalCharge }
 
 const BREAKDOWN_LABELS: [string, string][] = [
   ['gasCostCents', 'Fuel'],
@@ -25,10 +25,16 @@ export default function AdminQuoteEditor({
   jobId,
   initialBreakdown,
   initialCharges,
+  markupPercent,
+  minimumDriverPayCents,
+  initialDriverPayCents,
 }: {
   jobId: string
   initialBreakdown: Record<string, number> | null
   initialCharges: AdditionalCharge[]
+  markupPercent: number
+  minimumDriverPayCents: number
+  initialDriverPayCents: number | null
 }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -42,11 +48,29 @@ export default function AdminQuoteEditor({
       label: c.description,
       amountCents: c.dealerAmountCents,
       fromBreakdown: false,
+      charge: c,
     }))
     return [...fromBreakdown, ...fromCharges]
   })
 
+  const [driverPayInput, setDriverPayInput] = useState(
+    initialDriverPayCents != null ? (initialDriverPayCents / 100).toFixed(2) : ''
+  )
+
+  // The lines are the cost BEFORE markup - the same way the job's price is
+  // first calculated - so the dealer is billed the lines' total x markup.
+  // Saving the plain total (as this editor used to) silently dropped the
+  // markup from the whole quote.
   const total = lines.reduce((sum, l) => sum + l.amountCents, 0)
+  const dealerCostCents = Math.round(total * (markupPercent / 100))
+
+  // Driver pay follows the same hours the dealer is billed for, plus wear &
+  // tear and any overnight fee, never below the minimum pay.
+  const lineAmount = (key: string) => lines.find((l) => l.key === key)?.amountCents ?? 0
+  const suggestedDriverPayCents = Math.max(
+    lineAmount('hourlyDealerCents') + lineAmount('wearAndTearCents') + lineAmount('overnightFeeCents'),
+    minimumDriverPayCents
+  )
 
   function updateAmount(key: string, dollarValue: string) {
     const cents = Math.round((parseFloat(dollarValue) || 0) * 100)
@@ -74,26 +98,62 @@ export default function AdminQuoteEditor({
     setSaving(true)
     const supabase = createClient()
 
-    const newBreakdown: Record<string, number> = {}
-    for (const l of lines) {
-      if (l.fromBreakdown) newBreakdown[l.key] = l.amountCents
+    const driverPayCents = driverPayInput.trim() === '' ? null : Math.round(parseFloat(driverPayInput) * 100)
+    if (driverPayCents != null && (!Number.isFinite(driverPayCents) || driverPayCents < 0)) {
+      setSaving(false)
+      setError('Driver pay must be a dollar amount of 0 or more.')
+      return
     }
+
+    // Start from the full saved breakdown and only change the lines shown
+    // here. Rebuilding it from just these lines (as before) threw away
+    // everything else stored in it, such as the calculated driver pay.
+    const newBreakdown: Record<string, number> = { ...(initialBreakdown ?? {}) }
+    for (const [key] of BREAKDOWN_LABELS) {
+      const line = lines.find((l) => l.key === key)
+      newBreakdown[key] = line ? line.amountCents : 0
+    }
+    newBreakdown.costBasisCents = total
+    newBreakdown.estimatedDealerCostCents = dealerCostCents
+    if (driverPayCents != null) newBreakdown.estimatedDriverPayCents = driverPayCents
+
     const newCharges: AdditionalCharge[] = lines
       .filter((l) => !l.fromBreakdown)
-      .map((l) => ({ description: l.label, dealerAmountCents: l.amountCents, hoursAdded: 0, paidToDriver: false }))
+      .map((l) => ({
+        hoursAdded: 0,
+        paidToDriver: false,
+        ...(l.charge ?? {}),
+        description: l.label,
+        dealerAmountCents: l.amountCents,
+      }))
 
-    const { error: updateError } = await supabase
+    const { data: updatedRows, error: updateError } = await supabase
       .from('jobs')
       .update({
         pricing_breakdown: JSON.stringify(newBreakdown),
         additional_charges: newCharges,
-        estimated_dealer_cost_cents: total,
       })
       .eq('id', jobId)
+      .select('id')
+
+    if (updateError || !updatedRows || updatedRows.length === 0) {
+      setSaving(false)
+      setError(`Could not save: ${updateError?.message ?? 'no job was updated'}`)
+      return
+    }
+
+    // Dealer cost and driver pay go through the audited admin function, which
+    // also clears any driver pay override that would otherwise hide the new figure.
+    const { error: amountsError } = await supabase.rpc('admin_set_job_amounts', {
+      p_job_id: jobId,
+      p_dealer_cost_cents: dealerCostCents,
+      p_driver_pay_cents: driverPayCents,
+      p_reason: 'Quote edited on the job edit page',
+    })
 
     setSaving(false)
-    if (updateError) {
-      setError(`Could not save: ${updateError.message}`)
+    if (amountsError) {
+      setError(`The line items saved but the totals did not: ${amountsError.message}`)
       return
     }
     window.location.reload()
@@ -126,9 +186,41 @@ export default function AdminQuoteEditor({
       </div>
       <button onClick={addLine} className="text-xs text-blue-600 hover:underline mt-2">+ Add line item</button>
 
-      <div className="flex justify-between text-sm pt-2 mt-2 border-t border-gray-200">
+      <div className="flex justify-between text-xs text-gray-500 pt-2 mt-2 border-t border-gray-200">
+        <span>Lines total (before markup)</span>
+        <span>{formatCents(total)}</span>
+      </div>
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>Markup ({markupPercent}%)</span>
+        <span>{formatCents(dealerCostCents - total)}</span>
+      </div>
+      <div className="flex justify-between text-sm pt-1">
         <span className="text-gray-900 font-medium">New dealer cost</span>
-        <span className="text-gray-900 font-semibold">{formatCents(total)}</span>
+        <span className="text-gray-900 font-semibold">{formatCents(dealerCostCents)}</span>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Driver pay (what the driver sees)</p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">$</span>
+          <input
+            type="number"
+            step="0.01"
+            value={driverPayInput}
+            onChange={(e) => setDriverPayInput(e.target.value)}
+            className="w-24 text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+          />
+          <button
+            type="button"
+            onClick={() => setDriverPayInput((suggestedDriverPayCents / 100).toFixed(2))}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Use suggested {formatCents(suggestedDriverPayCents)}
+          </button>
+        </div>
+        <p className="text-[11px] text-gray-400 mt-1">
+          Suggested = hourly line + wear &amp; tear + overnight fee, at least the {formatCents(minimumDriverPayCents)} minimum. Saving also clears any driver pay override.
+        </p>
       </div>
 
       <button
