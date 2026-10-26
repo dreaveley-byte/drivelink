@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,13 +15,32 @@ const STATUS_LABELS: Record<string, string> = {
 // Undo for a job that was completed by mistake (e.g. a force-complete on a
 // drive that is still going). Puts it back to the status it had just before,
 // clears the completion date and locked-in final pay, and logs the change.
-export default function AdminReopenJob({ jobId, jobStatus }: { jobId: string; jobStatus: string }) {
+// compact: a small button for job cards. showUntil: epoch ms after which the
+// button hides itself (used for the short undo window on the admin dashboard).
+export default function AdminReopenJob({
+  jobId,
+  jobStatus,
+  compact = false,
+  showUntil,
+}: {
+  jobId: string
+  jobStatus: string
+  compact?: boolean
+  showUntil?: number
+}) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [expired, setExpired] = useState(false)
 
-  if (jobStatus !== 'completed') return null
+  useEffect(() => {
+    if (showUntil == null) return
+    const timer = setTimeout(() => setExpired(true), Math.max(0, showUntil - new Date().getTime()))
+    return () => clearTimeout(timer)
+  }, [showUntil])
+
+  if (jobStatus !== 'completed' || expired) return null
 
   async function reopen() {
     setSaving(true)
@@ -40,18 +59,24 @@ export default function AdminReopenJob({ jobId, jobStatus }: { jobId: string; jo
   }
 
   return (
-    <div className="border border-amber-300 bg-amber-50 rounded-xl p-4">
-      <p className="text-sm font-medium text-gray-900 mb-1">Completed by mistake?</p>
-      <p className="text-xs text-gray-600 mb-3">
-        Reopens this job at the status it had just before it was completed, clears the completion date and locked-in
-        driver pay (it goes back to the current estimate), and logs who reopened it.
-      </p>
+    <div className={compact ? '' : 'border border-amber-300 bg-amber-50 rounded-xl p-4'}>
+      {!compact && (
+        <>
+          <p className="text-sm font-medium text-gray-900 mb-1">Completed by mistake?</p>
+          <p className="text-xs text-gray-600 mb-3">
+            Reopens this job at the status it had just before it was completed, clears the completion date and locked-in
+            driver pay (it goes back to the current estimate), and logs who reopened it.
+          </p>
+        </>
+      )}
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+        className={compact
+          ? 'text-xs bg-amber-600 text-white px-2.5 py-1 rounded-lg hover:bg-amber-700 whitespace-nowrap'
+          : 'text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800'}
       >
-        Reopen this job
+        {compact ? 'Undo complete' : 'Reopen this job'}
       </button>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 

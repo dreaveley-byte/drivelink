@@ -5,6 +5,7 @@ import SignOutButton from '@/components/SignOutButton'
 import SettingsGearLink from '@/components/SettingsGearLink'
 import JobActions from '@/components/JobActions'
 import AutoRefresh from '@/components/AutoRefresh'
+import AdminReopenJob from '@/components/AdminReopenJob'
 import SortSelect from '@/components/SortSelect'
 import AdminJobLookup from '@/components/AdminJobLookup'
 import { shortJobId } from '@/lib/shortId'
@@ -66,6 +67,36 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .order('scheduled_for', { ascending, nullsFirst: false })
 
   const jobs = sortJobsActiveFirst(jobsRaw ?? [], ascending)
+
+  // Undo window: for 20 minutes after an admin completes a job (e.g. a
+  // force-complete), its card shows an "Undo complete" button. The button
+  // also hides itself on a timer, and this list stops including the job
+  // once the window passes (the page refreshes every 15s).
+  const REOPEN_WINDOW_MS = 20 * 60000
+  const reopenableIds = new Set<string>()
+  const recentCompletedIds = jobs
+    .filter((j) => j.status === 'completed' && j.completed_at && new Date().getTime() - new Date(j.completed_at).getTime() < REOPEN_WINDOW_MS)
+    .map((j) => j.id as string)
+  if (recentCompletedIds.length > 0) {
+    const { data: completedEvents } = await supabase
+      .from('job_status_events')
+      .select('job_id, changed_by')
+      .in('job_id', recentCompletedIds)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+    const completedBy = new Map<string, string | null>()
+    for (const e of completedEvents ?? []) {
+      if (!completedBy.has(e.job_id)) completedBy.set(e.job_id, e.changed_by)
+    }
+    const completerIds = [...new Set([...completedBy.values()].filter((v): v is string => !!v))]
+    const { data: adminCompleters } = completerIds.length > 0
+      ? await supabase.from('profiles').select('id').in('id', completerIds).eq('role', 'platform_admin')
+      : { data: [] as { id: string }[] }
+    const adminCompleterIds = new Set((adminCompleters ?? []).map((p) => p.id))
+    for (const [jobId, by] of completedBy) {
+      if (by && adminCompleterIds.has(by)) reopenableIds.add(jobId)
+    }
+  }
 
   const { data: reviewSettings } = await supabase
     .from('pricing_settings')
@@ -419,6 +450,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <span className="text-[10px] text-purple-600 font-medium whitespace-nowrap">
                       ETA {new Date(new Date(job.pickup_gps_at).getTime() + job.estimated_duration_minutes * 60000).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
                     </span>
+                  )}
+                  {reopenableIds.has(job.id) && job.completed_at && (
+                    <AdminReopenJob
+                      compact
+                      jobId={job.id}
+                      jobStatus={job.status}
+                      showUntil={new Date(job.completed_at).getTime() + REOPEN_WINDOW_MS}
+                    />
                   )}
                   <JobActions jobId={job.id} status={job.status} archived={!!job.archived_at} isAdmin />
                 </div>
