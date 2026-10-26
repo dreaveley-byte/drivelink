@@ -65,7 +65,8 @@ export default function AdminReopenJob({
           <p className="text-sm font-medium text-gray-900 mb-1">Completed by mistake?</p>
           <p className="text-xs text-gray-600 mb-3">
             Reopens this job at the status it had just before it was completed, clears the completion date and locked-in
-            driver pay (it goes back to the current estimate), and logs who reopened it.
+            driver pay (it goes back to the current estimate), takes it out of the archive if it was archived, and logs who
+            reopened it.
           </p>
         </>
       )}
