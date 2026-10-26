@@ -105,10 +105,19 @@ export default function ExpenseReviewList({
         amount_cents: parsedAmount,
       })
       .eq('id', expenseId)
-    setLoadingId(null)
     if (error) {
+      setLoadingId(null)
       alert(`Could not update expense: ${error.message}`)
       return
+    }
+    // Changing the category or amount changes how much of this expense is
+    // billed to the dealer (e.g. inspection is only billed above what was
+    // already priced in, repair is billed in full). Without re-working that
+    // out, the old charge stayed on the job's total.
+    const { error: recomputeError } = await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
+    setLoadingId(null)
+    if (recomputeError) {
+      alert(`The expense saved, but the dealer charge could not be recalculated: ${recomputeError.message}`)
     }
     setEditingId(null)
     router.refresh()
