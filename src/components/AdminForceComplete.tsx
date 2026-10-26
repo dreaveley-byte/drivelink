@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -24,6 +24,38 @@ export default function AdminForceComplete({
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [details, setDetails] = useState<{ label: string; value: string }[] | null>(null)
+  const [detailsError, setDetailsError] = useState('')
+
+  // Loads the saved job when the confirmation opens, so what's shown is
+  // what is actually in the database (not unsaved edits on the form) and
+  // an admin can see exactly which drive they are about to complete.
+  useEffect(() => {
+    if (!confirming) return
+    let cancelled = false
+    createClient()
+      .from('jobs')
+      .select('vehicle_year, vehicle_make, vehicle_model, stock_number, customer_full_name, dropoff_address, driver:driver_id(full_name)')
+      .eq('id', jobId)
+      .single()
+      .then(({ data, error: loadError }) => {
+        if (cancelled) return
+        if (loadError || !data) {
+          setDetailsError('Could not load the job details to show here.')
+          return
+        }
+        const driver = Array.isArray(data.driver) ? data.driver[0] : data.driver
+        const vehicle = [data.vehicle_year, data.vehicle_make, data.vehicle_model].filter(Boolean).join(' ')
+        setDetails([
+          { label: 'Driver', value: driver?.full_name || '-' },
+          { label: 'Customer', value: data.customer_full_name || '-' },
+          { label: 'Vehicle', value: vehicle || '-' },
+          { label: 'Stock #', value: data.stock_number || '-' },
+          { label: 'Going to', value: data.dropoff_address || '-' },
+        ])
+      })
+    return () => { cancelled = true }
+  }, [confirming, jobId])
 
   if (['completed', 'cancelled'].includes(jobStatus)) return null
 
@@ -65,7 +97,7 @@ export default function AdminForceComplete({
       ) : (
         <button
           type="button"
-          onClick={() => setConfirming(true)}
+          onClick={() => { setDetails(null); setDetailsError(''); setConfirming(true) }}
           className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
         >
           Force complete this job
@@ -77,6 +109,18 @@ export default function AdminForceComplete({
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-sm w-full p-5">
             <p className="text-sm font-semibold text-gray-900 mb-2">Force complete this job?</p>
+            {detailsError && <p className="text-xs text-red-600 mb-3">{detailsError}</p>}
+            {!details && !detailsError && <p className="text-xs text-gray-400 mb-3">Loading job details…</p>}
+            {details && (
+              <div className="border border-gray-200 rounded-lg bg-gray-50 px-3 py-2 mb-3 space-y-1">
+                {details.map((d) => (
+                  <div key={d.label} className="flex gap-2 text-sm">
+                    <span className="w-20 shrink-0 text-gray-500">{d.label}</span>
+                    <span className="text-gray-900 font-medium break-words min-w-0">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="text-sm text-gray-600 mb-4">
               This marks it completed immediately, skipping any remaining checklist steps, and calculates the
               driver&apos;s final pay based on the current estimate. This can&apos;t be undone from here.
