@@ -78,8 +78,8 @@ export default function PostJobPage() {
   // Dealer-to-dealer: any number of vehicles to drop off and/or pick up (0-7
   // each), unlike the fixed-at-2 multi-vehicle scenarios above. Every vehicle
   // beyond the first needs its own driver.
-  type DealerVehicle = { year: string; make: string; model: string; stockNumber: string; vin: string }
-  const blankDealerVehicle = (): DealerVehicle => ({ year: '', make: '', model: '', stockNumber: '', vin: '' })
+  type DealerVehicle = { year: string; make: string; model: string; stockNumber: string; vin: string; transmission: string }
+  const blankDealerVehicle = (): DealerVehicle => ({ year: '', make: '', model: '', stockNumber: '', vin: '', transmission: '' })
   const [dealerDropoffCount, setDealerDropoffCount] = useState(0)
   const [dealerPickupCount, setDealerPickupCount] = useState(0)
   const [dealerDropoffVehicles, setDealerDropoffVehicles] = useState<DealerVehicle[]>([])
@@ -1058,7 +1058,7 @@ export default function PostJobPage() {
       vehicle_model: isDealerToDealerMultiVehicle ? (primaryVehicle?.model || null) : (vehicleModel || null),
       stock_number: isDealerToDealerMultiVehicle ? (primaryDropoffVehicle?.stockNumber || null) : (stockNumber || null),
       vin: isDealerToDealerMultiVehicle ? (primaryVehicle?.vin || null) : (vin || null),
-      vehicle_transmission: vehicleTransmission || null,
+      vehicle_transmission: isDealerToDealerMultiVehicle ? (primaryVehicle?.transmission || null) : (vehicleTransmission || null),
       pickup_dropoff_mode: isVehiclePickupDropoff ? pickupDropoffMode : null,
       mileage: mileage ? parseInt(mileage) : null,
       key_count: keyCount ? parseInt(keyCount) : null,
@@ -1323,6 +1323,7 @@ export default function PostJobPage() {
           vehicle_model: vehicle?.model || null,
           stock_number: dropoffVehicle?.stockNumber || null,
           vin: vehicle?.vin || null,
+          vehicle_transmission: vehicle?.transmission || null,
           mileage: null,
           key_count: keyCount ? parseInt(keyCount) : null,
           has_wheel_lock: hasWheelLock,
@@ -1411,6 +1412,9 @@ export default function PostJobPage() {
   // Signing is always a round trip on the driver's own vehicle, never a
   // one-way Uber-back/chase-vehicle scenario like a courier package can be.
   const useSimplifiedForm = isCourier || isPaperworkSigning || isCustomerRide
+  // On a Dealer Trade with vehicles listed, per-vehicle details live in the
+  // trade section, so the general Vehicle section doesn't repeat them.
+  const isTradeWithVehicles = jobTypeName === 'Dealer Trade' && (dealerDropoffCount > 0 || dealerPickupCount > 0)
 
   return (
     <div className="min-h-screen bg-white">
@@ -1615,6 +1619,12 @@ export default function PostJobPage() {
                   </div>
                   <input value={v.stockNumber} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'stockNumber', e.target.value)} placeholder="Stock #" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   <input value={v.vin} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'vin', e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <select value={v.transmission} onChange={(e) => updateDealerVehicle(dealerDropoffVehicles, setDealerDropoffVehicles, i, 'transmission', e.target.value)} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">Transmission: not specified</option>
+                    <option value="automatic">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                  <p className="text-xs text-gray-400">The driver needs to know before accepting if this vehicle is a manual.</p>
                 </div>
               ))}
 
@@ -1627,6 +1637,12 @@ export default function PostJobPage() {
                     <input value={v.model} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'model', e.target.value)} placeholder="Model" className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
                   </div>
                   <input value={v.vin} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'vin', e.target.value)} placeholder="VIN" required className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  <select value={v.transmission} onChange={(e) => updateDealerVehicle(dealerPickupVehicles, setDealerPickupVehicles, i, 'transmission', e.target.value)} className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">Transmission: not specified</option>
+                    <option value="automatic">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                  <p className="text-xs text-gray-400">The driver needs to know before accepting if this vehicle is a manual.</p>
                 </div>
               ))}
             </div>
@@ -1745,50 +1761,63 @@ export default function PostJobPage() {
           ) : (
           <div className="space-y-3 border border-gray-200 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-900">Vehicle</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Year</label>
-                <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            {isTradeWithVehicles && (
+              <p className="text-xs text-gray-400">
+                Each vehicle&apos;s year, make, model, stock #, VIN and transmission are entered above under Vehicles In This Trade.
+              </p>
+            )}
+            {!isTradeWithVehicles && (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Year</label>
+                  <input value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Make</label>
+                  <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Model</label>
+                  <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Make</label>
-                <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Model</label>
-                <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-              </div>
-            </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Stock number</label>
-                <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-              </div>
+              {!isTradeWithVehicles && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Stock number</label>
+                  <input value={stockNumber} onChange={(e) => setStockNumber(e.target.value)} required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Mileage</label>
                 <input value={mileage} onChange={(e) => setMileage(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">VIN</label>
-              <input value={vin} onChange={(e) => setVin(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Transmission</label>
-              <select value={vehicleTransmission} onChange={(e) => setVehicleTransmission(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">Not specified</option>
-                <option value="automatic">Automatic</option>
-                <option value="manual">Manual</option>
-              </select>
-              <p className="text-xs text-gray-400 mt-1">The driver needs to know before accepting if this vehicle is a manual.</p>
-            </div>
+            {!isTradeWithVehicles && (
+              <>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">VIN</label>
+                  <input value={vin} onChange={(e) => setVin(e.target.value)} required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Transmission</label>
+                  <select value={vehicleTransmission} onChange={(e) => setVehicleTransmission(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Not specified</option>
+                    <option value="automatic">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">The driver needs to know before accepting if this vehicle is a manual.</p>
+                </div>
+              </>
+            )}
 
             <div className="pt-2 border-t border-gray-100">
               <p className="text-xs text-gray-500 mb-2">Included with vehicle</p>
