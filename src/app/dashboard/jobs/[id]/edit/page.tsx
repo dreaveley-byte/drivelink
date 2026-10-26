@@ -1,5 +1,6 @@
 'use client'
 
+import AdminReopenJob from '@/components/AdminReopenJob'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -1388,6 +1389,11 @@ export default function EditJobPage() {
         {isAdmin && (
           <div className="mb-6">
             <AdminForceComplete jobId={jobId} jobStatus={jobStatus} hasDriver={!!currentDriverId} />
+          </div>
+        )}
+        {isAdmin && jobStatus === 'completed' && (
+          <div className="mb-6">
+            <AdminReopenJob jobId={jobId} jobStatus={jobStatus} />
           </div>
         )}
         {isAdmin && savedPricing && (savedPricing.dealerCostCents != null || savedPricing.charges.length > 0) && (
