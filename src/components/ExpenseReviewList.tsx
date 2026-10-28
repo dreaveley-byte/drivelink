@@ -140,12 +140,11 @@ export default function ExpenseReviewList({
       })
       .eq('id', expense.id)
 
-    if (!error && approve && addAmount > 0) {
-      const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
-      await supabase
-        .from('jobs')
-        .update({ approved_expenses_cents: (job?.approved_expenses_cents ?? 0) + addAmount })
-        .eq('id', jobId)
+    // Re-derive the job's billed total from the receipts themselves rather
+    // than adding to a saved running total (which could drift out of sync
+    // when several receipts were handled in quick succession).
+    if (!error) {
+      await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
     }
 
     setLoadingId(null)
@@ -168,13 +167,8 @@ export default function ExpenseReviewList({
       .update({ status: 'pending', reviewed_by: null, reviewed_at: null, approved_addition_cents: null })
       .eq('id', expense.id)
 
-    const addedAmount = expense.approved_addition_cents ?? 0
-    if (!error && addedAmount > 0) {
-      const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
-      await supabase
-        .from('jobs')
-        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - addedAmount) })
-        .eq('id', jobId)
+    if (!error) {
+      await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
     }
 
     setLoadingId(null)
@@ -192,15 +186,10 @@ export default function ExpenseReviewList({
     setLoadingId(expense.id)
     const supabase = createClient()
 
-    const addedAmount = expense.approved_addition_cents ?? 0
     const { error } = await supabase.from('job_expenses').delete().eq('id', expense.id)
 
-    if (!error && addedAmount > 0) {
-      const { data: job } = await supabase.from('jobs').select('approved_expenses_cents').eq('id', jobId).single()
-      await supabase
-        .from('jobs')
-        .update({ approved_expenses_cents: Math.max(0, (job?.approved_expenses_cents ?? 0) - addedAmount) })
-        .eq('id', jobId)
+    if (!error) {
+      await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
     }
 
     setLoadingId(null)

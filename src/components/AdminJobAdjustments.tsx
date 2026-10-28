@@ -243,10 +243,7 @@ export default function AdminJobAdjustments({
     })
 
     if (!insertError) {
-      await supabase
-        .from('jobs')
-        .update({ approved_expenses_cents: approvedExpensesCents + addAmountCents })
-        .eq('id', jobId)
+      await supabase.rpc('recompute_job_expense_additions', { p_job_id: jobId })
     }
 
     setSavingExpense(false)
