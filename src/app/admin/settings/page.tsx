@@ -56,6 +56,10 @@ type Settings = {
   idle_fee_grace_minutes: number
   idle_fee_per_minute_cents: number
   bus_base_fare_cents: number
+  harbour_air_victoria_fare_cents?: number
+  harbour_air_nanaimo_fare_cents?: number
+  harbour_air_flight_minutes?: number
+  harbour_air_buffer_hours?: number
   bus_per_km_cents: number
   bus_terminal_buffer_hours: number
   bus_max_distance_km: number
@@ -395,6 +399,36 @@ export default function PricingSettingsPage() {
                 onChange={(e) => updateDollarField('ferry_walkon_fare_cents', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
+            {settings.harbour_air_victoria_fare_cents != null && (
+              <>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Harbour Air fare: Vancouver ⇄ Victoria ($)</label>
+                  <p className="text-xs text-gray-400 mb-1">Estimate only — there is no live Harbour Air fare feed. Published &quot;from&quot; fares need ~14 days&apos; notice; set this to what a short-notice ticket really costs. Used to compare a seaplane home against the walk-on ferry on jobs that cross the water.</p>
+                  <input type="number" step="0.01" value={dollars(settings.harbour_air_victoria_fare_cents)}
+                    onChange={(e) => updateDollarField('harbour_air_victoria_fare_cents', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Harbour Air fare: Vancouver ⇄ Nanaimo ($)</label>
+                  <input type="number" step="0.01" value={dollars(settings.harbour_air_nanaimo_fare_cents ?? 0)}
+                    onChange={(e) => updateDollarField('harbour_air_nanaimo_fare_cents', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Harbour Air flight time (minutes)</label>
+                  <input type="number" step="5" value={settings.harbour_air_flight_minutes ?? 35}
+                    onChange={(e) => updateNumberField('harbour_air_flight_minutes', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Harbour Air buffer (hours)</label>
+                  <p className="text-xs text-gray-400 mb-1">Billed driver time added around the flight for arriving, check-in and boarding</p>
+                  <input type="number" step="0.25" value={settings.harbour_air_buffer_hours ?? 1}
+                    onChange={(e) => updateNumberField('harbour_air_buffer_hours', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </>
+            )}
             <div>
               <label className="block text-sm text-gray-700 mb-1">Bus base fare ($)</label>
               <p className="text-xs text-gray-400 mb-1">Estimate only — no live bus pricing source exists. Used to compare against flying/driving back on long hauls.</p>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { calculatePricing, formatCents, groundHomeCharge, groundToAirportCharge, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
+import { calculatePricing, formatCents, groundHomeCharge, groundToAirportCharge, groundLegPricing, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
@@ -416,7 +416,7 @@ export default function PostJobPage() {
 
       // --- Ferry: look this up once regardless of round-trip/one-way, since the
       // terminal match itself doesn't depend on that — only the crossing count does.
-      let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number; groundHome: { distanceKm: number; durationMinutes: number } | null } | null = null
+      let ferryInfo: { fromTerminal: { name: string }; toTerminal: { name: string }; sailingDurationMinutes: number; avgGapMinutes: number; sailingsPerDay: number; groundHome: { distanceKm: number; durationMinutes: number } | null; groundToTerminal?: { distanceKm: number; durationMinutes: number } | null } | null = null
       // A real BC Ferries route never applies to a short local drive — the terminal
       // matching can otherwise false-positive on nearby-but-different terminals for
       // trips like a quick dealer-to-dealer trade. Skip the check entirely below
@@ -622,6 +622,40 @@ export default function PostJobPage() {
         ]
       }
 
+      // Harbour Air seaplane home across the water - only offered when this
+      // route actually crosses a ferry, and only when the API finds a seaplane
+      // base that's a short ride from both ends.
+      async function buildHarbourAirCharges(): Promise<AdditionalCharge[] | null> {
+        if (!ferryInfo) return null
+        try {
+          const r = await fetch('/api/harbour-air', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pickupAddress: filledStops[0], dropoffAddress: filledStops[filledStops.length - 1] }),
+          })
+          const b = await r.json().catch(() => ({}))
+          return r.ok && b.available ? (b.charges as AdditionalCharge[]) : null
+        } catch {
+          return null
+        }
+      }
+
+      // The walk-on ferry home starts with getting from the drop-off to the
+      // ferry terminal - a real ride (and real driver hours) that the
+      // "ferry + ride from the terminal" price used to leave out.
+      function ferryToTerminalCharge(): AdditionalCharge | null {
+        const leg = ferryInfo?.groundToTerminal
+        if (!ferryInfo || !leg) return null
+        const p = groundLegPricing({ distanceKm: leg.distanceKm, durationMinutes: leg.durationMinutes, mode: 'uber' }, pricingSettings!)
+        return {
+          description: `Ground transport to ferry terminal — ${ferryInfo.toTerminal.name}, ${leg.distanceKm}km`,
+          kind: 'ground-to-airport' as const,
+          dealerAmountCents: p.dealerAmountCents,
+          hoursAdded: p.hoursAdded,
+          paidToDriver: true,
+        }
+      }
+
       // Only keep charges the user actually typed in themselves — anything
       // auto-generated (tagged with a `kind`) gets rebuilt fresh every time.
       const manualCharges = additionalCharges.filter((c) => !c.kind)
@@ -668,9 +702,9 @@ export default function PostJobPage() {
         // one way, and there's no reason to default into an expensive round trip
         // just because chase vehicle happens to be checked. Flight/bus only get
         // added to the comparison on genuine long hauls, where they're realistic.
-        const [flyCharges, busCharges] = longHaul
-          ? await Promise.all([buildFlyCharges(), Promise.resolve(buildBusCharges())])
-          : [null, null]
+        const [flyCharges, busCharges, harbourCharges] = longHaul || ferryInfo
+          ? await Promise.all([buildFlyCharges(), Promise.resolve(longHaul ? buildBusCharges() : null), buildHarbourAirCharges()])
+          : [null, null, null]
 
         const options: { label: string; flying: boolean; secondDrv: boolean; chase: boolean; charges: AdditionalCharge[]; cost: number }[] = []
 
@@ -694,12 +728,27 @@ export default function PostJobPage() {
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
         }
 
-        {
+        if (harbourCharges) {
+          const fc = ferryCharge('oneway-vehicle')
+          const charges = fc ? [...manualCharges, ...harbourCharges, fc] : [...manualCharges, ...harbourCharges]
+          const r = calculatePricing(
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            pricingSettings
+          )
+          options.push({ label: 'Harbour Air', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
+        }
+
+        // An Uber home only makes sense for a ride-share-sized distance, or a
+        // walk-on ferry plus a short ride. A 1,000 km "Uber back" was being
+        // quoted (and could win) on long hauls where no flight was found.
+        const UBER_BACK_MAX_KM = 150
+        if (ferryInfo || data.distanceKm <= UBER_BACK_MAX_KM) {
           // Uber-back — the driver goes one-way, and takes an Uber (or walks onto
           // a ferry as a passenger, if one's involved) back to the dealership.
           const fc = ferryCharge('oneway-walkon-return')
           const groundHomeCharge = ferryReturnGroundTransport()
-          const charges = fc ? [...manualCharges, groundHomeCharge, fc] : [...manualCharges, groundHomeCharge]
+          const toTerminal = ferryToTerminalCharge()
+          const charges = fc ? [...manualCharges, ...(toTerminal ? [toTerminal] : []), groundHomeCharge, fc] : [...manualCharges, groundHomeCharge]
           const r = calculatePricing(
             { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
@@ -1988,7 +2037,7 @@ export default function PostJobPage() {
               <>
                 <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                   <input type="checkbox" checked={autoSelectReturnMethod} onChange={(e) => setAutoSelectReturnMethod(e.target.checked)} />
-                  Auto-select cheapest return method (Uber, chase vehicle, flight, or bus)
+                  Auto-select cheapest return method (Uber, ferry, Harbour Air, chase vehicle, flight, or bus)
                 </label>
                 {!autoSelectReturnMethod && !flyingBack && !(secondDriver && chaseVehicle) && (
                   <label className="flex items-center gap-2 text-sm text-gray-700 ml-6">
@@ -2126,14 +2175,13 @@ export default function PostJobPage() {
                   </p>
                 </div>
               )}
-              {flyingBack && flightOptions.length > 0 && pricingSettings && additionalCharges.some((c) => c.kind === 'flight') && (
+              {flyingBack && additionalCharges.some((c) => c.kind === 'flight' || c.kind === 'bus' || c.kind === 'ground-home') && (
                 <ReturnRouteSteps
                   pickup={stops[0] ?? ''}
                   dropoff={stops[stops.length - 1] ?? ''}
                   driveKm={distanceKm}
                   driveMinutes={durationMinutes}
-                  option={flightOptions[selectedFlightOptionIdx] ?? flightOptions[0]}
-                  settings={pricingSettings}
+                  charges={additionalCharges}
                 />
               )}
               <div className="ml-6 mt-2 grid grid-cols-2 gap-2">
@@ -2274,7 +2322,7 @@ export default function PostJobPage() {
                         {additionalCharges.find((c) => c.kind === 'flight')!.description}
                       </p>
                     )}
-                    <BreakdownRow label="Ground transport to airport" cents={additionalCharges.find((c) => c.kind === 'ground-to-airport')?.dealerAmountCents ?? 0} />
+                    <BreakdownRow label="Ground transport to airport / ferry terminal" cents={additionalCharges.find((c) => c.kind === 'ground-to-airport')?.dealerAmountCents ?? 0} />
                     <BreakdownRow label="Ground transport home" cents={additionalCharges.find((c) => c.kind === 'ground-home')?.dealerAmountCents ?? 0} />
                     <BreakdownRow
                       label="Other additional charges"

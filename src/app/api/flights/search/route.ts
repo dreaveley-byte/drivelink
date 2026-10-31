@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { groundLegPricing, AVG_BUS_SPEED_KMH } from '@/lib/pricing'
+import { isFerryIsolated } from '@/lib/bcGeography'
 
 const DUFFEL_BASE = 'https://api.duffel.com'
 
@@ -69,7 +70,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY
   if (!key) return null
-  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${key}`)
+  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&region=ca&key=${key}`)
   if (!res.ok) return null
   const data = await res.json()
   if (data.status !== 'OK') {
@@ -97,8 +98,7 @@ async function nearbyAirports(address: string, maxCandidates: number, maxRadiusK
   // distance. Rather than relying on distance alone, island-only airports
   // are excluded from consideration entirely unless the query address
   // itself falls within Vancouver Island's own rough bounding box.
-  const ON_VANCOUVER_ISLAND =
-    coords.lat >= 48.2 && coords.lat <= 51.0 && coords.lng <= -123.0 && coords.lng >= -128.6
+  const ON_VANCOUVER_ISLAND = isFerryIsolated(coords.lat, coords.lng)
   const eligibleAirports = ON_VANCOUVER_ISLAND ? AIRPORTS : AIRPORTS.filter((a) => !a.islandOnly)
 
   const withDistance = eligibleAirports.map((a) => ({ ...a, dist: haversineKm(coords.lat, coords.lng, a.lat, a.lng) }))
@@ -278,8 +278,8 @@ export async function POST(req: NextRequest) {
   type Segment = {
     marketing_carrier?: { name?: string; iata_code?: string }
     marketing_carrier_flight_number?: string
-    origin?: { iata_code?: string }
-    destination?: { iata_code?: string }
+    origin?: { iata_code?: string; iata_country_code?: string }
+    destination?: { iata_code?: string; iata_country_code?: string }
     departing_at?: string
     arriving_at?: string
   }
@@ -357,7 +357,16 @@ export async function POST(req: NextRequest) {
     }
 
     const offerRequestData = await offerRequestRes.json()
-    const offers = offerRequestData?.data?.offers ?? []
+    const allOffers = (offerRequestData?.data?.offers ?? []) as Offer[]
+    // Canada only. A connecting itinerary can route through a US hub (Seattle,
+    // Minneapolis, Denver...) - that means US customs and a flight the driver
+    // shouldn't be put on. Drop any offer where a segment starts or ends in
+    // another country. (When Duffel doesn't say which country an airport is
+    // in, it's kept rather than guessed at.)
+    const inCanada = (code?: string) => code == null || code === 'CA'
+    const offers = allOffers.filter((o) =>
+      o.slices.every((sl) => sl.segments.every((sg) => inCanada(sg.origin?.iata_country_code) && inCanada(sg.destination?.iata_country_code)))
+    )
     if (offers.length === 0) return { flightFrom, flightTo, flight: null, groundToAirport, groundFromAirport, effectiveCostCents: Infinity }
 
     // The earliest instant this driver could plausibly be standing at THIS

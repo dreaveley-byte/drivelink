@@ -237,7 +237,12 @@ export async function POST(req: NextRequest) {
   // When the driver returns as a walk-on passenger, they land back at the
   // origin-side terminal and still need a ride from there to the dealership —
   // a real driven distance, not a flat guess, since we know exactly where both ends are.
-  const groundHome = await drivingLeg(originAddress, { lat: bestMatch.origin.lat, lng: bestMatch.origin.lng })
+  // The other half of a walk-on return: the driver also has to get from the
+  // drop-off address to the ferry terminal on that side first.
+  const [groundHome, groundToTerminal] = await Promise.all([
+    drivingLeg(originAddress, { lat: bestMatch.origin.lat, lng: bestMatch.origin.lng }),
+    drivingLeg(destinationAddress, { lat: bestMatch.dest.lat, lng: bestMatch.dest.lng }),
+  ])
 
   return NextResponse.json({
     fromTerminal,
@@ -247,5 +252,6 @@ export async function POST(req: NextRequest) {
     sailingsPerDay: sailingTimes.length,
     sailingTimes: route.sailings.map((s) => s.time),
     groundHome,
+    groundToTerminal,
   })
 }
