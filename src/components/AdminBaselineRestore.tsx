@@ -15,15 +15,18 @@ type Baselines = {
   hotel: number
   ferry: number
   return_transport: number
+  // Only present once the car wash accrual migration has been run.
+  car_wash?: number
 }
 
-const FIELDS: { key: keyof Baselines; label: string }[] = [
+const ALL_FIELDS: { key: keyof Baselines; label: string }[] = [
   { key: 'fuel', label: 'Fuel' },
   { key: 'inspection', label: 'Inspection' },
   { key: 'food', label: 'Food' },
   { key: 'hotel', label: 'Hotel' },
   { key: 'ferry', label: 'Ferry' },
   { key: 'return_transport', label: 'Return transport' },
+  { key: 'car_wash', label: 'Car wash' },
 ]
 
 // The "accrued" baselines are what was already priced into the dealer's quote
@@ -45,8 +48,10 @@ export default function AdminBaselineRestore({
   dealerPaid: boolean
 }) {
   const router = useRouter()
+  // Car wash is only editable once the job actually has that baseline (i.e. the migration is in).
+  const FIELDS = ALL_FIELDS.filter((f) => f.key !== 'car_wash' || current.car_wash !== undefined)
   const initial = (b: Baselines | null) =>
-    Object.fromEntries(FIELDS.map((f) => [f.key, b ? (b[f.key] / 100).toFixed(2) : ''])) as Record<keyof Baselines, string>
+    Object.fromEntries(FIELDS.map((f) => [f.key, b ? ((b[f.key] ?? 0) / 100).toFixed(2) : ''])) as Record<keyof Baselines, string>
 
   const [values, setValues] = useState<Record<keyof Baselines, string>>(initial(saved ?? current))
   const [reason, setReason] = useState('')
@@ -54,10 +59,10 @@ export default function AdminBaselineRestore({
   const [error, setError] = useState('')
   const [saved_, setSavedOk] = useState(false)
 
-  const currentTotal = FIELDS.reduce((s, f) => s + current[f.key], 0)
-  const savedTotal = saved ? FIELDS.reduce((s, f) => s + saved[f.key], 0) : 0
+  const currentTotal = FIELDS.reduce((s, f) => s + (current[f.key] ?? 0), 0)
+  const savedTotal = saved ? FIELDS.reduce((s, f) => s + (saved[f.key] ?? 0), 0) : 0
   const looksWiped = currentTotal === 0 && savedTotal > 0
-  const differsFromSaved = !!saved && FIELDS.some((f) => saved[f.key] !== current[f.key])
+  const differsFromSaved = !!saved && FIELDS.some((f) => (saved[f.key] ?? 0) !== (current[f.key] ?? 0))
 
   async function save() {
     setError('')
@@ -94,6 +99,7 @@ export default function AdminBaselineRestore({
       p_hotel: cents.hotel,
       p_ferry: cents.ferry,
       p_return_transport: cents.return_transport,
+      ...(current.car_wash !== undefined ? { p_car_wash: cents.car_wash } : {}),
       p_reason: reason.trim(),
     })
     setSaving(false)
@@ -127,7 +133,7 @@ export default function AdminBaselineRestore({
         {FIELDS.map((f) => (
           <div key={f.key}>
             <label className="block text-xs text-gray-500 mb-1">
-              {f.label} <span className="text-gray-400">(now {formatCents(current[f.key])})</span>
+              {f.label} <span className="text-gray-400">(now {formatCents(current[f.key] ?? 0)})</span>
             </label>
             <input
               type="number"

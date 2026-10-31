@@ -65,6 +65,8 @@ type Settings = {
   bus_max_distance_km: number
   delivery_handling_buffer_hours: number
   max_driving_hours_before_overnight: number
+  car_wash_accrual_cents?: number
+  bc_insurance_transfer_hours?: number
   job_review_hold_minutes: number
   job_review_hold_min_distance_km: number
   job_review_hold_trigger_on_flight: boolean
@@ -336,11 +338,27 @@ export default function PricingSettingsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Max driving hours before overnight</label>
+              <label className="block text-sm text-gray-700 mb-1">Total billed hours before overnight (hotel + overnight fee)</label>
               <input type="number" step="0.5" value={settings.max_driving_hours_before_overnight}
                 onChange={(e) => updateNumberField('max_driving_hours_before_overnight', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
+            {settings.car_wash_accrual_cents != null && (
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Car wash accrual ($ per job)</label>
+                <input type="number" step="0.01" value={dollars(settings.car_wash_accrual_cents)}
+                  onChange={(e) => updateDollarField('car_wash_accrual_cents', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            )}
+            {settings.bc_insurance_transfer_hours != null && (
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">BC insurance transfer (extra driver hours)</label>
+                <input type="number" step="0.25" value={settings.bc_insurance_transfer_hours}
+                  onChange={(e) => updateNumberField('bc_insurance_transfer_hours', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            )}
           </div>
         </section>
 

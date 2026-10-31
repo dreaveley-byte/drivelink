@@ -41,6 +41,10 @@ export type PricingSettings = {
   drivflo_insurance_tow_deductible_fee_cents: number
   max_daily_meal_budget_cents: number
   bus_base_fare_cents: number
+  // Added by migration 183. Optional so the app keeps working (with both
+  // features simply off) until that migration has been run.
+  car_wash_accrual_cents?: number
+  bc_insurance_transfer_hours?: number
   bus_per_km_cents: number
   job_review_hold_minutes: number
   job_review_hold_min_distance_km: number
@@ -186,6 +190,13 @@ export type PricingInput = {
   // Parts Delivery/Parts Pickup only — enables the Uber-undercut price cap
   // (see parts_uber_discount_percent/parts_driver_pay_split_percent above).
   isPartsJob?: boolean
+  // BC delivery with an insurance transfer: adds the configured extra hour(s)
+  // of driver time (billed to the dealer and paid to the driver like any other
+  // billed hour).
+  bcInsuranceTransfer?: boolean
+  // Jobs that aren't a normal vehicle delivery (courier, customer rides,
+  // local pick/drop-offs) don't get the car wash accrual.
+  excludeCarWashAccrual?: boolean
 }
 
 export type PricingResult = {
@@ -198,6 +209,8 @@ export type PricingResult = {
   driverPaidHours: number
   gasCostCents: number
   mealCostCents: number
+  carWashCents: number
+  bcInsuranceHours: number
   wearAndTearCents: number
   trailerFeeCents: number
   hotelCents: number
@@ -263,13 +276,14 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // multiple of the interval yet. Previously this floored, which meant a
   // job could be several hours past its last "real" break and still show
   // zero additional break time/pay for it.
-  const mealBreaks = Math.min(
+  // Break stops happen on the road, so the time they add follows driving time.
+  const drivingBreaks = Math.min(
     baseDrivingHours < settings.meal_allowance_every_hours
       ? 0
       : Math.ceil(baseDrivingHours / settings.meal_allowance_every_hours),
     settings.meal_allowance_max_count
   )
-  const breakHours = (mealBreaks * settings.break_duration_minutes) / 60
+  const breakHours = (drivingBreaks * settings.break_duration_minutes) / 60
 
   // Hours always represent real time the driver spent working (driving, flying,
   // waiting at the airport, etc.) so they're always paid — separate from whether
@@ -278,34 +292,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // but the ticket cost itself is billed to the dealer only, not added to pay.)
   const extraDealerOnlyHours = additionalCharges.reduce((sum, c) => sum + c.hoursAdded, 0)
 
-  // Overnight is now based strictly on actual driving time alone (the
-  // round-trip drive itself), not the combined total of driving plus
-  // breaks/inspections/registry/insurance/ferry/flight-buffer time. Dan
-  // confirmed this explicitly, understanding the trade-off: a job that's
-  // short on driving but long due to a late return flight or long ferry
-  // wait will no longer automatically trigger overnight, even if the
-  // driver ends up stuck overnight in that scenario too.
-  const overnightRequired = baseDrivingHours > settings.max_driving_hours_before_overnight
-
-  // Capped per person per day — an overnight trip is treated as 2 days for this
-  // purpose (the app's overnight model is a single same-day/next-day threshold,
-  // not a full multi-night calendar).
-  //
-  // `mealBreaks` only counts meal stops taken during the driving portion of
-  // the trip — on an overnight job the driver is still away (and still needs
-  // to eat) on the second day even if no further "driving break" happens
-  // there (e.g. an early return flight, or a short final leg). Previously
-  // `mealDays` only widened the cap without ever actually scaling the dollar
-  // total for that second day, so a long overnight trip with few driving-break
-  // meals on day one could end up with a meal budget barely covering a single
-  // day despite the driver being out for two. Cap per day first (matching
-  // what `max_daily_meal_budget_cents` actually means), then multiply by the
-  // number of days the driver is out.
-  const perDayMealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
-    ? Math.min(mealBreaks * settings.meal_allowance_cents, settings.max_daily_meal_budget_cents)
-    : mealBreaks * settings.meal_allowance_cents
-  const mealDays = overnightRequired ? 2 : 1
-  const mealCostCents = perDayMealCostCents * mealDays * numDrivers
+  // BC delivery insurance transfer - extra driver time on top of everything else.
+  const bcInsuranceHours = input.bcInsuranceTransfer ? (settings.bc_insurance_transfer_hours ?? 0) : 0
 
   // Every delivery involves real time at the destination beyond pure driving —
   // paperwork, the walkaround, signatures, handing over keys. This wasn't
@@ -313,7 +301,32 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   // job, not just long-haul ones, since it's real time on every single delivery.
   const deliveryHandlingHours = settings.delivery_handling_buffer_hours
 
-  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
+  const dealerBilledHours = baseDrivingHours + breakHours + inspectionHours + registryHours + insuranceHours + bcInsuranceHours + ferryHours + extraDealerOnlyHours + deliveryHandlingHours
+
+  // Overnight (hotel + overnight fee), and the meal allowance, follow the
+  // TOTAL hours billed - not just time behind the wheel. A trip that is short
+  // on driving but long on inspections, ferry waits, or a late flight home
+  // still keeps the driver out all day, eating and needing a bed. (Previously
+  // both used driving time alone, so a 12.8h drive with a flight home and
+  // 25 billed hours got no hotel, no overnight fee and a one-day food budget.)
+  const overnightRequired = dealerBilledHours > settings.max_driving_hours_before_overnight
+
+  // Meal allowance: same cadence as before (one per N hours, capped), now
+  // counted over the whole billed trip.
+  const mealBreaks = Math.min(
+    dealerBilledHours < settings.meal_allowance_every_hours
+      ? 0
+      : Math.ceil(dealerBilledHours / settings.meal_allowance_every_hours),
+    settings.meal_allowance_max_count
+  )
+  // Capped per person per day, and an overnight trip is out for two days: cap
+  // per day first (what max_daily_meal_budget_cents actually means), then
+  // multiply by the number of days the driver is away.
+  const perDayMealCostCents = Number.isFinite(settings.max_daily_meal_budget_cents)
+    ? Math.min(mealBreaks * settings.meal_allowance_cents, settings.max_daily_meal_budget_cents)
+    : mealBreaks * settings.meal_allowance_cents
+  const mealDays = overnightRequired ? 2 : 1
+  const mealCostCents = perDayMealCostCents * mealDays * numDrivers
   // The driver is paid hourly for every hour the dealer is billed for — the
   // inspection/registry/insurance/ferry wait time is real time the driver
   // spends on the job, even though the dealer's flat inspection/registry fee
@@ -355,6 +368,11 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const trailerFeeCents = vehicleMode === 'towed' ? trailerDays * settings.trailer_fee_cents_per_day : 0
 
   const hotelCents = overnightRequired ? settings.hotel_rate_cents : 0
+
+  // Car wash accrual: a flat allowance priced into a normal vehicle delivery.
+  // The driver's real car wash receipt is checked against it (and only the
+  // amount over it is billed on top), the same way fuel and meals are.
+  const carWashCents = excludeFuelAccrual || input.isPartsJob || input.excludeCarWashAccrual ? 0 : (settings.car_wash_accrual_cents ?? 0)
   const overnightFeeCents = overnightRequired ? settings.overnight_fee_cents * numDrivers : 0
 
   // Flat service fees on top of the hourly-minimum time already billed above —
@@ -415,7 +433,7 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
   const garageInsuranceFeeCents = useGarageInsurance ? baseInsuranceCents + towDeductibleCents : 0
 
   const costBasisCents =
-    hourlyDealerCents + gasCostCents + mealCostCents + wearAndTearCents +
+    hourlyDealerCents + gasCostCents + mealCostCents + carWashCents + wearAndTearCents +
     trailerFeeCents + hotelCents + overnightFeeCents + inspectionFeeCents +
     registryFeeCents + ferryFeeCents + garageInsuranceFeeCents + extrasDealerCents + driverPayFloorBumpCents
 
@@ -472,6 +490,8 @@ export function calculatePricing(input: PricingInput, settings: PricingSettings)
     driverPaidHours,
     gasCostCents,
     mealCostCents,
+    carWashCents,
+    bcInsuranceHours,
     wearAndTearCents,
     trailerFeeCents,
     hotelCents,

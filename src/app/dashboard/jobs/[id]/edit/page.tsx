@@ -20,6 +20,15 @@ import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zoned
 
 type JobType = { id: string; name: string }
 
+// True for an address in British Columbia (Google-formatted addresses end in
+// ", BC V1V 1V1, Canada"; free-typed ones may say British Columbia).
+function isBcAddress(address: string): boolean {
+  return /(^|[\s,])BC([\s,]|$)|British Columbia/i.test(address)
+}
+
+// Job types that aren't a normal vehicle delivery - no car wash accrual.
+const NO_CAR_WASH_JOB_TYPES = ['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Customer Pick Up', 'Customer Drop Off', 'Vehicle Pick / Drop Off', 'Vehicle Pick Up / Drop Off']
+
 export default function EditJobPage() {
   const router = useRouter()
   const params = useParams()
@@ -101,6 +110,8 @@ export default function EditJobPage() {
   const [pickupDropoffReason, setPickupDropoffReason] = useState<'sales' | 'service' | 'other'>('sales')
   const [pickupDropoffReasonOther, setPickupDropoffReasonOther] = useState('')
   const [insuranceVisit, setInsuranceVisit] = useState(false)
+  const [bcInsuranceTransfer, setBcInsuranceTransfer] = useState(false)
+  const [bcInsuranceTouched, setBcInsuranceTouched] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
@@ -244,6 +255,12 @@ export default function EditJobPage() {
       setIsFirstNationsDelivery(job.is_first_nations_delivery ?? false)
       setFlyingBack(job.one_way_flight_back ?? false)
       setAutoSelectReturnMethod(job.auto_select_return_method ?? true)
+      if (job.bc_insurance_transfer != null) {
+        setBcInsuranceTransfer(job.bc_insurance_transfer)
+        // Only treat it as the user's own override if it differs from what
+        // auto-select would have picked for this drop-off address.
+        setBcInsuranceTouched(job.bc_insurance_transfer !== isBcAddress(job.dropoff_address ?? ''))
+      }
       setSavedPricing({
         dealerCostCents: job.estimated_dealer_cost_cents ?? null,
         driverPayCents: job.estimated_driver_pay_cents ?? null,
@@ -433,6 +450,19 @@ export default function EditJobPage() {
   // `scheduledFor` state update to land and this callback to be re-created on
   // the next render would mean the very first invocation still reads the OLD
   // date, silently recalculating the wrong quote.
+  // BC insurance transfer + car wash accrual. Both depend on migration 183;
+  // until it has been run (the new settings columns don't exist yet) they stay
+  // off and nothing new is written to the database.
+  const newColsReady = pricingSettings?.bc_insurance_transfer_hours != null
+  const isBcDelivery = isBcAddress(stops[stops.length - 1] ?? '')
+  const bcInsuranceOn = newColsReady && bcInsuranceTransfer
+  const excludeCarWash = NO_CAR_WASH_JOB_TYPES.includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
+  // Auto-select for BC deliveries until the user makes their own choice.
+  useEffect(() => {
+    if (!newColsReady || bcInsuranceTouched) return
+    setBcInsuranceTransfer(isBcDelivery)
+  }, [newColsReady, bcInsuranceTouched, isBcDelivery])
+
   const runCalculation = useCallback(async (scheduledForOverride?: string, forceFlying?: boolean, precomputedFlyCharges?: AdditionalCharge[] | null) => {
     // Guards against overlapping executions - e.g. a rapid double-click, or
     // any other code path invoking this while a previous call is still
@@ -766,7 +796,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...flyCharges, fc] : [...manualCharges, ...flyCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Flight', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -776,7 +806,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...busCharges, fc] : [...manualCharges, ...busCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Bus', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -786,7 +816,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('oneway-vehicle')
           const charges = fc ? [...manualCharges, ...harbourCharges, fc] : [...manualCharges, ...harbourCharges]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Harbour Air', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -798,7 +828,7 @@ export default function EditJobPage() {
           const toTerminal = ferryToTerminalCharge()
           const charges = [...manualCharges, ...(toTerminal ? [toTerminal] : []), ferryReturnGroundTransport(), ...(fc ? [fc] : [])]
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 1, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: true },
             pricingSettings
           )
           options.push({ label: 'Ferry home', flying: true, secondDrv: false, chase: false, charges, cost: r.estimatedDealerCostCents })
@@ -808,7 +838,7 @@ export default function EditJobPage() {
           const fc = ferryCharge('roundtrip-vehicle')
           const charges = fc ? [...manualCharges, fc] : manualCharges
           const r = calculatePricing(
-            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
+            { distanceKm: data.distanceKm, durationMinutes: data.durationMinutes, vehicleMode, numDrivers: 2, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash, ferryRequired: false, excludeFuelAccrual, useGarageInsurance, includeTowDeductibleCoverage, additionalCharges: charges, oneWayFlightBack: false },
             pricingSettings
           )
           options.push({ label: '2nd driver + chase', flying: false, secondDrv: true, chase: true, charges, cost: r.estimatedDealerCostCents })
@@ -920,7 +950,7 @@ export default function EditJobPage() {
       setCalcError('Something went wrong reaching the mapping service.')
     }
     setCalculating(false)
-  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested, selectedFlightOptionIdx, calculating])
+  }, [stops, vehicleMode, secondDriver, chaseVehicle, isTradeIn, outOfProvinceInspection, registryVisit, insuranceVisit, bcInsuranceOn, excludeCarWash, ferryRequired, additionalCharges, flyingBack, pricingSettings, scheduledFor, flightPriceOverride, flightHoursOverride, originTimeZone, destinationTimeZone, autoSelectReturnMethod, uberBackRequested, selectedFlightOptionIdx, calculating])
 
   // Single source of truth for the pricing summary — recomputes any time the
   // relevant inputs change, using the last-fetched distance/duration.
@@ -941,7 +971,7 @@ export default function EditJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
-        insuranceVisit,
+        insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash,
           ferryRequired: false,
           excludeFuelAccrual,
           useGarageInsurance,
@@ -976,7 +1006,7 @@ export default function EditJobPage() {
         numDrivers: secondDriver ? 2 : 1,
         outOfProvinceInspection,
         registryVisit,
-        insuranceVisit,
+        insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash,
         ferryRequired: false,
         excludeFuelAccrual,
         useGarageInsurance,
@@ -993,7 +1023,7 @@ export default function EditJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes, bcInsuranceOn, excludeCarWash, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -1025,7 +1055,7 @@ export default function EditJobPage() {
               numDrivers: 1,
               outOfProvinceInspection,
               registryVisit,
-            insuranceVisit,
+            insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash,
               ferryRequired: false,
               excludeFuelAccrual,
               useGarageInsurance: false,
@@ -1059,6 +1089,7 @@ export default function EditJobPage() {
           baseline_hotel_cents: pricing.hotelCents ?? 0,
           baseline_ferry_cents: pricing.ferryFeeCents ?? 0,
           baseline_return_transport_cents: pricing.groundHomeCents ?? 0,
+      ...(newColsReady ? { baseline_car_wash_cents: pricing.carWashCents ?? 0 } : {}),
           pricing_breakdown: JSON.stringify(pricing),
         }
       : {}
@@ -1100,6 +1131,7 @@ export default function EditJobPage() {
       out_of_province_inspection: outOfProvinceInspection,
       registry_visit: registryVisit,
       insurance_visit: insuranceVisit,
+      ...(newColsReady ? { bc_insurance_transfer: bcInsuranceTransfer } : {}),
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
       include_tow_deductible_coverage: includeTowDeductibleCoverage,
@@ -1188,7 +1220,7 @@ export default function EditJobPage() {
           numDrivers: 1,
           outOfProvinceInspection,
           registryVisit,
-        insuranceVisit,
+        insuranceVisit, bcInsuranceTransfer: bcInsuranceOn, excludeCarWashAccrual: excludeCarWash,
           ferryRequired: false,
           excludeFuelAccrual,
           useGarageInsurance: false,
@@ -1233,6 +1265,7 @@ export default function EditJobPage() {
         out_of_province_inspection: outOfProvinceInspection,
         registry_visit: registryVisit,
       insurance_visit: insuranceVisit,
+      ...(newColsReady ? { bc_insurance_transfer: bcInsuranceTransfer } : {}),
         ferry_required: ferryRequired,
         use_garage_insurance: false,
         is_second_driver_job: true,
@@ -1912,6 +1945,16 @@ export default function EditJobPage() {
               <input type="checkbox" checked={insuranceVisit} onChange={(e) => setInsuranceVisit(e.target.checked)} />
               Insurance visit required (for insurance transfer)
             </label>
+            {newColsReady && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={bcInsuranceTransfer}
+                  onChange={(e) => { setBcInsuranceTransfer(e.target.checked); setBcInsuranceTouched(true) }}
+                />
+                BC Insurance transfer (adds {pricingSettings?.bc_insurance_transfer_hours} hr of driver time){isBcDelivery ? ' — selected automatically for BC deliveries' : ''}
+              </label>
+            )}
             <label className={`flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 -mx-2 ${ferryRequired ? 'bg-amber-50 border border-amber-300 text-amber-800 font-medium' : 'text-gray-700'}`}>
               <input type="checkbox" checked={ferryRequired} onChange={(e) => setFerryRequired(e.target.checked)} />
               {ferryRequired ? '⚠️ Ferry crossing forced on — this adds the ferry fee regardless of the addresses' : 'Force ferry crossing (if not detected automatically)'}
@@ -2121,6 +2164,7 @@ export default function EditJobPage() {
                     {pricing.dealerBilledHours !== pricing.baseDrivingHours && (
                       <> · <span className="font-medium">{Math.round(pricing.dealerBilledHours * 10) / 10} hrs total billed</span></>
                     )}
+                    {pricing.bcInsuranceHours > 0 && <> · incl. {pricing.bcInsuranceHours} hr BC insurance transfer</>}
                     {pricing.overnightRequired && <span className="text-amber-600"> · Overnight stay required</span>}
                   </p>
 
@@ -2128,6 +2172,7 @@ export default function EditJobPage() {
                     <BreakdownRow label="Driving pay (dealer billed hours)" cents={pricing.hourlyDealerCents} />
                     <BreakdownRow label="Fuel" cents={pricing.gasCostCents} />
                     <BreakdownRow label="Meals" cents={pricing.mealCostCents} />
+                    <BreakdownRow label="Car wash" cents={pricing.carWashCents} />
                     <BreakdownRow label="Wear & tear" cents={pricing.wearAndTearCents} />
                     <BreakdownRow label="Trailer fee" cents={pricing.trailerFeeCents} />
                     <BreakdownRow label="Hotel" cents={pricing.hotelCents} />

@@ -434,6 +434,7 @@ export default async function JobReceiptPage({
   const ACCRUAL_LABELS: [string, string][] = [
     ['gasCostCents', 'Fuel'],
     ['mealCostCents', 'Meals'],
+    ['carWashCents', 'Car wash'],
     ['wearAndTearCents', 'Wear & tear'],
     ['trailerFeeCents', 'Trailer fee'],
     ['hotelCents', 'Hotel'],
@@ -453,7 +454,7 @@ export default async function JobReceiptPage({
   // not just any approved expense in that category.
   const CATEGORY_NAMES: Record<string, string> = {
     fuel: 'Fuel', inspection: 'Inspection', hotel: 'Hotel', ferry: 'Ferry',
-    return_transport: 'Return transport', food: 'Food', wait_time: 'Wait time', other: 'Other',
+    return_transport: 'Return transport', car_wash: 'Car wash', food: 'Food', wait_time: 'Wait time', other: 'Other',
   }
   const overageCategories = [...new Set(
     expenses.filter((e) => e.status === 'approved' && (e.approved_addition_cents ?? 0) > 0).map((e) => e.category)
@@ -947,6 +948,7 @@ export default async function JobReceiptPage({
               hotel: job.baseline_hotel_cents ?? 0,
               ferry: job.baseline_ferry_cents ?? 0,
               return_transport: job.baseline_return_transport_cents ?? 0,
+              ...(job.baseline_car_wash_cents != null ? { car_wash: job.baseline_car_wash_cents } : {}),
             }}
             saved={pricingBreakdown ? {
               fuel: pricingBreakdown.gasCostCents ?? 0,
@@ -955,6 +957,7 @@ export default async function JobReceiptPage({
               hotel: pricingBreakdown.hotelCents ?? 0,
               ferry: pricingBreakdown.ferryFeeCents ?? 0,
               return_transport: pricingBreakdown.groundHomeCents ?? 0,
+              ...(job.baseline_car_wash_cents != null ? { car_wash: pricingBreakdown.carWashCents ?? 0 } : {}),
             } : null}
             dealerPaid={!!job.dealer_paid_at}
           />
@@ -976,7 +979,7 @@ export default async function JobReceiptPage({
             calculatedDriverPayCents={job.estimated_driver_pay_cents}
             hourlyRateCents={hourlyRateCents}
             approvedExpensesCents={job.approved_expenses_cents ?? 0}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0, ...(job.baseline_car_wash_cents != null ? { car_wash: job.baseline_car_wash_cents } : {}) }}
             existingExpenses={(rawExpenses ?? []).map((e) => ({ category: e.category, status: e.status, amount_cents: e.amount_cents }))}
             currentIdleHoursAdded={job.admin_idle_hours_added}
             currentIdleHoursNote={job.admin_idle_hours_note}
@@ -990,7 +993,7 @@ export default async function JobReceiptPage({
             jobId={job.id}
             expenses={expenses}
             isAdmin={isAdmin}
-            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0 }}
+            baselines={{ fuel: job.baseline_fuel_cents ?? 0, inspection: job.baseline_inspection_cents ?? 0, food: job.baseline_food_cents ?? 0, hotel: job.baseline_hotel_cents ?? 0, ferry: job.baseline_ferry_cents ?? 0, return_transport: job.baseline_return_transport_cents ?? 0, ...(job.baseline_car_wash_cents != null ? { car_wash: job.baseline_car_wash_cents } : {}) }}
           />
         </div>
       )}

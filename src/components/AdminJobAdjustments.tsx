@@ -356,6 +356,7 @@ export default function AdminJobAdjustments({
               <option value="hotel">Hotel</option>
               <option value="charging">EV Charging</option>
               <option value="ferry">Ferry</option>
+              <option value="car_wash">Car wash</option>
               <option value="towing">Towing</option>
               <option value="other">Other</option>
             </select>
