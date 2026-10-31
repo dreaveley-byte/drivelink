@@ -111,6 +111,7 @@ export default function PostJobPage() {
   const [showReservePopup, setShowReservePopup] = useState(false)
   const [myOrgId, setMyOrgId] = useState<string | null>(null)
   const [discountPercent, setDiscountPercent] = useState(0)
+  const [orgMarkupOverride, setOrgMarkupOverride] = useState<number | null>(null)
   const [flyingBack, setFlyingBack] = useState(false)
   const [vehicleMode, setVehicleMode] = useState<'driven' | 'towed'>('driven')
   // Drivers always use their own vehicle — no toggle needed, wear & tear always applies.
@@ -210,12 +211,17 @@ export default function PostJobPage() {
     const effectiveOrgId = isAdmin ? selectedOrgId : myOrgId
     if (!effectiveOrgId || effectiveOrgId === '__new__') {
       setDiscountPercent(0)
+      setOrgMarkupOverride(null)
       setSendGoogleReview(true)
       return
     }
     const supabase = createClient()
     supabase.rpc('get_active_discount_percent', { p_org_id: effectiveOrgId }).then(({ data }) => {
       setDiscountPercent(data ?? 0)
+    })
+    // Separate query: the column only exists once migration 184 has been run.
+    supabase.from('organizations').select('markup_percent_override').eq('id', effectiveOrgId).single().then(({ data }) => {
+      setOrgMarkupOverride(data?.markup_percent_override ?? null)
     })
     supabase.from('organizations').select('send_google_review_default').eq('id', effectiveOrgId).single().then(({ data }) => {
       setSendGoogleReview(data?.send_google_review_default ?? true)
@@ -969,9 +975,9 @@ export default function PostJobPage() {
         outboundVehicleCount,
         returnVehicleCount,
         markupPercentOverride: (() => {
-          const baseMarkup = isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : pricingSettings.dealer_markup_percent
+          const baseMarkup = isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : (orgMarkupOverride ?? pricingSettings.dealer_markup_percent)
           if (discountPercent > 0) return baseMarkup * (1 - discountPercent / 100)
-          return isCustomerRide ? baseMarkup : null
+          return isCustomerRide || orgMarkupOverride != null ? baseMarkup : null
         })(),
         useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
         isPartsJob,
@@ -980,7 +986,7 @@ export default function PostJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, dealerDropoffCount, dealerPickupCount, distanceKm, durationMinutes, discountPercent, bcInsuranceOn, excludeCarWash, pricingSettings])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, dealerDropoffCount, dealerPickupCount, distanceKm, durationMinutes, discountPercent, orgMarkupOverride, bcInsuranceOn, excludeCarWash, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -2415,7 +2421,7 @@ export default function PostJobPage() {
                         <span>{formatCents(pricing.costBasisCents)}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                        <span>Markup{pricing.costBasisCents > 0 ? ` (${Math.round((pricing.estimatedDealerCostCents / pricing.costBasisCents) * 1000) / 10}%)` : ''}</span>
                         <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
                       </div>
                     </>

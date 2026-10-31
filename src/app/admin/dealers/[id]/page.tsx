@@ -7,6 +7,7 @@ import ApplicationCard from '@/components/ApplicationCard'
 import DealerApplicationEditForm from '@/components/DealerApplicationEditForm'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import DealerExpenseVisibilityToggle from '@/components/DealerExpenseVisibilityToggle'
+import DealerMarkupEditor from '@/components/DealerMarkupEditor'
 import ResetPasswordButton from '@/components/ResetPasswordButton'
 import AdminProfileEditToggle from '@/components/AdminProfileEditToggle'
 import RemoveTeamMemberButton from '@/components/RemoveTeamMemberButton'
@@ -54,6 +55,8 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
     .single()
 
   if (!dealer) notFound()
+
+  const { data: globalPricing } = await supabase.from('pricing_settings').select('dealer_markup_percent').eq('id', 1).single()
 
   const { data: members } = await supabase
     .from('profiles')
@@ -257,6 +260,10 @@ export default async function AdminDealerDetailPage({ params }: { params: Promis
         </div>
 
         <DealerExpenseVisibilityToggle organizationId={dealer.id} initialValue={!!dealer.dealer_can_view_expenses} />
+
+        {'markup_percent_override' in dealer && (
+          <DealerMarkupEditor organizationId={dealer.id} initialValue={dealer.markup_percent_override ?? null} globalMarkup={globalPricing?.dealer_markup_percent ?? null} />
+        )}
 
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Company Info</p>

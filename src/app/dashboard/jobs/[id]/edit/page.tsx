@@ -112,6 +112,10 @@ export default function EditJobPage() {
   const [insuranceVisit, setInsuranceVisit] = useState(false)
   const [bcInsuranceTransfer, setBcInsuranceTransfer] = useState(false)
   const [bcInsuranceTouched, setBcInsuranceTouched] = useState(false)
+  const [orgMarkupOverride, setOrgMarkupOverride] = useState<number | null>(null)
+  // Admin-only % off this one job. discountColReady = migration 184 has been run.
+  const [adminDiscountPercent, setAdminDiscountPercent] = useState('')
+  const [discountColReady, setDiscountColReady] = useState(false)
   const [ferryRequired, setFerryRequired] = useState(false)
   const [useGarageInsurance, setUseGarageInsurance] = useState(false)
   const [includeTowDeductibleCoverage, setIncludeTowDeductibleCoverage] = useState(false)
@@ -294,6 +298,15 @@ export default function EditJobPage() {
       setRidesAlongWithLinked(job.rides_along_with_linked ?? false)
       setCompanionJobId(job.companion_job_id ?? null)
       setOrganizationId(job.organization_id ?? null)
+      if ('admin_discount_percent' in job) {
+        setDiscountColReady(true)
+        setAdminDiscountPercent(job.admin_discount_percent ? String(job.admin_discount_percent) : '')
+      }
+      if (job.organization_id) {
+        // Separate query: the column only exists once migration 184 has been run.
+        const { data: orgRow } = await supabase.from('organizations').select('markup_percent_override').eq('id', job.organization_id).single()
+        setOrgMarkupOverride(orgRow?.markup_percent_override ?? null)
+      }
       setAdditionalCharges(job.additional_charges ?? [])
       setNotes(job.notes ?? '')
 
@@ -454,6 +467,7 @@ export default function EditJobPage() {
   // until it has been run (the new settings columns don't exist yet) they stay
   // off and nothing new is written to the database.
   const newColsReady = pricingSettings?.bc_insurance_transfer_hours != null
+  const jobDiscountPct = discountColReady ? Math.min(100, Math.max(0, parseFloat(adminDiscountPercent) || 0)) : 0
   const isBcDelivery = isBcAddress(stops[stops.length - 1] ?? '')
   const bcInsuranceOn = newColsReady && bcInsuranceTransfer
   const excludeCarWash = NO_CAR_WASH_JOB_TYPES.includes(jobTypes.find((jt) => jt.id === jobTypeId)?.name ?? '')
@@ -1015,7 +1029,11 @@ export default function EditJobPage() {
         oneWayFlightBack: effectiveOneWayReturn,
         outboundVehicleCount,
         returnVehicleCount,
-        markupPercentOverride: isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : null,
+        markupPercentOverride: (() => {
+          const base = isCustomerRide ? pricingSettings.customer_pickup_dropoff_markup_percent : (orgMarkupOverride ?? pricingSettings.dealer_markup_percent)
+          if (jobDiscountPct > 0) return base * (1 - jobDiscountPct / 100)
+          return isCustomerRide || orgMarkupOverride != null ? base : null
+        })(),
         useSimpleJobRates: isCourier || isPaperworkSigning || isCustomerRide,
         isPartsJob,
       },
@@ -1023,7 +1041,7 @@ export default function EditJobPage() {
     )
     setPricing(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes, bcInsuranceOn, excludeCarWash, pricingSettings])
+  }, [additionalCharges, vehicleMode, secondDriver, outOfProvinceInspection, registryVisit, ferryRequired, ferryLiveDataUsed, useGarageInsurance, includeTowDeductibleCoverage, multiVehicleArrangement, ridesAlongWithLinked, flyingBack, effectiveOneWayReturn, distanceKm, durationMinutes, bcInsuranceOn, excludeCarWash, orgMarkupOverride, jobDiscountPct, pricingSettings])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -1132,6 +1150,7 @@ export default function EditJobPage() {
       registry_visit: registryVisit,
       insurance_visit: insuranceVisit,
       ...(newColsReady ? { bc_insurance_transfer: bcInsuranceTransfer } : {}),
+      ...(isAdmin && discountColReady ? { admin_discount_percent: jobDiscountPct } : {}),
       ferry_required: ferryRequired,
       use_garage_insurance: useGarageInsurance,
       include_tow_deductible_coverage: includeTowDeductibleCoverage,
@@ -1470,7 +1489,10 @@ export default function EditJobPage() {
               jobId={jobId}
               initialBreakdown={savedPricing.breakdown}
               initialCharges={savedPricing.charges}
-              markupPercent={(isCustomerRide ? pricingSettings?.customer_pickup_dropoff_markup_percent : pricingSettings?.dealer_markup_percent) ?? 100}
+              markupPercent={(() => {
+                const base = (isCustomerRide ? pricingSettings?.customer_pickup_dropoff_markup_percent : (orgMarkupOverride ?? pricingSettings?.dealer_markup_percent)) ?? 100
+                return jobDiscountPct > 0 ? Math.round(base * (1 - jobDiscountPct / 100) * 10) / 10 : base
+              })()}
               minimumDriverPayCents={((isCourier || isPaperworkSigning || isCustomerRide) ? pricingSettings?.simple_job_minimum_pay_cents : pricingSettings?.minimum_driver_pay_cents) ?? 0}
               initialDriverPayCents={savedPricing.driverPayCents}
             />
@@ -2137,6 +2159,22 @@ export default function EditJobPage() {
           </div>
 
           <div>
+            {isAdmin && discountColReady && (
+              <div className="mb-4 border border-gray-300 rounded-lg p-3 bg-gray-50">
+                <label className="block text-sm font-medium text-gray-900 mb-1">Discount on this job (%) — admin only</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={adminDiscountPercent}
+                  onChange={(e) => setAdminDiscountPercent(e.target.value)}
+                  placeholder="0"
+                  className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">Takes this % off what the dealer is charged for this job (the markup is reduced, driver pay is not affected). Applies when you recalculate and save.{orgMarkupOverride != null ? ` This dealer has a custom ${orgMarkupOverride}% markup.` : ''}</p>
+              </div>
+            )}
             <label className="block text-sm text-gray-700 mb-1">Notes</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -2240,7 +2278,7 @@ export default function EditJobPage() {
                         <span>{formatCents(pricing.costBasisCents)}</span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Markup{pricingSettings ? ` (${pricingSettings.dealer_markup_percent}%)` : ''}</span>
+                        <span>Markup{pricing.costBasisCents > 0 ? ` (${Math.round((pricing.estimatedDealerCostCents / pricing.costBasisCents) * 1000) / 10}%)` : ''}{jobDiscountPct > 0 ? ` · includes ${jobDiscountPct}% discount` : ''}</span>
                         <span>{formatCents(pricing.estimatedDealerCostCents - pricing.costBasisCents)}</span>
                       </div>
                     </>

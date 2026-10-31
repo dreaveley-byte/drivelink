@@ -31,7 +31,7 @@ export default async function ArchivedJobsPage() {
 
   const { data: jobs } = await supabase
     .from('jobs')
-    .select('id, status, archived_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, estimated_dealer_cost_cents, job_types(name)')
+    .select('id, status, archived_at, pickup_address, dropoff_address, vehicle_year, vehicle_make, vehicle_model, stock_number, estimated_dealer_cost_cents, job_types(name), driver:driver_id(full_name)')
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false })
 
@@ -60,6 +60,7 @@ export default async function ArchivedJobsPage() {
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
             const isFinished = job.status === 'completed' || job.status === 'cancelled'
+            const driverName = (Array.isArray(job.driver) ? job.driver[0]?.full_name : (job.driver as { full_name: string } | null)?.full_name) ?? null
             const cardBody = (
               <>
                 <p className="text-sm font-medium text-gray-900">{jobTypeName}</p>
@@ -72,6 +73,7 @@ export default async function ArchivedJobsPage() {
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
+                {driverName && <p className="text-xs text-gray-600 mt-0.5">Driver: {driverName}</p>}
                 {job.estimated_dealer_cost_cents != null && (
                   <p className="text-xs text-gray-700 font-medium mt-0.5">
                     Est. cost: {formatCents(job.estimated_dealer_cost_cents)}
