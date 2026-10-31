@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
+import { calculatePricing, formatCents, groundHomeCharge, groundToAirportCharge, type PricingSettings, type AdditionalCharge, type PricingResult } from '@/lib/pricing'
 import Logo from '@/components/Logo'
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput'
 import ReviewHoldBadge from '@/components/ReviewHoldBadge'
@@ -13,6 +13,7 @@ import AdminQuoteEditor from '@/components/AdminQuoteEditor'
 import AdminDriverReassign from '@/components/AdminDriverReassign'
 import AdminForceComplete from '@/components/AdminForceComplete'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
+import ReturnRouteSteps from '@/components/ReturnRouteSteps'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
@@ -108,8 +109,8 @@ export default function EditJobPage() {
     origin: { code: string; name: string }
     destination: { code: string; name: string }
     flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean; outsidePracticalHours: boolean }
-    groundToAirport: { distanceKm: number; durationMinutes: number } | null
-    groundFromAirport: { distanceKm: number; durationMinutes: number } | null
+    groundToAirport: { distanceKm: number; durationMinutes: number; mode?: 'uber' | 'bus' } | null
+    groundFromAirport: { distanceKm: number; durationMinutes: number; mode?: 'uber' | 'bus' } | null
     effectiveCostCents: number
   }>>([])
   const [selectedFlightOptionIdx, setSelectedFlightOptionIdx] = useState(0)
@@ -639,43 +640,10 @@ export default function EditJobPage() {
         setFlightOptions(flightBody.options ?? [])
         const chosen = flightBody.options?.[selectedFlightOptionIdx] ?? flightBody.options?.[0] ?? flightBody
 
-        const result: AdditionalCharge[] = []
-        if (chosen.groundFromAirport) {
-          const km = chosen.groundFromAirport.distanceKm
-          result.push({
-            description: `Return ground transport (${km}km)`,
-            kind: 'ground-home' as const,
-            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
-            hoursAdded: Math.round((chosen.groundFromAirport.durationMinutes / 60) * 100) / 100,
-            paidToDriver: true,
-          })
-        } else {
-          result.push({
-            description: 'Return ground transport (flat estimate)',
-            kind: 'ground-home' as const,
-            dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
-            hoursAdded: pricingSettings!.return_ground_transport_hours,
-            paidToDriver: true,
-          })
-        }
-        if (chosen.groundToAirport) {
-          const km = chosen.groundToAirport.distanceKm
-          result.push({
-            description: 'Ground transport to airport',
-            kind: 'ground-to-airport' as const,
-            dealerAmountCents: Math.max(Math.round(pricingSettings!.uber_base_fare_cents + km * pricingSettings!.uber_per_km_cents), pricingSettings!.uber_minimum_fare_cents),
-            hoursAdded: Math.round((chosen.groundToAirport.durationMinutes / 60) * 100) / 100,
-            paidToDriver: true,
-          })
-        } else {
-          result.push({
-            description: 'Ground transport to airport (flat estimate)',
-            kind: 'ground-to-airport' as const,
-            dealerAmountCents: pricingSettings!.return_ground_transport_fee_cents,
-            hoursAdded: pricingSettings!.return_ground_transport_hours,
-            paidToDriver: true,
-          })
-        }
+        const result: AdditionalCharge[] = [
+          groundHomeCharge(chosen.groundFromAirport, chosen.destination, pricingSettings!),
+          groundToAirportCharge(chosen.groundToAirport, chosen.origin, pricingSettings!)!,
+        ]
         if (hasOverride) {
           result.push({
             description: `Flight back (manual override)${chosen.origin && chosen.destination ? `: ${chosen.origin.code} → ${chosen.destination.code}` : ''}`,
@@ -1964,6 +1932,16 @@ export default function EditJobPage() {
                     Total includes flight + ground transport both ends. {selectedFlightOptionIdx === 0 ? 'Currently using the cheapest option.' : ''}
                   </p>
                 </div>
+              )}
+              {flyingBack && flightOptions.length > 0 && pricingSettings && additionalCharges.some((c) => c.kind === 'flight') && (
+                <ReturnRouteSteps
+                  pickup={stops[0] ?? ''}
+                  dropoff={stops[stops.length - 1] ?? ''}
+                  driveKm={distanceKm}
+                  driveMinutes={durationMinutes}
+                  option={flightOptions[selectedFlightOptionIdx] ?? flightOptions[0]}
+                  settings={pricingSettings}
+                />
               )}
               <div className="ml-6 mt-2 grid grid-cols-2 gap-2">
                 <div>

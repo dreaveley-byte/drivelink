@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { groundLegPricing, AVG_BUS_SPEED_KMH } from '@/lib/pricing'
 
 const DUFFEL_BASE = 'https://api.duffel.com'
 
@@ -8,11 +9,11 @@ const DUFFEL_BASE = 'https://api.duffel.com'
 // used to find the nearest real airport to any address — much more reliable
 // than trying to text-match a city name against an airline database, since
 // most people don't live in a city that has its own airport.
-const AIRPORTS: { code: string; name: string; lat: number; lng: number; islandOnly?: boolean }[] = [
-  { code: 'YVR', name: 'Vancouver', lat: 49.1967, lng: -123.1815 },
+const AIRPORTS: { code: string; name: string; lat: number; lng: number; islandOnly?: boolean; hub?: boolean }[] = [
+  { code: 'YVR', name: 'Vancouver', lat: 49.1967, lng: -123.1815, hub: true },
   { code: 'YXX', name: 'Abbotsford', lat: 49.0253, lng: -122.3606 },
   { code: 'YKA', name: 'Kamloops', lat: 50.7022, lng: -120.4442 },
-  { code: 'YLW', name: 'Kelowna', lat: 49.9561, lng: -119.3778 },
+  { code: 'YLW', name: 'Kelowna', lat: 49.9561, lng: -119.3778, hub: true },
   { code: 'YXS', name: 'Prince George', lat: 53.8894, lng: -122.6789 },
   { code: 'YYJ', name: 'Victoria', lat: 48.6469, lng: -123.4258, islandOnly: true },
   { code: 'YQQ', name: 'Comox', lat: 49.7108, lng: -124.8867, islandOnly: true },
@@ -31,18 +32,18 @@ const AIRPORTS: { code: string; name: string; lat: number; lng: number; islandOn
   { code: 'YPW', name: 'Powell River', lat: 49.8339, lng: -124.5006 },
   { code: 'YAZ', name: 'Tofino', lat: 49.0794, lng: -125.7758 },
   { code: 'YYE', name: 'Fort Nelson', lat: 58.8361, lng: -122.5967 },
-  { code: 'YYC', name: 'Calgary', lat: 51.1215, lng: -114.0076 },
-  { code: 'YEG', name: 'Edmonton', lat: 53.3097, lng: -113.5801 },
+  { code: 'YYC', name: 'Calgary', lat: 51.1215, lng: -114.0076, hub: true },
+  { code: 'YEG', name: 'Edmonton', lat: 53.3097, lng: -113.5801, hub: true },
   { code: 'YQL', name: 'Lethbridge', lat: 49.6303, lng: -112.7997 },
   { code: 'YMM', name: 'Fort McMurray', lat: 56.6531, lng: -111.2225 },
   { code: 'YQU', name: 'Grande Prairie', lat: 55.1797, lng: -118.8858 },
-  { code: 'YXE', name: 'Saskatoon', lat: 52.1708, lng: -106.6997 },
-  { code: 'YQR', name: 'Regina', lat: 50.4319, lng: -104.6658 },
-  { code: 'YWG', name: 'Winnipeg', lat: 49.9100, lng: -97.2399 },
-  { code: 'YYZ', name: 'Toronto', lat: 43.6777, lng: -79.6248 },
-  { code: 'YOW', name: 'Ottawa', lat: 45.3225, lng: -75.6692 },
-  { code: 'YUL', name: 'Montreal', lat: 45.4706, lng: -73.7408 },
-  { code: 'YHZ', name: 'Halifax', lat: 44.8808, lng: -63.5086 },
+  { code: 'YXE', name: 'Saskatoon', lat: 52.1708, lng: -106.6997, hub: true },
+  { code: 'YQR', name: 'Regina', lat: 50.4319, lng: -104.6658, hub: true },
+  { code: 'YWG', name: 'Winnipeg', lat: 49.9100, lng: -97.2399, hub: true },
+  { code: 'YYZ', name: 'Toronto', lat: 43.6777, lng: -79.6248, hub: true },
+  { code: 'YOW', name: 'Ottawa', lat: 45.3225, lng: -75.6692, hub: true },
+  { code: 'YUL', name: 'Montreal', lat: 45.4706, lng: -73.7408, hub: true },
+  { code: 'YHZ', name: 'Halifax', lat: 44.8808, lng: -63.5086, hub: true },
   { code: 'YFC', name: 'Fredericton', lat: 45.8689, lng: -66.5372 },
   { code: 'YQM', name: 'Moncton', lat: 46.1122, lng: -64.6786 },
   { code: 'YYT', name: "St. John's", lat: 47.6186, lng: -52.7519 },
@@ -79,7 +80,12 @@ async function geocodeAddress(address: string): Promise<{ lat: number; lng: numb
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
-async function nearbyAirports(address: string, maxCandidates: number, maxRadiusKm: number): Promise<{ code: string; name: string; lat: number; lng: number }[] | { error: string }> {
+// Straight-line reach for adding a major hub as a bus-then-fly candidate, and
+// how many of them to add (each one costs an extra airline search per pairing).
+const HUB_RADIUS_KM = 400
+const MAX_HUBS = 2
+
+async function nearbyAirports(address: string, maxCandidates: number, maxRadiusKm: number, maxHubRadiusKm = HUB_RADIUS_KM, maxHubs = MAX_HUBS): Promise<{ code: string; name: string; lat: number; lng: number }[] | { error: string }> {
   const coords = await geocodeAddress(address)
   if (!coords) return { error: `Could not locate "${address}" on the map.` }
 
@@ -103,8 +109,26 @@ async function nearbyAirports(address: string, maxCandidates: number, maxRadiusK
   // still reasonably close — this is what actually catches cases like
   // Abbotsford vs. Vancouver, where the "closer" airport isn't necessarily
   // the cheaper one to fly from.
-  const candidates = [withDistance[0], ...withDistance.slice(1).filter((a) => a.dist <= maxRadiusKm)]
-  return candidates.slice(0, maxCandidates).map(({ code, name, lat, lng }) => ({ code, name, lat, lng }))
+  const candidates = [withDistance[0], ...withDistance.slice(1).filter((a) => a.dist <= maxRadiusKm)].slice(0, maxCandidates)
+
+  // A delivery can be hours from any airport with real airline service
+  // (Lethbridge's own airport has almost none; Calgary is ~2h away). The
+  // radius search above never reaches a major hub that far out, so the flight
+  // option would come back empty and the quote would fall back to someone
+  // driving the whole way home. Also consider the nearest major hubs within
+  // a bus ride's reach - the driver takes a bus to the hub and flies from
+  // there. Not applied on Vancouver Island (the road trip to a mainland hub
+  // needs a ferry we don't price here).
+  // Skipped entirely when a major hub is already among the candidates (e.g.
+  // anywhere near Vancouver or Toronto), so those searches are unchanged.
+  if (!ON_VANCOUVER_ISLAND && !candidates.some((c) => c.hub)) {
+    const have = new Set(candidates.map((c) => c.code))
+    const hubs = withDistance
+      .filter((a) => a.hub && !have.has(a.code) && a.dist <= maxHubRadiusKm)
+      .slice(0, maxHubs)
+    candidates.push(...hubs)
+  }
+  return candidates.map(({ code, name, lat, lng }) => ({ code, name, lat, lng }))
 }
 
 async function duffelFetch(path: string, token: string, init?: RequestInit) {
@@ -120,7 +144,10 @@ async function duffelFetch(path: string, token: string, init?: RequestInit) {
   })
 }
 
-async function drivingLegToAirport(address: string, airport: { lat: number; lng: number }, departureTime?: string): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+// Ground legs longer than this are priced as a bus instead of an Uber.
+const INTERCITY_KM = 100
+
+async function drivingLegToAirport(address: string, airport: { lat: number; lng: number }, departureTime?: string): Promise<{ distanceKm: number; durationMinutes: number; mode: 'uber' | 'bus' } | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
 
@@ -148,9 +175,13 @@ async function drivingLegToAirport(address: string, airport: { lat: number; lng:
   const route = data.routes?.[0]
   if (!route) return null
   const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10)
+  const distanceKm = Math.round((route.distanceMeters / 1000) * 10) / 10
   return {
-    distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
+    distanceKm,
     durationMinutes: Math.round(durationSeconds / 60),
+    // Past this distance a ride-share isn't a sensible way to reach the
+    // airport; price it (and describe it) as an intercity bus.
+    mode: distanceKm > INTERCITY_KM ? 'bus' : 'uber',
   }
 }
 
@@ -214,7 +245,20 @@ export async function POST(req: NextRequest) {
   const date = departureDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   const supabase = await createClient()
-  const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours, uber_base_fare_cents, uber_per_km_cents, uber_minimum_fare_cents').eq('id', 1).single()
+  const { data: pricingSettings } = await supabase.from('pricing_settings').select('flight_airport_buffer_hours, uber_base_fare_cents, uber_per_km_cents, uber_minimum_fare_cents, bus_base_fare_cents, bus_per_km_cents, bus_terminal_buffer_hours, bus_max_distance_km, hourly_rate_cents').eq('id', 1).single()
+  const legSettings = {
+    uber_base_fare_cents: pricingSettings?.uber_base_fare_cents ?? 0,
+    uber_per_km_cents: pricingSettings?.uber_per_km_cents ?? 0,
+    uber_minimum_fare_cents: pricingSettings?.uber_minimum_fare_cents ?? 0,
+    bus_base_fare_cents: pricingSettings?.bus_base_fare_cents ?? 3000,
+    bus_per_km_cents: pricingSettings?.bus_per_km_cents ?? 15,
+    bus_terminal_buffer_hours: pricingSettings?.bus_terminal_buffer_hours ?? 2,
+  }
+  const BUS_MAX_KM = pricingSettings?.bus_max_distance_km ?? 600
+  // Minutes from leaving the drop-off to standing at the airport: a bus leg
+  // also has the wait for the next departure and slower average speed.
+  const legMinutes = (leg: { distanceKm: number; durationMinutes: number; mode: 'uber' | 'bus' } | null | undefined, fallback: number) =>
+    !leg ? fallback : leg.mode === 'bus' ? Math.round((leg.distanceKm / AVG_BUS_SPEED_KMH + legSettings.bus_terminal_buffer_hours) * 60) : leg.durationMinutes
   const AIRPORT_BUFFER_MINUTES = (pricingSettings?.flight_airport_buffer_hours ?? 3) * 60
 
   // Minimum time the driver needs to be at the airport BEFORE a flight departs
@@ -326,7 +370,7 @@ export async function POST(req: NextRequest) {
     if (earliestViableDepartureAt) {
       const baseMs = new Date(earliestViableDepartureAt).getTime()
       if (!isNaN(baseMs)) {
-        const groundMinutes = groundToAirport?.durationMinutes ?? DEFAULT_GROUND_TO_AIRPORT_MINUTES
+        const groundMinutes = legMinutes(groundToAirport, DEFAULT_GROUND_TO_AIRPORT_MINUTES)
         earliestCatchableDepartAt = baseMs + groundMinutes * 60_000 + CHECKIN_BUFFER_MINUTES * 60_000
       }
     }
@@ -406,17 +450,16 @@ export async function POST(req: NextRequest) {
     // loss) once the extra ground transport to reach it is factored in. Uses
     // the same fare formula the actual pricing engine uses, so this ranking
     // reflects the real cost, not a rough guess.
-    const groundCostEstimate = (groundToAirport
-      ? Math.max(
-          Math.round((pricingSettings?.uber_base_fare_cents ?? 0) + groundToAirport.distanceKm * (pricingSettings?.uber_per_km_cents ?? 0)),
-          pricingSettings?.uber_minimum_fare_cents ?? 0
-        )
-      : 0) + (groundFromAirport
-      ? Math.max(
-          Math.round((pricingSettings?.uber_base_fare_cents ?? 0) + groundFromAirport.distanceKm * (pricingSettings?.uber_per_km_cents ?? 0)),
-          pricingSettings?.uber_minimum_fare_cents ?? 0
-        )
-      : 0)
+    // Fares plus the paid driver time each leg adds (a long bus leg adds hours
+    // the dealer is billed for, so it has to count when comparing airports).
+    const toLeg = groundToAirport ? groundLegPricing(groundToAirport, legSettings) : null
+    const fromLeg = groundFromAirport ? groundLegPricing(groundFromAirport, legSettings) : null
+    const hourlyCents = pricingSettings?.hourly_rate_cents ?? 0
+    const flightHoursCost = Math.round(((flightDurationMinutes + AIRPORT_BUFFER_MINUTES) / 60) * hourlyCents)
+    const groundCostEstimate =
+      (toLeg ? toLeg.dealerAmountCents + Math.round(toLeg.hoursAdded * hourlyCents) : 0) +
+      (fromLeg ? fromLeg.dealerAmountCents + Math.round(fromLeg.hoursAdded * hourlyCents) : 0) +
+      flightHoursCost
     const effectiveCostCents = converted.amountCents + groundCostEstimate
 
     return {
@@ -454,7 +497,7 @@ export async function POST(req: NextRequest) {
         driverMustLeaveBy: (() => {
           const departingAt = best.slices[0]?.segments?.[0]?.departing_at
           if (!departingAt) return null
-          const groundMinutes = groundToAirport?.durationMinutes ?? DEFAULT_GROUND_TO_AIRPORT_MINUTES
+          const groundMinutes = legMinutes(groundToAirport, DEFAULT_GROUND_TO_AIRPORT_MINUTES)
           const leaveByMs = new Date(departingAt).getTime() - CHECKIN_BUFFER_MINUTES * 60_000 - groundMinutes * 60_000
           return isNaN(leaveByMs) ? null : new Date(leaveByMs).toISOString()
         })(),
@@ -489,9 +532,10 @@ export async function POST(req: NextRequest) {
     // drive across open water, so treat an unrealistically long ground leg
     // as this airport simply not being a practical option, not a valid
     // (if expensive) one to offer.
-    const MAX_REASONABLE_GROUND_KM = 150
-    if (r.groundToAirport && r.groundToAirport.distanceKm > MAX_REASONABLE_GROUND_KM) return false
-    if (r.groundFromAirport && r.groundFromAirport.distanceKm > MAX_REASONABLE_GROUND_KM) return false
+    const MAX_REASONABLE_UBER_KM = 150
+    const legTooFar = (leg: { distanceKm: number; mode: 'uber' | 'bus' } | null) =>
+      !!leg && (leg.mode === 'bus' ? leg.distanceKm > BUS_MAX_KM : leg.distanceKm > MAX_REASONABLE_UBER_KM)
+    if (legTooFar(r.groundToAirport) || legTooFar(r.groundFromAirport)) return false
     return true
   })
 

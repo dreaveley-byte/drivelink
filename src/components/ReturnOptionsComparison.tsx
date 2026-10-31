@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { calculatePricing, formatCents, type PricingSettings } from '@/lib/pricing'
+import { calculatePricing, formatCents, groundLegPricing, type PricingSettings } from '@/lib/pricing'
 import { toLocalDateString, zonedLocalInputToUtcIso, localInputToUtcIso } from '@/lib/localDatetime'
 
 export default function ReturnOptionsComparison({
@@ -105,11 +105,9 @@ export default function ReturnOptionsComparison({
       `${body.origin.code} → ${body.destination.code} · ${body.flight.isDirect ? 'Direct' : `${body.flight.stops} stop${body.flight.stops === 1 ? '' : 's'}`} · ${body.flight.currency}${departsText}${bufferWarning}`
     )
     if (body.groundToAirport) {
-      const km = body.groundToAirport.distanceKm
-      setGroundToAirportCents(
-        Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents)
-      )
-      setGroundToAirportHours(Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100)
+      const leg = groundLegPricing(body.groundToAirport, pricingSettings)
+      setGroundToAirportCents(leg.dealerAmountCents)
+      setGroundToAirportHours(leg.hoursAdded)
     } else {
       setGroundToAirportCents(0)
       setGroundToAirportHours(0)

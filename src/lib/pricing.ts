@@ -69,6 +69,93 @@ export type AdditionalCharge = {
   kind?: 'flight' | 'ferry' | 'bus' | 'ground-to-airport' | 'ground-home'
 }
 
+// A ground leg between a job address and an airport. Short hops are priced
+// as an Uber; long ones (a delivery that's hours from the nearest airport
+// with real service, e.g. Lethbridge -> Calgary) are priced as an intercity
+// bus instead, since an Uber at that distance is neither realistic nor cheap.
+export type GroundLeg = { distanceKm: number; durationMinutes: number; mode?: 'uber' | 'bus' }
+
+type GroundLegSettings = Pick<
+  PricingSettings,
+  'uber_base_fare_cents' | 'uber_per_km_cents' | 'uber_minimum_fare_cents' | 'bus_base_fare_cents' | 'bus_per_km_cents' | 'bus_terminal_buffer_hours'
+>
+
+export const AVG_BUS_SPEED_KMH = 65
+
+export function groundLegPricing(leg: GroundLeg, s: GroundLegSettings): { dealerAmountCents: number; hoursAdded: number; mode: 'uber' | 'bus' } {
+  if (leg.mode === 'bus') {
+    return {
+      dealerAmountCents: Math.round(s.bus_base_fare_cents + leg.distanceKm * s.bus_per_km_cents),
+      hoursAdded: Math.round((leg.distanceKm / AVG_BUS_SPEED_KMH + s.bus_terminal_buffer_hours) * 100) / 100,
+      mode: 'bus',
+    }
+  }
+  return {
+    dealerAmountCents: Math.max(Math.round(s.uber_base_fare_cents + leg.distanceKm * s.uber_per_km_cents), s.uber_minimum_fare_cents),
+    hoursAdded: Math.round((leg.durationMinutes / 60) * 100) / 100,
+    mode: 'uber',
+  }
+}
+
+type AirportRef = { code: string; name: string } | null | undefined
+
+// The two ground charges around a flight-back. `flat` supplies the fallback
+// when the real distance couldn't be calculated (null leg). Descriptions keep
+// the original "Ground transport to airport" / "Return ground transport"
+// prefixes (older data and reports match on them) and add the route detail
+// after it, so the dealer can see how the driver actually gets there.
+export function groundToAirportCharge(
+  leg: GroundLeg | null | undefined,
+  airport: AirportRef,
+  s: GroundLegSettings & { return_ground_transport_fee_cents: number; return_ground_transport_hours: number },
+  flatFallback = true
+): AdditionalCharge | null {
+  if (leg) {
+    const p = groundLegPricing(leg, s)
+    const where = airport ? `${airport.name} (${airport.code})` : 'airport'
+    return {
+      description: p.mode === 'bus' ? `Ground transport to airport — bus to ${where}, ${leg.distanceKm}km` : 'Ground transport to airport',
+      kind: 'ground-to-airport',
+      dealerAmountCents: p.dealerAmountCents,
+      hoursAdded: p.hoursAdded,
+      paidToDriver: true,
+    }
+  }
+  if (!flatFallback) return null
+  return {
+    description: 'Ground transport to airport (flat estimate)',
+    kind: 'ground-to-airport',
+    dealerAmountCents: s.return_ground_transport_fee_cents,
+    hoursAdded: s.return_ground_transport_hours,
+    paidToDriver: true,
+  }
+}
+
+export function groundHomeCharge(
+  leg: GroundLeg | null | undefined,
+  airport: AirportRef,
+  s: GroundLegSettings & { return_ground_transport_fee_cents: number; return_ground_transport_hours: number }
+): AdditionalCharge {
+  if (leg) {
+    const p = groundLegPricing(leg, s)
+    const from = airport ? `${airport.name} (${airport.code})` : 'airport'
+    return {
+      description: p.mode === 'bus' ? `Return ground transport — bus from ${from}, ${leg.distanceKm}km` : `Return ground transport (${leg.distanceKm}km)`,
+      kind: 'ground-home',
+      dealerAmountCents: p.dealerAmountCents,
+      hoursAdded: p.hoursAdded,
+      paidToDriver: true,
+    }
+  }
+  return {
+    description: 'Return ground transport (flat estimate)',
+    kind: 'ground-home',
+    dealerAmountCents: s.return_ground_transport_fee_cents,
+    hoursAdded: s.return_ground_transport_hours,
+    paidToDriver: true,
+  }
+}
+
 export type PricingInput = {
   distanceKm: number // one-way, from Google
   durationMinutes: number // one-way, from Google

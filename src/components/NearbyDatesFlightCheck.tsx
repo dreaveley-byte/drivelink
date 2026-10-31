@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { calculatePricing, formatCents, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
+import { calculatePricing, formatCents, groundHomeCharge, groundToAirportCharge, type PricingSettings, type AdditionalCharge } from '@/lib/pricing'
 import { toLocalDateString, toLocalDatetimeInputValue, zonedLocalInputToUtcIso, localInputToUtcIso } from '@/lib/localDatetime'
 
 // Mirrors the `options` shape returned by /api/flights/search and consumed
@@ -13,8 +13,8 @@ export type FlightOption = {
   origin: { code: string; name: string }
   destination: { code: string; name: string }
   flight: { priceCents: number; isDirect: boolean; stops: number; hoursToAdd: number; driverMustLeaveBy: string | null; meetsCheckInBuffer: boolean; outsidePracticalHours: boolean }
-  groundToAirport: { distanceKm: number; durationMinutes: number } | null
-  groundFromAirport: { distanceKm: number; durationMinutes: number } | null
+  groundToAirport: { distanceKm: number; durationMinutes: number; mode?: 'uber' | 'bus' } | null
+  groundFromAirport: { distanceKm: number; durationMinutes: number; mode?: 'uber' | 'bus' } | null
   effectiveCostCents: number
 }
 
@@ -160,38 +160,9 @@ export default function NearbyDatesFlightCheck({
         // which is why a date picked here could show a real, correct
         // distance-based Uber fare on the main calculate screen but a flat
         // $30 once applied (and later saved) through this panel.
-        const flyCharges: AdditionalCharge[] = body.groundFromAirport
-          ? [
-              {
-                description: `Return ground transport (${body.groundFromAirport.distanceKm}km)`,
-                kind: 'ground-home' as const,
-                dealerAmountCents: Math.max(
-                  Math.round(pricingSettings.uber_base_fare_cents + body.groundFromAirport.distanceKm * pricingSettings.uber_per_km_cents),
-                  pricingSettings.uber_minimum_fare_cents
-                ),
-                hoursAdded: Math.round((body.groundFromAirport.durationMinutes / 60) * 100) / 100,
-                paidToDriver: true,
-              },
-            ]
-          : [
-              {
-                description: 'Return ground transport (flat estimate)',
-                kind: 'ground-home' as const,
-                dealerAmountCents: pricingSettings.return_ground_transport_fee_cents,
-                hoursAdded: pricingSettings.return_ground_transport_hours,
-                paidToDriver: true,
-              },
-            ]
-        if (body.groundToAirport) {
-          const km = body.groundToAirport.distanceKm
-          flyCharges.push({
-            description: 'Ground transport to airport',
-            kind: 'ground-to-airport' as const,
-            dealerAmountCents: Math.max(Math.round(pricingSettings.uber_base_fare_cents + km * pricingSettings.uber_per_km_cents), pricingSettings.uber_minimum_fare_cents),
-            hoursAdded: Math.round((body.groundToAirport.durationMinutes / 60) * 100) / 100,
-            paidToDriver: true,
-          })
-        }
+        const flyCharges: AdditionalCharge[] = [groundHomeCharge(body.groundFromAirport, body.destination, pricingSettings)]
+        const toAirportCharge = groundToAirportCharge(body.groundToAirport, body.origin, pricingSettings, false)
+        if (toAirportCharge) flyCharges.push(toAirportCharge)
         const departsTextForCharge = body.flight.departingAt
           ? ` — departs ${new Date(body.flight.departingAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`
           : ''
