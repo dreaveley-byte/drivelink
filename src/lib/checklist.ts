@@ -269,6 +269,10 @@ export function buildConditionAcceptanceText(params: {
     '',
     '6. Rights not affected. Nothing in this document limits my rights under my purchase agreement with the Dealer, any manufacturer or dealer warranty, or any right that cannot be waived under applicable law, including consumer protection legislation.',
     '',
-    '7. Signature. I have read and understood this document, I have had the opportunity to ask questions, and I sign it voluntarily. My electronic signature has the same effect as a handwritten signature.',
+    `7. Purchase. I understand that I am purchasing the Vehicle from the Dealer, and that by signing I confirm that the Vehicle delivered to me is the vehicle I agreed to buy.`,
+    '',
+    '8. My rights. I understand my legal rights, including the rights described in section 6. I understand what I am agreeing to and what I am giving up by signing this document, and I have had the opportunity to ask questions and to obtain independent advice before signing.',
+    '',
+    '9. Signature. I have read and understood this document, and I sign it voluntarily. My electronic signature has the same effect as a handwritten signature.',
   ].join('\n')
 }
