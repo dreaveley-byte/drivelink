@@ -8,6 +8,7 @@ import Logo from '@/components/Logo'
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput'
 import ReturnOptionsComparison from '@/components/ReturnOptionsComparison'
 import ReturnRouteSteps from '@/components/ReturnRouteSteps'
+import AdminTripItinerary from '@/components/AdminTripItinerary'
 import NearbyDatesFlightCheck from '@/components/NearbyDatesFlightCheck'
 import FirstNationsReservePopup from '@/components/FirstNationsReservePopup'
 import { localInputToUtcIso, toLocalDatetimeInputValue, toLocalDateString, zonedLocalInputToUtcIso, utcIsoToZonedInputValue, zonedAbbreviation } from '@/lib/localDatetime'
@@ -2513,6 +2514,17 @@ export default function PostJobPage() {
                 />
               )}
             </div>
+          )}
+
+          {isAdmin && (
+            <AdminTripItinerary
+              pickupAddress={stops.map((s) => s.trim()).filter(Boolean)[0] ?? ''}
+              dropoffAddress={stops.map((s) => s.trim()).filter(Boolean).slice(-1)[0] ?? ''}
+              startUtc={scheduledFor ? ((originTimeZone ? zonedLocalInputToUtcIso(scheduledFor, originTimeZone) : localInputToUtcIso(scheduledFor)) ?? null) : null}
+              registryRequired={registryVisit}
+              pricing={pricing}
+              additionalCharges={additionalCharges}
+            />
           )}
 
           {pricing && isAdmin && distanceKm != null && durationMinutes != null && pricingSettings && (
