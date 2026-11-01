@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import PrintButton from '@/components/PrintButton'
 import CloseButton from '@/components/CloseButton'
 import { formatCents } from '@/lib/pricing'
-import { buildDeliveryDisclosureText } from '@/lib/checklist'
+import { buildDeliveryDisclosureText, buildConditionAcceptanceText, CONDITION_ACCEPTANCE_EFFECTIVE_ISO } from '@/lib/checklist'
 import DealerFeedbackForm from '@/components/DealerFeedbackForm'
 import ConditionReportView from '@/components/ConditionReportView'
 import Logo from '@/components/Logo'
@@ -1276,9 +1276,7 @@ export default async function JobReceiptPage({
                   const cd = pickupCondition.condition_data
                   return (
                     <div className="mb-2">
-                      <p className="text-xs text-gray-500 mb-1">
-                        Vehicle Condition Report (pickup){signedDate ? ' — accepted by the customer when they signed this acknowledgement' : ''}
-                      </p>
+                      <p className="text-xs text-gray-500 mb-1">Vehicle Condition Report (pickup)</p>
                       {cd && (cd.cleanliness != null || cd.smell) && (
                         <p className="text-xs text-gray-600">
                           {cd.cleanliness != null && `Cleanliness: ${cd.cleanliness}/5`}
@@ -1287,6 +1285,16 @@ export default async function JobReceiptPage({
                         </p>
                       )}
                       {cd?.markers?.length > 0 ? <ConditionReportView data={cd} /> : <p className="text-xs text-gray-600">No damage or marks were recorded at pickup.</p>}
+                      {(!disclosureItem.completed_at || new Date(disclosureItem.completed_at) >= new Date(CONDITION_ACCEPTANCE_EFFECTIVE_ISO)) && (
+                        <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 whitespace-pre-line">
+                          {buildConditionAcceptanceText({
+                            customerName: job.customer_full_name || job.recipient_name,
+                            vehicleDesc,
+                            vin: job.vin,
+                            dealerName: org?.name,
+                          })}
+                        </p>
+                      )}
                     </div>
                   )
                 })()}

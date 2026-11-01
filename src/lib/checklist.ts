@@ -236,3 +236,39 @@ export function buildDeliveryDisclosureText(params: {
 
   return lines.join('\n')
 }
+
+// Signature-only condition acceptance & release. Shown to the customer under
+// the pickup Vehicle Condition Report; signing the delivery acknowledgement is
+// the acceptance (no tick-box). Acceptances signed before this date did not see
+// it, so the receipt must not claim they did.
+export const CONDITION_ACCEPTANCE_EFFECTIVE_ISO = '2026-11-01T07:00:00Z'
+
+export function buildConditionAcceptanceText(params: {
+  customerName?: string | null
+  vehicleDesc?: string | null
+  vin?: string | null
+  dealerName?: string | null
+}): string {
+  const name = params.customerName?.trim() || 'the undersigned customer'
+  const vehicle = [params.vehicleDesc, params.vin ? `VIN ${params.vin}` : null].filter(Boolean).join(', ') || 'the vehicle described in this document'
+  const dealer = params.dealerName?.trim() || 'the selling dealer'
+  return [
+    'VEHICLE CONDITION ACCEPTANCE & RELEASE',
+    '',
+    `I, ${name}, acknowledge and agree as follows in respect of ${vehicle} (the "Vehicle"), delivered to me by Drivflo Inc. ("Drivflo") on behalf of ${dealer} (the "Dealer"):`,
+    '',
+    '1. Condition report. I have reviewed the Vehicle Condition Report recorded at pickup and shown above, and I understand that it records the apparent condition of the Vehicle when it was collected.',
+    '',
+    '2. Inspection. I have visually inspected the Vehicle. I understand that it is my responsibility, before accepting the Vehicle, to inspect it fully, including its exterior, interior, glass, wheels and tires, lights and accessories, and to start, operate and drive it. I have been given a reasonable opportunity to do so, and I have not been rushed or prevented from doing so.',
+    '',
+    '3. Acceptance. By signing, I accept and take delivery of the Vehicle as it stands, in its current condition as I am receiving it.',
+    '',
+    '4. Release. To the fullest extent permitted by law, I release and forever discharge Drivflo, its officers, employees, drivers and contractors, and the Dealer, from any claim relating to the condition of the Vehicle that is recorded in the Vehicle Condition Report or that was apparent or reasonably discoverable on inspection, starting or driving the Vehicle at delivery, including damage, scratches, dents, glass and wheel condition, interior condition, stains, odours, wear, warning lights, and the need for cleaning or repairs.',
+    '',
+    '5. Drivflo\'s role. I understand that Drivflo\'s role is limited to transporting the Vehicle, that its drivers are not mechanics or inspectors, and that Drivflo has made no representation or warranty about the mechanical condition of the Vehicle.',
+    '',
+    '6. Rights not affected. Nothing in this document limits my rights under my purchase agreement with the Dealer, any manufacturer or dealer warranty, or any right that cannot be waived under applicable law, including consumer protection legislation.',
+    '',
+    '7. Signature. I have read and understood this document, I have had the opportunity to ask questions, and I sign it voluntarily. My electronic signature has the same effect as a handwritten signature.',
+  ].join('\n')
+}

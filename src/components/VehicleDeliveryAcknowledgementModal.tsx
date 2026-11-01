@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ConditionReportView from '@/components/ConditionReportView'
+import { buildConditionAcceptanceText } from '@/lib/checklist'
 
 export type PickupConditionReport = {
   markers: { panel: 'driver' | 'passenger'; x: number; y: number; note: string }[]
@@ -63,7 +64,6 @@ export default function VehicleDeliveryAcknowledgementModal({
   const [ackReceipt, setAckReceipt] = useState(false)
   const [ackInspect, setAckInspect] = useState(false)
   const [ackRead, setAckRead] = useState(false)
-  const [ackCondition, setAckCondition] = useState(false)
   const [mediaConsent, setMediaConsent] = useState(false)
   const [caslConsent, setCaslConsent] = useState(false)
   const [phoneMailConsent, setPhoneMailConsent] = useState(false)
@@ -78,7 +78,6 @@ export default function VehicleDeliveryAcknowledgementModal({
     setAckReceipt(false)
     setAckInspect(false)
     setAckRead(false)
-    setAckCondition(false)
     setMediaConsent(false)
     setCaslConsent(false)
     setPhoneMailConsent(false)
@@ -125,7 +124,7 @@ export default function VehicleDeliveryAcknowledgementModal({
     ['Job Number', fields.jobNumber],
   ]
 
-  const canAgree = scrolledToBottom && ackReceipt && ackInspect && ackRead && ackCondition
+  const canAgree = scrolledToBottom && ackReceipt && ackInspect && ackRead
 
   async function handleAgree() {
     if (!doc || !canAgree) return
@@ -214,6 +213,15 @@ export default function VehicleDeliveryAcknowledgementModal({
                 ) : (
                   <p className="text-xs text-gray-600">No pickup condition report was recorded for this vehicle.</p>
                 )}
+                <p className="text-xs text-gray-700 whitespace-pre-line mt-3 pt-3 border-t border-gray-200">
+                  {buildConditionAcceptanceText({
+                    customerName: fields.recipientName,
+                    vehicleDesc: fields.vehicleDesc,
+                    vin: fields.vin,
+                    dealerName: fields.dealerName,
+                  })}
+                </p>
+                <p className="text-xs font-medium text-gray-700 mt-2">Your signature on the next step confirms this condition acceptance and release.</p>
               </div>
 
               <div className="mt-5 space-y-2 border-t border-gray-200 pt-4">
@@ -224,12 +232,6 @@ export default function VehicleDeliveryAcknowledgementModal({
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={ackInspect} onChange={(e) => setAckInspect(e.target.checked)} />
                   I had a reasonable opportunity to inspect the vehicle.
-                </label>
-                <label className="flex items-start gap-2 text-sm text-gray-700">
-                  <input type="checkbox" className="mt-0.5" checked={ackCondition} onChange={(e) => setAckCondition(e.target.checked)} />
-                  {conditionReport
-                    ? 'I have reviewed the Vehicle Condition Report above and I accept the vehicle in the condition it describes.'
-                    : 'I accept the vehicle in its present condition at delivery.'}
                 </label>
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={ackRead} onChange={(e) => setAckRead(e.target.checked)} />
