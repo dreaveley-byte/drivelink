@@ -603,9 +603,17 @@ export default async function JobReceiptPage({
             <div className="space-y-3">
               {conditionItems.map((item) => (
                 <div key={item.id} className="text-sm">
-                  <span className={item.completed_at ? 'text-gray-700' : 'text-gray-400'}>
-                    {item.completed_at ? '✓ ' : '○ '}{item.label.replace(/^(Pickup|Delivery):\s*/, '')}
-                  </span>
+                  {(() => {
+                    // A condition report with a cleanliness rating or marks was filled in
+                    // even if the driver never ticked it done (older jobs, before the app
+                    // marked it complete automatically).
+                    const recorded = !!item.completed_at || (item.item_type?.includes('condition_report') && (item.condition_data?.cleanliness != null || (item.condition_data?.markers?.length ?? 0) > 0))
+                    return (
+                      <span className={recorded ? 'text-gray-700' : 'text-gray-400'}>
+                        {recorded ? '✓ ' : '○ '}{item.label.replace(/^(Pickup|Delivery):\s*/, '')}
+                      </span>
+                    )
+                  })()}
                   {item.notes && <p className="text-xs text-gray-600 mt-0.5">{item.notes}</p>}
                   {item.condition_data && (item.condition_data.cleanliness || item.condition_data.smell) && (
                     <p className="text-xs text-gray-600 mt-0.5">
@@ -617,7 +625,7 @@ export default async function JobReceiptPage({
                   {item.condition_data && item.condition_data.markers?.length > 0 && (
                     <ConditionReportView data={item.condition_data} />
                   )}
-                  {item.completed_at && item.item_type?.includes('condition_report') && !(item.condition_data?.markers?.length > 0) && (
+                  {item.item_type?.includes('condition_report') && (item.completed_at || item.condition_data?.cleanliness != null) && !(item.condition_data?.markers?.length > 0) && (
                     <p className="text-xs text-gray-500 mt-0.5">No damage or marks were recorded on the vehicle diagram.</p>
                   )}
                   <FileThumbs files={item.files} />

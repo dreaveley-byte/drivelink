@@ -426,7 +426,7 @@ export default function DriverJobActions({
 
     const updatedPaths = [...item.file_paths, ...newPaths]
     const shouldComplete = item.item_type === 'condition_report' || item.item_type === 'trade_in_condition_report'
-      ? !!(item.notes && item.notes.trim().length > 0)
+      ? !!(item.notes && item.notes.trim().length > 0) || item.condition_data?.cleanliness != null || (item.condition_data?.markers?.length ?? 0) > 0
       : true
 
     setChecklist((prev) =>
@@ -522,8 +522,20 @@ export default function DriverJobActions({
   }
 
   async function saveConditionData(item: ChecklistItem, conditionData: ConditionData) {
-    setChecklist((prev) => prev.map((i) => (i.id === item.id ? { ...i, condition_data: conditionData } : i)))
-    await saveChecklistRow(item.id, { condition_data: conditionData })
+    // Rating the cleanliness or marking any damage counts as filling in the
+    // report. It used to be marked done only when a free-text note was typed,
+    // so a driver who rated the car and found no damage left it "incomplete".
+    const filledIn = conditionData.cleanliness != null || (conditionData.markers?.length ?? 0) > 0
+    const markComplete = filledIn && !item.completed_at
+    const completedAt = new Date().toISOString()
+    setChecklist((prev) => prev.map((i) => (i.id === item.id ? { ...i, condition_data: conditionData, ...(markComplete ? { completed_at: completedAt } : {}) } : i)))
+    if (markComplete) {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      await saveChecklistRow(item.id, { condition_data: conditionData, completed_at: completedAt, completed_by: user?.id })
+    } else {
+      await saveChecklistRow(item.id, { condition_data: conditionData })
+    }
   }
 
   async function saveSimpleTextValue(item: ChecklistItem, value: string) {
