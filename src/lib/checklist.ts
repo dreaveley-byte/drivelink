@@ -201,7 +201,7 @@ export function buildDeliveryDisclosureText(params: {
     'opportunity to inspect its exterior, interior, glass, wheels and tires, lights and accessories, odometer, ' +
     'and included keys and accessories. I confirm I am satisfied with the condition of the vehicle at the time ' +
     "of delivery, and that I have reviewed the Vehicle Condition Report completed at pickup, which forms part " +
-    'of this transaction.'
+    'of this transaction. I accept the vehicle in the condition described in that report.'
   )
   lines.push('')
   lines.push(

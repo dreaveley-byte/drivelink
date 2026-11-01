@@ -1732,6 +1732,12 @@ export default function DriverJobActions({
                                         deliveryLocation,
                                         jobNumber: job.id,
                                       }}
+                                      conditionReport={(() => {
+                                        const pc = checklist.find((c) => c.item_type === 'condition_report')
+                                        if (!pc) return null
+                                        const cd = pc.condition_data
+                                        return { markers: cd?.markers ?? [], cleanliness: cd?.cleanliness ?? null, smell: cd?.smell ?? '', notes: pc.notes }
+                                      })()}
                                       onClose={() => setDeliveryAckModalOpen(false)}
                                       onAccepted={({ mediaConsent }) => {
                                         setDeliveryAckAccepted(true)

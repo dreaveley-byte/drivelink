@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import ConditionReportView from '@/components/ConditionReportView'
+
+export type PickupConditionReport = {
+  markers: { panel: 'driver' | 'passenger'; x: number; y: number; note: string }[]
+  cleanliness: number | null
+  smell: string
+  notes?: string | null
+}
 
 export type DeliveryAutoFillFields = {
   recipientName?: string | null
@@ -36,10 +44,13 @@ export default function VehicleDeliveryAcknowledgementModal({
   fields,
   onClose,
   onAccepted,
+  conditionReport,
 }: {
   open: boolean
   jobId: string
   fields: DeliveryAutoFillFields
+  /** the pickup condition report the customer is being asked to accept (null = none was recorded) */
+  conditionReport?: PickupConditionReport | null
   onClose: () => void
   onAccepted: (result: { version: number; mediaConsent: boolean; caslConsent: boolean; phoneMailConsent: boolean }) => void
 }) {
@@ -52,6 +63,7 @@ export default function VehicleDeliveryAcknowledgementModal({
   const [ackReceipt, setAckReceipt] = useState(false)
   const [ackInspect, setAckInspect] = useState(false)
   const [ackRead, setAckRead] = useState(false)
+  const [ackCondition, setAckCondition] = useState(false)
   const [mediaConsent, setMediaConsent] = useState(false)
   const [caslConsent, setCaslConsent] = useState(false)
   const [phoneMailConsent, setPhoneMailConsent] = useState(false)
@@ -66,6 +78,7 @@ export default function VehicleDeliveryAcknowledgementModal({
     setAckReceipt(false)
     setAckInspect(false)
     setAckRead(false)
+    setAckCondition(false)
     setMediaConsent(false)
     setCaslConsent(false)
     setPhoneMailConsent(false)
@@ -112,7 +125,7 @@ export default function VehicleDeliveryAcknowledgementModal({
     ['Job Number', fields.jobNumber],
   ]
 
-  const canAgree = scrolledToBottom && ackReceipt && ackInspect && ackRead
+  const canAgree = scrolledToBottom && ackReceipt && ackInspect && ackRead && ackCondition
 
   async function handleAgree() {
     if (!doc || !canAgree) return
@@ -180,6 +193,29 @@ export default function VehicleDeliveryAcknowledgementModal({
               </div>
               <p className="whitespace-pre-line">{doc.body}</p>
 
+              <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <p className="text-xs font-semibold text-gray-500 mb-1">VEHICLE CONDITION REPORT (recorded at pickup)</p>
+                {conditionReport ? (
+                  <>
+                    {(conditionReport.cleanliness != null || conditionReport.smell) && (
+                      <p className="text-xs text-gray-700">
+                        {conditionReport.cleanliness != null && `Cleanliness: ${conditionReport.cleanliness}/5`}
+                        {conditionReport.cleanliness != null && conditionReport.smell && ' · '}
+                        {conditionReport.smell && `Smell: ${conditionReport.smell}`}
+                      </p>
+                    )}
+                    {conditionReport.notes && <p className="text-xs text-gray-700 mt-0.5">{conditionReport.notes}</p>}
+                    {conditionReport.markers?.length > 0 ? (
+                      <ConditionReportView data={{ markers: conditionReport.markers, cleanliness: conditionReport.cleanliness, smell: conditionReport.smell }} />
+                    ) : (
+                      <p className="text-xs text-gray-600 mt-0.5">No damage or marks were recorded at pickup.</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-600">No pickup condition report was recorded for this vehicle.</p>
+                )}
+              </div>
+
               <div className="mt-5 space-y-2 border-t border-gray-200 pt-4">
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={ackReceipt} onChange={(e) => setAckReceipt(e.target.checked)} />
@@ -188,6 +224,12 @@ export default function VehicleDeliveryAcknowledgementModal({
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={ackInspect} onChange={(e) => setAckInspect(e.target.checked)} />
                   I had a reasonable opportunity to inspect the vehicle.
+                </label>
+                <label className="flex items-start gap-2 text-sm text-gray-700">
+                  <input type="checkbox" className="mt-0.5" checked={ackCondition} onChange={(e) => setAckCondition(e.target.checked)} />
+                  {conditionReport
+                    ? 'I have reviewed the Vehicle Condition Report above and I accept the vehicle in the condition it describes.'
+                    : 'I accept the vehicle in its present condition at delivery.'}
                 </label>
                 <label className="flex items-start gap-2 text-sm text-gray-700">
                   <input type="checkbox" className="mt-0.5" checked={ackRead} onChange={(e) => setAckRead(e.target.checked)} />

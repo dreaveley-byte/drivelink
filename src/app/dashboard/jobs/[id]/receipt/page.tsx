@@ -1270,6 +1270,26 @@ export default async function JobReceiptPage({
                 <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 whitespace-pre-line">
                   {deliveryAcceptanceBody ?? disclosureText}
                 </p>
+                {(() => {
+                  const pickupCondition = conditionItems.find((i) => i.item_type === 'condition_report')
+                  if (!pickupCondition) return null
+                  const cd = pickupCondition.condition_data
+                  return (
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Vehicle Condition Report (pickup){signedDate ? ' — accepted by the customer when they signed this acknowledgement' : ''}
+                      </p>
+                      {cd && (cd.cleanliness != null || cd.smell) && (
+                        <p className="text-xs text-gray-600">
+                          {cd.cleanliness != null && `Cleanliness: ${cd.cleanliness}/5`}
+                          {cd.cleanliness != null && cd.smell && ' · '}
+                          {cd.smell && `Smell: ${cd.smell}`}
+                        </p>
+                      )}
+                      {cd?.markers?.length > 0 ? <ConditionReportView data={cd} /> : <p className="text-xs text-gray-600">No damage or marks were recorded at pickup.</p>}
+                    </div>
+                  )
+                })()}
                 {deliveryConditionItem?.condition_data && deliveryConditionItem.condition_data.markers?.length > 0 && (
                   <div className="mb-2">
                     <p className="text-xs text-gray-500 mb-1">Condition at delivery</p>
