@@ -617,10 +617,19 @@ export default async function JobReceiptPage({
                   {item.condition_data && item.condition_data.markers?.length > 0 && (
                     <ConditionReportView data={item.condition_data} />
                   )}
+                  {item.completed_at && item.item_type?.includes('condition_report') && !(item.condition_data?.markers?.length > 0) && (
+                    <p className="text-xs text-gray-500 mt-0.5">No damage or marks were recorded on the vehicle diagram.</p>
+                  )}
                   <FileThumbs files={item.files} />
                 </div>
               ))}
             </div>
+          </div>
+        )}
+        {conditionItems.length === 0 && job.status === 'completed' && !['Courier / Package', 'Parts Delivery', 'Parts Pickup', 'Paperwork Signing'].includes(jobTypeName ?? '') && (
+          <div className="mb-6">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Condition Report</p>
+            <p className="text-sm text-gray-500">No condition report was recorded for this drive (the driver&apos;s checklist has no condition report entries).</p>
           </div>
         )}
 
