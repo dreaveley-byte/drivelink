@@ -33,6 +33,7 @@ export default function AdminBillingCorrection({
   suggestedDealerCents,
   suggestedDriverCents,
   hasPayOverride,
+  discountPercent,
   audit,
 }: {
   jobId: string
@@ -46,6 +47,8 @@ export default function AdminBillingCorrection({
   suggestedDealerCents: number | null
   suggestedDriverCents: number | null
   hasPayOverride: boolean
+  /** the % currently taken off this job; null = discount column not available yet (migration 184/185 not run) */
+  discountPercent: number | null
   audit: AuditRow[]
 }) {
   const router = useRouter()
@@ -55,6 +58,41 @@ export default function AdminBillingCorrection({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [discountInput, setDiscountInput] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
+  const [discountSaving, setDiscountSaving] = useState(false)
+  const [discountMsg, setDiscountMsg] = useState('')
+  const [discountError, setDiscountError] = useState('')
+
+  async function applyDiscount() {
+    setDiscountError('')
+    setDiscountMsg('')
+    const pct = parseFloat(discountInput)
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      setDiscountError('Enter a discount between 0 and 100 (use 0 to remove it).')
+      return
+    }
+    if (!discountReason.trim()) {
+      setDiscountError('Add a short reason - it is saved with the change.')
+      return
+    }
+    setDiscountSaving(true)
+    const supabase = createClient()
+    const { error: rpcError } = await supabase.rpc('admin_set_job_discount', {
+      p_job_id: jobId,
+      p_percent: pct,
+      p_reason: discountReason.trim(),
+    })
+    setDiscountSaving(false)
+    if (rpcError) {
+      setDiscountError(`Could not save: ${rpcError.message}`)
+      return
+    }
+    setDiscountMsg(pct === 0 ? '✓ Discount removed' : `✓ ${pct}% discount applied`)
+    setDiscountInput('')
+    setDiscountReason('')
+    router.refresh()
+  }
 
   const dealerMissing = (dealerCostCents ?? 0) <= 0
   const driverMissing = (driverPayCents ?? 0) <= 0
@@ -209,6 +247,47 @@ export default function AdminBillingCorrection({
         {saved && <span className="text-xs text-green-700">✓ Saved</span>}
       </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+      {discountPercent != null && (
+        <div className="mt-4 pt-3 border-t border-gray-200">
+          <p className="text-sm font-medium text-gray-900 mb-0.5">Discount on this job</p>
+          <p className="text-xs text-gray-500 mb-2">
+            {discountPercent > 0 ? `Currently ${discountPercent}% off the dealer charge. ` : 'No discount applied. '}
+            Takes a % off the dealer charge above (not approved extras, and driver pay is not affected). Entering a new % replaces the old one; 0 removes it.
+          </p>
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              max="100"
+              value={discountInput}
+              onChange={(e) => setDiscountInput(e.target.value)}
+              placeholder="e.g. 10"
+              className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+            />
+            <span className="text-sm text-gray-500">%</span>
+          </div>
+          <input
+            value={discountReason}
+            onChange={(e) => setDiscountReason(e.target.value)}
+            placeholder="Reason (required, e.g. goodwill for late delivery)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 bg-white"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={applyDiscount}
+              disabled={discountSaving}
+              className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              {discountSaving ? 'Saving…' : 'Apply discount'}
+            </button>
+            {discountMsg && <span className="text-xs text-green-700">{discountMsg}</span>}
+          </div>
+          {discountError && <p className="text-xs text-red-600 mt-2">{discountError}</p>}
+        </div>
+      )}
 
       {audit.length > 0 && (
         <div className="mt-4 pt-3 border-t border-gray-200">

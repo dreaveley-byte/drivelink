@@ -696,7 +696,7 @@ export default async function JobReceiptPage({
             <div className="space-y-1">
               {job.estimated_dealer_cost_cents != null && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Dealer charged (original estimate)</span>
+                  <span className="text-gray-600">Dealer charged (original estimate){Number(job.admin_discount_percent ?? 0) > 0 ? ` — includes ${Number(job.admin_discount_percent)}% discount` : ''}</span>
                   <span className="text-gray-900 font-medium">{formatCents(job.estimated_dealer_cost_cents)}</span>
                 </div>
               )}
@@ -860,6 +860,9 @@ export default async function JobReceiptPage({
                     {formatCents(job.estimated_dealer_cost_cents)}
                   </span>
                 </div>
+                {Number(job.admin_discount_percent ?? 0) > 0 && (
+                  <p className="text-xs text-green-700">Includes a {Number(job.admin_discount_percent)}% discount</p>
+                )}
                 {job.approved_expenses_cents > 0 && (
                   <div className="flex justify-between">
                     <span className="text-base text-gray-700">{approvedExpensesLabel}</span>
@@ -937,6 +940,7 @@ export default async function JobReceiptPage({
             // not a meaningful comparison for this job's driver.
             suggestedDriverCents={job.second_driver_required ? null : pricingBreakdown?.estimatedDriverPayCents ?? null}
             hasPayOverride={job.admin_pay_override_cents != null}
+            discountPercent={'admin_discount_percent' in job ? Number(job.admin_discount_percent ?? 0) : null}
             audit={billingAudit}
           />
           <AdminBaselineRestore
