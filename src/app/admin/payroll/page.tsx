@@ -8,6 +8,7 @@ import MarkPaidButton from '@/components/MarkPaidButton'
 import AddDrawButton from '@/components/AddDrawButton'
 import DateRangeFilter from '@/components/DateRangeFilter'
 import DriverPayrollJobs, { type PayrollJobRow, type PayrollDrawRow } from '@/components/DriverPayrollJobs'
+import DriverOutstandingDrives from '@/components/DriverOutstandingDrives'
 import { formatCents } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -101,11 +102,41 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
         .eq('status', 'approved')
     : { data: [] as { job_id: string; submitted_by: string | null; amount_cents: number; reimbursement_paid_at: string | null }[] }
 
+  // Every payout (not just ones overlapping this period) - needed to tell
+  // whether a drive finished before this period was ever paid.
   const { data: payouts } = await supabase
     .from('driver_payouts')
     .select('driver_id, period_start, period_end, paid_at')
-    .lte('period_start', weekEndStr)
-    .gte('period_end', weekStartStr)
+
+  // Drives finished BEFORE this period that haven't been paid. The summary
+  // function only counts the selected period's earnings, but it counts every
+  // unpaid reimbursement and advance - so an unpaid drive from last week showed
+  // its expenses and nothing else. Look back 120 days.
+  const lookback = new Date(weekStart)
+  lookback.setDate(lookback.getDate() - 120)
+  const lookbackStr = lookback.toISOString().slice(0, 10)
+  const { data: earlierJobsRaw } = await supabase
+    .from('jobs')
+    .select('id, driver_id, completed_at, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, customer_full_name, pickup_address, dropoff_address, organizations(name)')
+    .eq('status', 'completed')
+    .is('archived_at', null)
+    .not('driver_id', 'is', null)
+    .gte('completed_at', lookbackStr)
+    .lt('completed_at', weekStartStr)
+    .order('completed_at', { ascending: true })
+  const earlierJobsAll = (earlierJobsRaw ?? []) as unknown as PeriodJob[]
+  const earlierUnpaid = earlierJobsAll.filter((j) => {
+    const d = (j.completed_at ?? '').slice(0, 10)
+    return !(payouts ?? []).some((p) => p.driver_id === j.driver_id && p.period_start <= d && d <= p.period_end)
+  })
+  const earlierIds = earlierUnpaid.map((j) => j.id)
+  const { data: earlierExpenses } = earlierIds.length > 0
+    ? await supabase
+        .from('job_expenses')
+        .select('job_id, submitted_by, amount_cents, reimbursement_paid_at')
+        .in('job_id', earlierIds)
+        .eq('status', 'approved')
+    : { data: [] as { job_id: string; submitted_by: string | null; amount_cents: number; reimbursement_paid_at: string | null }[] }
 
   const { data: drawRows } = await supabase
     .from('driver_draws')
@@ -142,6 +173,35 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     const list = jobRowsByDriver.get(j.driver_id) ?? []
     list.push(row)
     jobRowsByDriver.set(j.driver_id, list)
+  }
+
+  const earlierRowsByDriver = new Map<string, PayrollJobRow[]>()
+  for (const j of earlierUnpaid) {
+    if (!j.driver_id) continue
+    const jobExpenses = (earlierExpenses ?? []).filter((e) => e.job_id === j.id && e.submitted_by === j.driver_id)
+    const expensesCents = jobExpenses.reduce((sum, e) => sum + e.amount_cents, 0)
+    const unpaidExpensesCents = jobExpenses.filter((e) => !e.reimbursement_paid_at).reduce((sum, e) => sum + e.amount_cents, 0)
+    const basePayCents = j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0
+    const bonusCents = j.performance_bonus_override_cents ?? (j.performance_bonus_eligible ? (j.performance_bonus_cents ?? 0) : 0)
+    const org = Array.isArray(j.organizations) ? j.organizations[0] : j.organizations
+    const row: PayrollJobRow = {
+      id: j.id,
+      completedAt: j.completed_at,
+      dealer: org?.name ?? 'Unknown dealer',
+      customer: j.customer_full_name || '-',
+      pickup: j.pickup_address ?? '',
+      dropoff: j.dropoff_address ?? '',
+      basePayCents,
+      bonusCents,
+      expensesCents,
+      unpaidExpensesCents,
+      paid: false,
+      paidAt: null,
+      outstandingCents: basePayCents + bonusCents + unpaidExpensesCents,
+    }
+    const list = earlierRowsByDriver.get(j.driver_id) ?? []
+    list.push(row)
+    earlierRowsByDriver.set(j.driver_id, list)
   }
 
   const drawsByDriver = new Map<string, PayrollDrawRow[]>()
@@ -230,12 +290,26 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
             unsettled_draws_cents: number
             net_owed_cents: number
             month_earnings_cents: number
-          }) => (
+          }) => {
+            const earlierRows = earlierRowsByDriver.get(r.driver_id) ?? []
+            // Base pay + bonus only: the unpaid expenses on these drives are already
+            // inside outstanding_reimbursements_cents (it isn't limited to a period).
+            const earlierPayCents = earlierRows.reduce((sum, j) => sum + j.basePayCents + j.bonusCents, 0)
+            const earliestEarlier = earlierRows.map((j) => (j.completedAt ?? '').slice(0, 10)).filter(Boolean).sort()[0]
+            const payoutStart = earliestEarlier && earliestEarlier < weekStartStr ? earliestEarlier : weekStartStr
+            const netOwed = r.net_owed_cents + earlierPayCents
+            const earningsToPay = r.week_earnings_cents + earlierPayCents
+            return (
             <div key={r.driver_id} className="border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <p className="text-sm font-medium text-gray-900">{r.driver_name || 'Unnamed driver'}</p>
+                    {earlierRows.length > 0 && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-300 rounded-full px-2 py-0.5">
+                        {earlierRows.length} earlier drive{earlierRows.length === 1 ? '' : 's'} unpaid ({formatCents(earlierPayCents)})
+                      </span>
+                    )}
                     <span className="text-xs text-gray-500">
                       Month earnings: <span className="text-gray-900 font-medium">{formatCents(r.month_earnings_cents)}</span>
                     </span>
@@ -247,16 +321,16 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                   <MarkPaidButton
                     driverId={r.driver_id}
                     driverName={r.driver_name}
-                    periodStart={weekStartStr}
+                    periodStart={payoutStart}
                     periodEnd={weekEnd.toISOString().slice(0, 10)}
-                    earningsCents={r.week_earnings_cents}
+                    earningsCents={earningsToPay}
                     reimbursementsCents={r.outstanding_reimbursements_cents}
                     drawsCents={r.unsettled_draws_cents}
-                    netOwedCents={r.net_owed_cents}
+                    netOwedCents={netOwed}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mt-3 pt-3 border-t border-gray-100">
+              <div className={`grid grid-cols-2 ${earlierRows.length > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 text-xs mt-3 pt-3 border-t border-gray-100`}>
                 <DriverPayrollJobs
                   label={`Jobs ${periodUnit}`}
                   jobs={jobRowsByDriver.get(r.driver_id) ?? []}
@@ -265,8 +339,12 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                     0,
                     r.outstanding_reimbursements_cents - (jobRowsByDriver.get(r.driver_id) ?? []).reduce((sum, j) => sum + j.unpaidExpensesCents, 0)
                   )}
-                  netOwedCents={r.net_owed_cents}
+                  netOwedCents={netOwed}
+                  earlierPayCents={earlierPayCents}
                 />
+                {earlierRows.length > 0 && (
+                  <DriverOutstandingDrives jobs={earlierRows} draws={drawsByDriver.get(r.driver_id) ?? []} periodLabel={weekStart.toLocaleDateString('en-CA', { dateStyle: 'medium' })} />
+                )}
                 <div>
                   <p className="text-gray-400">Earnings {periodUnit}</p>
                   <p className="text-gray-900 font-medium text-sm mt-0.5">{formatCents(r.week_earnings_cents)}</p>
@@ -281,7 +359,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                     {r.unsettled_draws_cents > 0 ? `−${formatCents(r.unsettled_draws_cents)}` : formatCents(0)}
                   </p>
                 </div>
-                <div className="col-span-2 sm:col-span-4 flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100">
+                <div className={`col-span-2 ${earlierRows.length > 0 ? 'sm:col-span-5' : 'sm:col-span-4'} flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100`}>
                   <div>
                     {r.pending_job_count > 0 && (
                       <span className="text-amber-600">
@@ -292,19 +370,20 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
                   <div className="flex items-center gap-4">
                     <span>
                       <span className="text-gray-400 mr-1.5">Net owed</span>
-                      <span className="text-gray-900 font-semibold text-sm">{formatCents(r.net_owed_cents)}</span>
+                      <span className="text-gray-900 font-semibold text-sm">{formatCents(netOwed)}</span>
                     </span>
                     {r.pending_job_count > 0 && (
                       <span>
                         <span className="text-amber-600 mr-1.5">Total incl. pending</span>
-                        <span className="text-amber-700 font-semibold text-sm">{formatCents(r.net_owed_cents + r.pending_amount_cents)}</span>
+                        <span className="text-amber-700 font-semibold text-sm">{formatCents(netOwed + r.pending_amount_cents)}</span>
                       </span>
                     )}
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
           {(!rows || rows.length === 0) && (
             <p className="text-sm text-gray-400">No drivers found.</p>
           )}

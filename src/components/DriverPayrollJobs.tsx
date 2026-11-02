@@ -45,12 +45,15 @@ export default function DriverPayrollJobs({
   draws,
   otherOutstandingReimbursementsCents,
   netOwedCents,
+  earlierPayCents = 0,
 }: {
   label: string
   jobs: PayrollJobRow[]
   draws: PayrollDrawRow[]
   otherOutstandingReimbursementsCents: number
   netOwedCents: number
+  /** unpaid base pay + bonus from drives finished before this period (shown under "Outstanding drives") */
+  earlierPayCents?: number
 }) {
   const [open, setOpen] = useState(false)
 
@@ -163,8 +166,14 @@ export default function DriverPayrollJobs({
                 <span className="text-amber-700 font-medium">+{formatCents(otherOutstandingReimbursementsCents)}</span>
               </div>
             )}
+            {earlierPayCents > 0 && (
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <span className="text-gray-700">Unpaid pay from drives finished before this period (see Outstanding drives)</span>
+                <span className="text-amber-700 font-medium">+{formatCents(earlierPayCents)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-gray-200 text-gray-900 font-medium">
-              <span>Net owed (jobs + unpaid expenses − outstanding advances{unsettledDraws > 0 ? ` ${formatCents(unsettledDraws)}` : ''})</span>
+              <span>Net owed (jobs + earlier unpaid drives + unpaid expenses − outstanding advances{unsettledDraws > 0 ? ` ${formatCents(unsettledDraws)}` : ''})</span>
               <span>{formatCents(netOwedCents)}</span>
             </div>
           </div>
