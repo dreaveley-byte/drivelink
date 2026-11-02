@@ -316,7 +316,7 @@ export default async function JobReceiptPage({
     })
   )
   const driverName = driverInfo?.full_name as string | undefined
-  const driverPhone = driverInfo?.phone as string | undefined
+  const driverPhone = isAdmin ? (driverInfo?.phone as string | undefined) : undefined
   const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : job.job_types?.name
   const org = Array.isArray(job.organizations) ? job.organizations[0] : job.organizations
   const orgName = org?.name

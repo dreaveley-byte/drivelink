@@ -158,7 +158,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, driver_id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('id, driver_id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -251,7 +251,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
           {jobs?.map((job) => {
             const jobTypeName = Array.isArray(job.job_types) ? job.job_types[0]?.name : (job.job_types as { name: string } | null)?.name
-            const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; phone: string | null; photo_url: string | null } | null)
+            const driverInfo = Array.isArray(job.driver) ? job.driver[0] : (job.driver as { full_name: string; photo_url: string | null } | null)
             const isFinished = job.status === 'completed' || job.status === 'cancelled'
             const isTrackable = ['assigned', 'picked_up', 'in_progress', 'delivered'].includes(job.status)
             const cardBody = (
@@ -295,7 +295,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     )}
                     <span className="text-gray-400">Driver:</span>
                     <span className="font-medium text-gray-900">{driverInfo?.full_name ?? (job.driver_id ? 'Assigned' : 'Not yet assigned')}</span>
-                    {driverInfo?.phone && <span className="text-gray-400">· {driverInfo.phone}</span>}
                   </p>
                 )}
                 {job.idle_since && (
@@ -370,13 +369,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   {isTrackable && <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />}
                 </div>
               </div>
-              {['assigned', 'picked_up', 'in_progress'].includes(job.status) && (driverInfo?.phone || job.customer_phone) && (
+              {['assigned', 'picked_up', 'in_progress'].includes(job.status) && job.customer_phone && (
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
-                  {driverInfo?.phone && (
-                    <a href={`tel:${driverInfo.phone}`} className="text-xs text-[#378ADD] hover:underline">
-                      📞 Call driver
-                    </a>
-                  )}
                   {job.customer_phone && (
                     <a href={`tel:${job.customer_phone}`} className="text-xs text-[#378ADD] hover:underline">
                       📞 Call customer
