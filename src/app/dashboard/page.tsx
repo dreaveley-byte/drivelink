@@ -158,7 +158,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
+    .select('id, driver_id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, phone, photo_url)')
     .is('archived_at', null)
     .order('scheduled_for', { ascending, nullsFirst: false })
 
@@ -286,15 +286,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <p className="text-xs text-gray-500 mt-0.5">
                   {job.pickup_address} → {job.dropoff_address}
                 </p>
-                {driverInfo?.full_name && (
-                  <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-1.5">
-                    {driverInfo.photo_url ? (
+                {(driverInfo?.full_name || job.driver_id || job.status !== 'awaiting_driver') && (
+                  <p className="text-xs text-gray-600 mt-1 flex items-center gap-1.5">
+                    {driverInfo?.photo_url ? (
                       <img src={driverInfo.photo_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                     ) : (
                       <span className="w-5 h-5 rounded-full bg-gray-200 inline-block" />
                     )}
-                    {driverInfo.full_name}
-                    {driverInfo.phone && <span className="text-gray-400">· {driverInfo.phone}</span>}
+                    <span className="text-gray-400">Driver:</span>
+                    <span className="font-medium text-gray-900">{driverInfo?.full_name ?? (job.driver_id ? 'Assigned' : 'Not yet assigned')}</span>
+                    {driverInfo?.phone && <span className="text-gray-400">· {driverInfo.phone}</span>}
                   </p>
                 )}
                 {job.idle_since && (
