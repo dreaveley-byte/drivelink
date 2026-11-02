@@ -127,7 +127,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   const earlierJobsAll = (earlierJobsRaw ?? []) as unknown as PeriodJob[]
   const earlierUnpaid = earlierJobsAll.filter((j) => {
     const d = (j.completed_at ?? '').slice(0, 10)
-    return !(payouts ?? []).some((p) => p.driver_id === j.driver_id && p.period_start <= d && d <= p.period_end)
+    return !(payouts ?? []).some((p) => p.driver_id === j.driver_id && p.period_start <= d && d <= p.period_end && (!j.completed_at || !p.paid_at || p.paid_at >= j.completed_at))
   })
   const earlierIds = earlierUnpaid.map((j) => j.id)
   const { data: earlierExpenses } = earlierIds.length > 0
@@ -148,7 +148,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   for (const j of periodJobs) {
     if (!j.driver_id) continue
     const dateStr = (j.completed_at ?? '').slice(0, 10)
-    const payout = (payouts ?? []).find((p) => p.driver_id === j.driver_id && p.period_start <= dateStr && dateStr <= p.period_end)
+    const payout = (payouts ?? []).find((p) => p.driver_id === j.driver_id && p.period_start <= dateStr && dateStr <= p.period_end && (!j.completed_at || !p.paid_at || p.paid_at >= j.completed_at))
     const jobExpenses = (periodExpenses ?? []).filter((e) => e.job_id === j.id && e.submitted_by === j.driver_id)
     const expensesCents = jobExpenses.reduce((sum, e) => sum + e.amount_cents, 0)
     const unpaidExpensesCents = jobExpenses.filter((e) => !e.reimbursement_paid_at).reduce((sum, e) => sum + e.amount_cents, 0)
