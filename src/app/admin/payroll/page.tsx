@@ -75,6 +75,9 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     completed_at: string | null
     final_driver_pay_cents: number | null
     estimated_driver_pay_cents: number | null
+    admin_pay_override_cents: number | null
+    admin_idle_hours_driver_cents: number | null
+    idle_fee_cents: number | null
     performance_bonus_cents: number | null
     performance_bonus_override_cents: number | null
     performance_bonus_eligible: boolean | null
@@ -85,7 +88,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   }
   const { data: periodJobsRaw } = await supabase
     .from('jobs')
-    .select('id, driver_id, completed_at, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, customer_full_name, pickup_address, dropoff_address, organizations(name)')
+    .select('id, driver_id, completed_at, final_driver_pay_cents, estimated_driver_pay_cents, admin_pay_override_cents, admin_idle_hours_driver_cents, idle_fee_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, customer_full_name, pickup_address, dropoff_address, organizations(name)')
     .eq('status', 'completed')
     .is('archived_at', null)
     .gte('completed_at', weekStartStr)
@@ -117,7 +120,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   const lookbackStr = lookback.toISOString().slice(0, 10)
   const { data: earlierJobsRaw } = await supabase
     .from('jobs')
-    .select('id, driver_id, completed_at, final_driver_pay_cents, estimated_driver_pay_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, customer_full_name, pickup_address, dropoff_address, organizations(name)')
+    .select('id, driver_id, completed_at, final_driver_pay_cents, estimated_driver_pay_cents, admin_pay_override_cents, admin_idle_hours_driver_cents, idle_fee_cents, performance_bonus_cents, performance_bonus_override_cents, performance_bonus_eligible, customer_full_name, pickup_address, dropoff_address, organizations(name)')
     .eq('status', 'completed')
     .is('archived_at', null)
     .not('driver_id', 'is', null)
@@ -152,7 +155,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     const jobExpenses = (periodExpenses ?? []).filter((e) => e.job_id === j.id && e.submitted_by === j.driver_id)
     const expensesCents = jobExpenses.reduce((sum, e) => sum + e.amount_cents, 0)
     const unpaidExpensesCents = jobExpenses.filter((e) => !e.reimbursement_paid_at).reduce((sum, e) => sum + e.amount_cents, 0)
-    const basePayCents = j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0
+    const basePayCents = (j.admin_pay_override_cents ?? j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0) + (j.admin_idle_hours_driver_cents ?? 0) + (j.idle_fee_cents ?? 0)
     const bonusCents = j.performance_bonus_override_cents ?? (j.performance_bonus_eligible ? (j.performance_bonus_cents ?? 0) : 0)
     const org = Array.isArray(j.organizations) ? j.organizations[0] : j.organizations
     const row: PayrollJobRow = {
@@ -181,7 +184,7 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
     const jobExpenses = (earlierExpenses ?? []).filter((e) => e.job_id === j.id && e.submitted_by === j.driver_id)
     const expensesCents = jobExpenses.reduce((sum, e) => sum + e.amount_cents, 0)
     const unpaidExpensesCents = jobExpenses.filter((e) => !e.reimbursement_paid_at).reduce((sum, e) => sum + e.amount_cents, 0)
-    const basePayCents = j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0
+    const basePayCents = (j.admin_pay_override_cents ?? j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0) + (j.admin_idle_hours_driver_cents ?? 0) + (j.idle_fee_cents ?? 0)
     const bonusCents = j.performance_bonus_override_cents ?? (j.performance_bonus_eligible ? (j.performance_bonus_cents ?? 0) : 0)
     const org = Array.isArray(j.organizations) ? j.organizations[0] : j.organizations
     const row: PayrollJobRow = {
@@ -214,11 +217,11 @@ export default async function AdminPayrollPage({ searchParams }: { searchParams:
   const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString()
   const { data: ytdJobs } = await supabase
     .from('jobs')
-    .select('final_driver_pay_cents, estimated_driver_pay_cents')
+    .select('final_driver_pay_cents, estimated_driver_pay_cents, admin_pay_override_cents, admin_idle_hours_driver_cents, idle_fee_cents')
     .eq('status', 'completed')
     .is('archived_at', null)
     .gte('completed_at', yearStart)
-  const yearTotalCents = (ytdJobs ?? []).reduce((sum, j) => sum + (j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0), 0)
+  const yearTotalCents = (ytdJobs ?? []).reduce((sum, j) => sum + ((j.admin_pay_override_cents ?? j.final_driver_pay_cents ?? j.estimated_driver_pay_cents ?? 0) + (j.admin_idle_hours_driver_cents ?? 0) + (j.idle_fee_cents ?? 0)), 0)
 
   return (
     <div className="min-h-screen bg-white">
