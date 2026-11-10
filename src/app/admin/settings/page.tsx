@@ -50,6 +50,8 @@ type Settings = {
   preferred_driver_window_minutes: number
   eta_window_buffer_percent: number
   quiet_hours_end_hour: number
+  sms_window_end_hour: number
+  license_transition_days: number
   return_to_pickup_radius_km: number
   admin_alert_phone: string | null
   idle_alert_minutes: number
@@ -543,6 +545,28 @@ export default function PricingSettingsPage() {
                   <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">No automatic texts after this time</label>
+              <p className="text-xs text-gray-400 mb-1">
+                Automatic customer texts (arrival time and delay updates) generated after this hour, in the delivery&apos;s local time, are held until the morning start time above. The driver can still choose &quot;Send now anyway&quot;. Default 10:00 PM.
+              </p>
+              <select value={settings.sms_window_end_hour}
+                onChange={(e) => updateNumberField('sms_window_end_hour', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Days for existing drivers to upload their licence</label>
+              <p className="text-xs text-gray-400 mb-1">
+                Drivers with no licence expiry date on file are allowed to keep working for this many days after the update, then are blocked until their licence is uploaded and approved. (Applies only to drivers who existed before the update.)
+              </p>
+              <input type="number" step="1" min="1" value={settings.license_transition_days}
+                onChange={(e) => updateNumberField('license_transition_days', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Admin alert phone number</label>

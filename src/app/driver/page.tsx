@@ -3,23 +3,26 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import DriverJobActions from './DriverJobActions'
-import LocationSharer from '@/components/LocationSharer'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
 import AutoRefresh from '@/components/AutoRefresh'
 import SortSelect from '@/components/SortSelect'
 import Logo from '@/components/Logo'
 import SettingsGearLink from '@/components/SettingsGearLink'
-import ChatBadgeLink from '@/components/ChatBadgeLink'
 import JobMessageWatcher from '@/components/JobMessageWatcher'
 import { getUnreadJobChatSet } from '@/lib/unreadChat'
 import { formatCents } from '@/lib/pricing'
 import { getOutstandingLegalDocs } from '@/lib/legalGate'
 import LegalGateModal from '@/components/LegalGateModal'
+import DismissibleBanner from '@/components/DismissibleBanner'
+import ClaimedJobsList from '@/components/ClaimedJobsList'
+import JobRequirementFlags from '@/components/JobRequirementFlags'
+import DriverNotificationsBell from '@/components/DriverNotificationsBell'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DriverPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
-  const { sort } = await searchParams
+export default async function DriverPage({ searchParams }: { searchParams: Promise<{ sort?: string; tab?: string; claimed?: string }> }) {
+  const { sort, tab: tabParam, claimed: justClaimed } = await searchParams
+  const tab = tabParam === 'available' ? 'available' : 'claimed'
   const ascending = sort !== 'latest'
   const supabase = await createClient()
 
@@ -90,7 +93,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     )
   }
 
-  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_chase_vehicle_job, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, package_description, package_direction, package_size, special_instructions, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, admin_pay_override_cents, estimated_driver_reimbursement_cents, additional_charges, job_types(name), organizations(name, address, phone)'
+  const jobSelect = 'id, status, scheduled_for, delivery_deadline, pickup_address, dropoff_address, recipient_name, customer_full_name, customer_address, customer_phone, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, is_trade_in_pickup, is_chase_vehicle_job, is_first_nations_delivery, out_of_province_inspection, key_count, has_wheel_lock, has_charging_cables, other_included_items, package_description, package_direction, package_size, special_instructions, delivery_gps_lat, delivery_gps_lng, delivery_gps_at, pickup_gps_lat, pickup_gps_lng, pickup_gps_at, id_verification_completed_at, id_verification_sent_at, id_verification_approved_at, id_verification_failed_attempts, id_verification_manual_override, wait_time_started_at, total_wait_minutes, idle_fee_cents, estimated_distance_km, estimated_duration_minutes, estimated_driver_pay_cents, admin_pay_override_cents, estimated_driver_reimbursement_cents, additional_charges, vehicle_transmission, second_vehicle_transmission, vehicle_mode, job_types(name), organizations(name, address, phone)'
 
   const { data: myJobs } = await supabase
     .from('jobs')
@@ -148,6 +151,12 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
     }
   }
 
+  const { data: notificationRows } = await supabase
+    .from('driver_notifications')
+    .select('id, kind, title, body, job_id, read_at, created_at')
+    .eq('driver_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(30)
   const pendingCount = myJobs?.length ?? 0
   const pendingPay = (myJobs ?? []).reduce((sum, j) => sum + (j.admin_pay_override_cents ?? j.estimated_driver_pay_cents ?? 0), 0)
   const unreadChatJobs = await getUnreadJobChatSet(supabase, user.id, (myJobs ?? []).map((j) => j.id))
@@ -181,9 +190,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           <span className="text-sm text-gray-400">— Driver</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/driver/history" className="text-sm text-gray-600 hover:text-gray-900">
-            History
-          </Link>
+          <DriverNotificationsBell driverId={user.id} initial={notificationRows ?? []} />
           <SignOutButton />
           <SettingsGearLink href="/driver/settings" />
         </div>
@@ -197,6 +204,17 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
         <AutoRefresh />
         {(() => {
           const REMINDER_DAYS = 30
+          const nowDate = new Date()
+
+          // Driver's licence: no grace period, no override. Checked first.
+          const todayBc = nowDate.toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' })
+          const licenceExpiry: string | null = profile?.license_expiry_date ?? null
+          const transitionEnds: string | null = profile?.license_transition_until ?? null
+          const licenceBlocked = licenceExpiry ? licenceExpiry < todayBc : !(transitionEnds && new Date(transitionEnds) > nowDate)
+          const transitionDays = !licenceExpiry && transitionEnds && new Date(transitionEnds) > nowDate
+            ? Math.ceil((new Date(transitionEnds).getTime() - nowDate.getTime()) / 86400000)
+            : null
+
           const wantsPassengerJobs = !!profile?.preferred_job_types?.some((t: string) => t === 'Customer Pick Up' || t === 'Customer Drop Off')
           const docs: { label: string; reviewedAt: string | null; expiryMonths: number }[] = [
             { label: "Driver's abstract", reviewedAt: profile?.driver_abstract_reviewed_at ?? null, expiryMonths: 12 },
@@ -207,7 +225,6 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
               ? [{ label: 'Vehicle safety inspection', reviewedAt: profile?.vehicle_safety_inspection_reviewed_at ?? null, expiryMonths: 6 }]
               : []),
           ]
-          const now = new Date()
           const expired: string[] = []
           const expiringSoon: { label: string; date: string }[] = []
           for (const doc of docs) {
@@ -217,34 +234,68 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
             }
             const expiresAt = new Date(doc.reviewedAt)
             expiresAt.setMonth(expiresAt.getMonth() + doc.expiryMonths)
-            const daysLeft = Math.round((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            const daysLeft = Math.round((expiresAt.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
             if (daysLeft < 0) expired.push(doc.label)
             else if (daysLeft <= REMINDER_DAYS) expiringSoon.push({ label: doc.label, date: expiresAt.toLocaleDateString('en-CA', { dateStyle: 'medium' }) })
           }
-          if (expired.length === 0 && expiringSoon.length === 0) return null
+
+          // Grace period = the admin's existing compliance override (with its own
+          // expiry date). The countdown is days until that override ends and
+          // never changes when the banner is dismissed.
+          const overrideActive = !!profile?.compliance_override && (!profile?.compliance_override_expires_at || new Date(profile.compliance_override_expires_at) > nowDate)
+          const graceDaysLeft = overrideActive && profile?.compliance_override_expires_at
+            ? Math.max(1, Math.ceil((new Date(profile.compliance_override_expires_at).getTime() - nowDate.getTime()) / 86400000))
+            : null
+
           return (
-            <div className={`border rounded-xl px-4 py-3 ${expired.length > 0 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
+            <>
+              {licenceBlocked && (
+                <DismissibleBanner title="Driver's Licence Expired" dismissible={false}>
+                  {licenceExpiry
+                    ? "Your driver's licence has expired. You cannot view or claim available jobs until your updated valid licence has been submitted and approved."
+                    : "We don't have an approved driver's licence expiry date on file for you. You cannot view or claim available jobs until your licence has been uploaded and approved."}{' '}
+                  <Link href="/driver/settings" className="underline font-medium">Upload licence</Link>
+                </DismissibleBanner>
+              )}
+              {!licenceBlocked && transitionDays != null && (
+                <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3">
+                  <p className="text-sm font-medium text-amber-800">
+                    Please upload your driver&apos;s licence within {transitionDays} day{transitionDays === 1 ? '' : 's'} to keep seeing available jobs.
+                  </p>
+                  <Link href="/driver/settings" className="text-xs underline mt-1 inline-block text-gray-700">Upload licence</Link>
+                </div>
+              )}
               {expired.length > 0 && (
-                <p className="text-sm font-medium text-red-700">
-                  You can&apos;t claim new jobs until you upload and get these reviewed: {expired.join(', ')}.
-                </p>
+                <DismissibleBanner title={expired.length === 1 ? 'Action Required — Document Expired' : 'Multiple Expired Documents'}>
+                  {expired.length === 1 && <p>Your {expired[0]} has expired.</p>}
+                  <p className={expired.length === 1 ? 'mt-1' : ''}>
+                    {graceDaysLeft != null
+                      ? `You have ${graceDaysLeft} day${graceDaysLeft === 1 ? '' : 's'} remaining to update your documentation before access to available jobs is restricted.`
+                      : overrideActive
+                        ? 'An admin has allowed you to keep working while you update your documentation.'
+                        : 'Access to available jobs is restricted until your documentation is updated and approved.'}
+                  </p>
+                  <Link href="/driver/settings" className="underline font-medium inline-block mt-1">Go to Compliance</Link>
+                </DismissibleBanner>
               )}
               {expiringSoon.length > 0 && (
-                <p className={`text-sm ${expired.length > 0 ? 'text-red-600 mt-1' : 'text-amber-700 font-medium'}`}>
-                  {expiringSoon.map((d) => `${d.label} expires ${d.date}`).join(' · ')} — upload a renewal before then to keep claiming jobs.
-                </p>
+                <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3">
+                  <p className="text-sm text-amber-700 font-medium">
+                    {expiringSoon.map((d) => `${d.label} expires ${d.date}`).join(' · ')} — upload a renewal before then to keep claiming jobs.
+                  </p>
+                  <Link href="/driver/settings" className="text-xs underline mt-1 inline-block text-gray-700">
+                    Go to Compliance
+                  </Link>
+                </div>
               )}
-              <Link href="/driver/settings" className="text-xs underline mt-1 inline-block text-gray-700">
-                Go to Compliance
-              </Link>
-            </div>
+            </>
           )
         })()}
         <div className="grid grid-cols-2 gap-3">
           <div className="border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-500">Pending</p>
             <p className="text-lg font-semibold text-gray-900 mt-0.5">{formatCents(pendingPay)}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{pendingCount} job{pendingCount === 1 ? '' : 's'} in progress</p>
+            <p className="text-xs text-gray-400 mt-0.5">{pendingCount} claimed job{pendingCount === 1 ? '' : 's'}</p>
           </div>
           <div className="border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-500">This month</p>
@@ -253,37 +304,54 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
 
-        {myJobs && myJobs.length > 0 && (
+        <div className="flex items-center gap-1 border-b border-gray-200 -mb-4">
+          {([
+            { key: 'claimed', label: `Claimed (${pendingCount})` },
+            { key: 'available', label: `Available (${openJobs.length})` },
+          ] as const).map((t) => (
+            <Link
+              key={t.key}
+              href={`/driver?tab=${t.key}${sort ? `&sort=${sort}` : ''}`}
+              className={`text-sm px-4 py-2 -mb-px border-b-2 ${tab === t.key ? 'border-[#378ADD] text-gray-900 font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+            >
+              {t.label}
+            </Link>
+          ))}
+          <Link href="/driver/history" className="text-sm px-4 py-2 -mb-px border-b-2 border-transparent text-gray-500 hover:text-gray-800">
+            History
+          </Link>
+        </div>
+
+        {tab === 'claimed' && (
           <div>
-            <h2 className="text-sm font-medium text-gray-500 mb-2">
-              Your active job{myJobs.length > 1 ? 's' : ''}
-            </h2>
-            <div className="space-y-3">
-              {myJobs.map((job) => (
-                <div key={job.id}>
-                  <DriverJobActions job={job} isActive approvedReimbursementCents={approvedReimbursementByJob[job.id] ?? 0} />
-                  <div className="mt-2 flex items-center gap-3">
-                    <LocationSharer jobId={job.id} />
-                    <ChatBadgeLink jobId={job.id} unread={unreadChatJobs.has(job.id)} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <JobMessageWatcher jobIds={myJobs.map((j) => j.id)} currentUserId={user.id} />
+            {justClaimed === '1' && (
+              <p className="mb-3 text-sm text-green-800 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                ✓ Job claimed. It&apos;s in your Claimed list below.
+              </p>
+            )}
+            <ClaimedJobsList
+              jobs={(myJobs ?? []) as never}
+              currentUserId={user.id}
+              unreadChatJobIds={[...unreadChatJobs]}
+              approvedReimbursementByJob={approvedReimbursementByJob}
+            />
+            {myJobs && myJobs.length > 0 && <JobMessageWatcher jobIds={myJobs.map((j) => j.id)} currentUserId={user.id} />}
           </div>
         )}
 
-        <div>
-          <h2 className="text-sm font-medium text-gray-500 mb-2">Available jobs</h2>
+        {tab === 'available' && (
           <div className="space-y-3">
             {openJobs.length === 0 && (
               <p className="text-sm text-gray-400 py-8 text-center">No open jobs right now.</p>
             )}
             {openJobs.map((job) => (
-              <DriverJobActions key={job.id} job={job} isActive={false} disabled={overlapsAnyMyJob(job)} approvedReimbursementCents={approvedReimbursementByJob[job.id] ?? 0} />
+              <div key={job.id}>
+                <JobRequirementFlags job={job} />
+                <DriverJobActions job={job} isActive={false} disabled={overlapsAnyMyJob(job)} approvedReimbursementCents={approvedReimbursementByJob[job.id] ?? 0} />
+              </div>
             ))}
           </div>
-        </div>
+        )}
       </main>
     </div>
   )

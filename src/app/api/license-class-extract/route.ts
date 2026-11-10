@@ -23,7 +23,9 @@ export async function POST(req: NextRequest) {
 
   const prompt =
     'This is a photo of a driver\'s license. Read the vehicle class/licence class printed on it (in BC this is usually a single digit like 5, 7, 4, 3, 2, or 1, sometimes labelled "CLASS" or "CLS"). ' +
-    `Reply with ONLY raw JSON, no markdown formatting, no code fences, in exactly this shape: {"licenseClass": "Class 5", "confident": true}. ` +
+    `Also read the licence EXPIRY date printed on it (labelled "EXPIRES", "EXP" or similar). ` +
+    `Reply with ONLY raw JSON, no markdown formatting, no code fences, in exactly this shape: {"licenseClass": "Class 5", "expiryDate": "2028-05-14", "confident": true}. ` +
+    `"expiryDate" must be YYYY-MM-DD, or null if you cannot clearly read an expiry date. Never guess a date. ` +
     `The "licenseClass" value must be exactly one of: ${VALID_CLASSES.join(', ')}. ` +
     'Use "Other/Out of province" if the license is clearly not a BC license, or if you cannot make out a class matching the list above. ' +
     'Set "confident" to false if the image is blurry, cropped, or you are genuinely unsure of the class, even if you provide a best guess.'
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 100,
+        max_tokens: 150,
         messages: [
           {
             role: 'user',
@@ -57,9 +59,10 @@ export async function POST(req: NextRequest) {
 
     const licenseClass = VALID_CLASSES.includes(parsed.licenseClass) ? parsed.licenseClass : null
     const confident = parsed.confident === true
+    const expiryDate = typeof parsed.expiryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.expiryDate) ? parsed.expiryDate : null
 
-    return NextResponse.json({ licenseClass, confident })
+    return NextResponse.json({ licenseClass, expiryDate, confident })
   } catch {
-    return NextResponse.json({ licenseClass: null, confident: false })
+    return NextResponse.json({ licenseClass: null, expiryDate: null, confident: false })
   }
 }

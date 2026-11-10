@@ -1,3 +1,4 @@
+import AdminLicenceReview from '@/components/AdminLicenceReview'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -432,6 +433,19 @@ export default async function AdminDriverDetailPage({ params }: { params: Promis
                 <DriverApplicationEditForm userId={driver.id} userEmail={driver.email ?? ''} application={null} />
               </div>
             )}
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Driver's Licence" subtitle={<span className="text-xs text-gray-400">Must be valid at all times</span>}>
+            <AdminLicenceReview
+              driverId={driver.id}
+              licensePath={application?.drivers_license_path ?? null}
+              expiryDate={driver.license_expiry_date ?? null}
+              approvedAt={driver.license_approved_at ?? null}
+              pendingExpiryDate={driver.license_pending_expiry_date ?? null}
+              pendingUploadedAt={driver.license_pending_uploaded_at ?? null}
+              applicationExtractedExpiry={application?.extracted_license_expiry ?? null}
+              transitionUntil={driver.license_transition_until ?? null}
+            />
           </CollapsibleSection>
 
           <CollapsibleSection title="Recurring Compliance Documents" subtitle={<span className="text-xs text-gray-400">Renewal required every 12 months</span>}>

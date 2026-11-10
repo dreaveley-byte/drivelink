@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     ? `${vehicleDesc} - ${job.pickup_address} to ${job.dropoff_address}`
     : `${jobTypeName || 'New job'} - ${job.pickup_address} to ${job.dropoff_address}`
 
-  await notifyDriversOfNewJob(summary)
+  await notifyDriversOfNewJob(jobId, summary)
 
   return NextResponse.json({ ok: true })
 }

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   // RLS already restricts this to the job's own driver/dealer/admin
   const { data: job } = await supabase
     .from('jobs')
-    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, pickup_address, dropoff_address, driver_lat, driver_lng, package_description, scheduled_for, estimated_duration_minutes, job_types(name)')
+    .select('customer_phone, customer_full_name, tracking_token, vehicle_year, vehicle_make, vehicle_model, pickup_address, dropoff_address, driver_lat, driver_lng, package_description, scheduled_for, estimated_duration_minutes, delivery_deadline, eta_sms_sent_at, job_types(name)')
     .eq('id', jobId)
     .single()
 
@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
   }
   if (!job.customer_phone) {
     return NextResponse.json({ ok: false, skipped: 'no_customer_phone' })
+  }
+
+  // One "on the way" text per job - going back and forth between statuses must not resend it.
+  if (job.eta_sms_sent_at) {
+    return NextResponse.json({ ok: true, skipped: 'already_sent' })
   }
 
   const host = req.headers.get('host')
@@ -99,17 +104,64 @@ export async function POST(req: NextRequest) {
     // ETA is a nice-to-have on top of the tracking link — don't block the text over it.
   }
 
+  // ORIGINAL ETA = the delivery date/time the dealer booked (delivery_deadline),
+  // shown as a two-hour window starting at that time (e.g. 2:00-4:00 PM). It is
+  // never replaced just because the calculator disagrees. A delay text is added
+  // only when the live Google ETA lands AFTER the end of that window.
+  let windowText = ''
+  let delayText = ''
+  let notifiedEta: Date | null = null
+  if (job.delivery_deadline) {
+    // Ask Google first - besides the live ETA it tells us the drop-off's own time zone.
+    let live: { durationMinutes?: number; destinationTimeZone?: string } | null = null
+    try {
+      const dest = isCustomerRide ? job.pickup_address : job.dropoff_address
+      const origin = job.driver_lat != null && job.driver_lng != null ? `${job.driver_lat},${job.driver_lng}` : job.pickup_address
+      live = await fetch(`${protocol}://${host}/api/distance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: [origin, dest] }),
+      }).then((r) => r.json())
+    } catch {
+      live = null
+    }
+    destinationTimeZone = destinationTimeZone || live?.destinationTimeZone
+    const tz = destinationTimeZone || 'America/Vancouver'
+    const start = new Date(job.delivery_deadline)
+    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000)
+    const dateFmt = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: tz })
+    const timeFmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+    windowText = ` Scheduled delivery: ${dateFmt(start)}, between ${timeFmt(start)} and ${timeFmt(end)}.`
+    if (live?.durationMinutes != null) {
+      const liveEta = new Date(Date.now() + live.durationMinutes * 60 * 1000)
+      if (liveEta.getTime() > end.getTime()) {
+        notifiedEta = liveEta
+        const sameDay = dateFmt(liveEta) === dateFmt(start)
+        delayText = ` We're running behind - new estimated arrival: ${sameDay ? '' : `${dateFmt(liveEta)}, `}${timeFmt(liveEta)}. Sorry for the delay.`
+      }
+    }
+  }
+
   const customerFirstName = firstNameProperCase(job.customer_full_name)
+  if (windowText) etaText = `${windowText}${delayText}`
   const body = isCustomerRide
     ? `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our driver is on the way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
     : isCourier
       ? `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our package${job.package_description ? ` (${job.package_description})` : ''} has been picked up and is on its way!${etaText} Track here: ${link} — reply to this text anytime to reach your driver.`
       : `${customerFirstName ? `Hi ${customerFirstName}, y` : 'Y'}our ${vehicleDesc || 'vehicle'} is on its way!${etaText} Track the delivery here: ${link} — reply to this text anytime to reach your driver.`
 
-  const result = await sendOrQueueCustomerSms(supabase, jobId, job.customer_phone, body, destinationTimeZone, false)
+  const result = await sendOrQueueCustomerSms(supabase, jobId, job.customer_phone, body, destinationTimeZone, false, notifiedEta ? 'delay' : 'eta')
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: result.error === 'not_configured' ? 501 : 502 })
   }
+  // Mark sent/held so this text is never duplicated; remember the ETA we told them.
+  await supabase
+    .from('jobs')
+    .update({
+      eta_sms_sent_at: new Date().toISOString(),
+      ...(notifiedEta ? { delay_sms_sent_at: new Date().toISOString(), last_notified_eta: notifiedEta.toISOString() } : {}),
+    })
+    .eq('id', jobId)
   if (result.queued) {
     return NextResponse.json({ ok: true, queued: true })
   }

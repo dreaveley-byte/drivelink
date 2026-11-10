@@ -90,7 +90,7 @@ export default function CustomerSmsThread({ jobId, hasCustomerPhone }: { jobId: 
           const isOutbound = m.direction === 'to_customer'
           return (
             <div key={m.id} className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isOutbound ? 'bg-[#378ADD] text-white' : 'bg-white border border-gray-200 text-gray-900'}`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isOutbound ? 'bg-[#378ADD] text-white' : 'bg-gray-200 text-gray-900'}`}>
                 {!isOutbound && <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">Customer</p>}
                 <p className="whitespace-pre-wrap">{m.body}</p>
               </div>

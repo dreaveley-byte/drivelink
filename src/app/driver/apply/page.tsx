@@ -59,6 +59,7 @@ export default function DriverApplyPage() {
   const [vehicleMileage, setVehicleMileage] = useState('')
   const [licenseClass, setLicenseClass] = useState('')
   const [extractedLicenseClass, setExtractedLicenseClass] = useState('')
+  const [extractedLicenseExpiry, setExtractedLicenseExpiry] = useState('')
   const [extractingLicenseClass, setExtractingLicenseClass] = useState(false)
   const [canTowTrailer, setCanTowTrailer] = useState<boolean | null>(null)
   const [transmissionCapability, setTransmissionCapability] = useState('')
@@ -278,6 +279,7 @@ export default function DriverApplyPage() {
         body: JSON.stringify({ photo: base64 }),
       })
       const data = await res.json()
+      if (data.expiryDate) setExtractedLicenseExpiry(data.expiryDate)
       if (data.licenseClass) {
         setExtractedLicenseClass(data.licenseClass)
         // Only auto-fill the self-reported dropdown if it's still blank -
@@ -444,6 +446,7 @@ export default function DriverApplyPage() {
       vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
       license_class: licenseClass || null,
       extracted_license_class: extractedLicenseClass || null,
+      extracted_license_expiry: extractedLicenseExpiry || null,
       can_tow_trailer: canTowTrailer,
       transmission_capability: transmissionCapability || null,
       trailer_towing_experience: trailerTowingExperience,

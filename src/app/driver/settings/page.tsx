@@ -5,6 +5,7 @@ import SignOutButton from '@/components/SignOutButton'
 import ProfileSettingsForm from '@/components/ProfileSettingsForm'
 import DriverApplicationEditForm from '@/components/DriverApplicationEditForm'
 import ComplianceDocumentsSection from '@/components/ComplianceDocumentsSection'
+import DriverLicenceSection from '@/components/DriverLicenceSection'
 import SettingsTabs from '@/components/SettingsTabs'
 import Logo from '@/components/Logo'
 
@@ -24,7 +25,8 @@ export default async function DriverSettingsPage() {
       drug_alcohol_test_path, drug_alcohol_test_uploaded_at, drug_alcohol_test_reviewed_at,
       medical_fitness_test_path, medical_fitness_test_uploaded_at, medical_fitness_test_reviewed_at,
       vulnerable_sector_check_path, vulnerable_sector_check_uploaded_at, vulnerable_sector_check_reviewed_at,
-      vehicle_safety_inspection_path, vehicle_safety_inspection_uploaded_at, vehicle_safety_inspection_reviewed_at
+      vehicle_safety_inspection_path, vehicle_safety_inspection_uploaded_at, vehicle_safety_inspection_reviewed_at,
+      license_expiry_date, license_pending_expiry_date, license_pending_uploaded_at, license_transition_until
     `)
     .eq('id', user.id)
     .single()
@@ -76,6 +78,14 @@ export default async function DriverSettingsPage() {
             <DriverApplicationEditForm userId={user.id} userEmail={user.email ?? ''} application={application ?? null} />
           }
           compliance={
+            <>
+            <DriverLicenceSection
+              userId={user.id}
+              expiryDate={profile?.license_expiry_date ?? null}
+              pendingExpiryDate={profile?.license_pending_expiry_date ?? null}
+              pendingUploadedAt={profile?.license_pending_uploaded_at ?? null}
+              transitionUntil={profile?.license_transition_until ?? null}
+            />
             <ComplianceDocumentsSection
               userId={user.id}
               wantsPassengerJobs={!!profile?.preferred_job_types?.some((t: string) => t === 'Customer Pick Up' || t === 'Customer Drop Off')}
@@ -107,6 +117,7 @@ export default async function DriverSettingsPage() {
                 },
               }}
             />
+            </>
           }
         />
       </main>

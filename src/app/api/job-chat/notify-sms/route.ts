@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendSms } from '@/lib/sms'
+import { notifyDrivers } from '@/lib/pushNotifications'
 
 const roleLabels: Record<string, string> = {
   driver: 'Your driver',
@@ -74,6 +75,13 @@ export async function POST(req: NextRequest) {
 
   // Notify the driver, unless they're the one who sent it
   if (senderRole !== 'driver' && driverId) {
+    // Push + in-app alert (works with the app closed), on top of the SMS below.
+    await notifyDrivers([driverId], {
+      kind: senderRole === 'customer' ? 'customer_sms' : 'message',
+      title: `${label}${senderName ? ` (${senderName})` : ''} sent a message`,
+      body: excerpt,
+      jobId: resolvedJobId,
+    })
     const { data: driver } = await supabase
       .from('profiles')
       .select('phone, sms_notifications_opt_in')

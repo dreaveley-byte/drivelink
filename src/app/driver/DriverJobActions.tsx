@@ -392,9 +392,24 @@ export default function DriverJobActions({
   }
 
   async function toggleChecklistItem(item: ChecklistItem) {
+    const nowCompleting = !item.completed_at
+
+    // The "Mark vehicle picked up" step is the bottom of the pickup checklist:
+    // ticking it confirms pickup for the whole job (no separate button tap).
+    // It only counts once every other step is done - opening the checklist is
+    // never treated as completing it.
+    if (item.label === 'Pickup: Mark vehicle picked up' && job.status === 'assigned' && nowCompleting) {
+      const remaining = checklist.filter((i) => i.id !== item.id && !i.completed_at)
+      if (remaining.length > 0) {
+        alert(`Finish the rest of the pickup checklist first (${remaining.length} step${remaining.length === 1 ? '' : 's'} left, e.g. "${remaining[0].label}").`)
+        return
+      }
+      await advanceStatus() // asks to confirm, ticks this item, and moves the job to Picked up
+      return
+    }
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const nowCompleting = !item.completed_at
 
     setChecklist((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, completed_at: nowCompleting ? new Date().toISOString() : null } : i))
@@ -558,23 +573,30 @@ export default function DriverJobActions({
       })
   }
 
+  // Two steps: the Claim button only opens the confirmation; nothing is claimed
+  // until the driver taps "Confirm claim". The server then re-checks approval,
+  // licence, documents, qualifications and schedule before accepting.
+  const [confirmingClaim, setConfirmingClaim] = useState(false)
+  const [claimError, setClaimError] = useState<string | null>(null)
+
   async function claimJob() {
-    if (!confirm('Claim this job? Make sure it doesn’t conflict with anything else you have scheduled.')) return
+    setClaimError(null)
     setLoading(true)
     const supabase = createClient()
 
-    // Server-enforced, not just a disabled button in the UI - this is the
-    // actual guarantee against claiming two overlapping jobs (e.g. a race
-    // between two tabs/devices, or the UI just not having refreshed yet).
-    // The status-event log entry is now also written inside this same RPC
-    // call, cutting out a full extra round-trip that used to run after it.
-    const { error: claimError } = await supabase.rpc('claim_job_if_no_conflict', { p_job_id: job.id })
-    if (claimError) {
+    const claimRes = await fetch('/api/driver/claim-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.id }),
+    })
+    const claimJson = await claimRes.json().catch(() => ({}))
+    if (!claimRes.ok) {
       setLoading(false)
-      alert(claimError.message)
+      setClaimError(claimJson?.error ?? 'Could not claim this job.')
       router.refresh()
       return
     }
+    setConfirmingClaim(false)
 
     const defaults = getDefaultChecklist(joinName(job.job_types), !!job.is_trade_in_pickup, !!job.is_first_nations_delivery, {
       keyCount: job.key_count,
@@ -599,6 +621,8 @@ export default function DriverJobActions({
       console.error('Checklist backfill failed:', backfillError)
     }
 
+    // Clear confirmation: land on the Claimed tab with a success notice.
+    router.push('/driver?tab=claimed&claimed=1')
     router.refresh()
     setLoading(false)
   }
@@ -642,6 +666,10 @@ export default function DriverJobActions({
   async function advanceStatus() {
     const newStatus = nextStatus[job.status]
     if (!newStatus) return
+    if (newStatus === 'picked_up') {
+      const open = checklist.filter((i) => i.label !== 'Pickup: Mark vehicle picked up' && !i.completed_at)
+      if (open.length > 0 && !confirm(`${open.length} pickup checklist step${open.length === 1 ? ' isn\'t' : 's aren\'t'} done yet. Mark as picked up anyway?`)) return
+    }
     if (!confirm(`Mark this job as "${(isCustomerRideJob ? rideStatusLabels : statusLabels)[newStatus] ?? newStatus}"?`)) return
     setLoading(true)
     try {
@@ -1356,13 +1384,45 @@ export default function DriverJobActions({
         {!isActive && (
           <div className="flex flex-col items-end gap-1">
             <button
-              onClick={claimJob}
+              onClick={() => { setClaimError(null); setConfirmingClaim(true) }}
               disabled={loading || disabled}
               className="text-xs bg-[#378ADD] text-white px-3 py-1.5 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
             >              {loading ? '...' : 'Claim'}
             </button>
             {disabled && (
               <span className="text-[10px] text-amber-600">Conflicts with another job</span>
+            )}
+            {claimError && !confirmingClaim && (
+              <span className="text-[11px] text-red-600 max-w-[16rem] text-right">{claimError}</span>
+            )}
+            {confirmingClaim && (
+              <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-6" role="dialog" aria-modal="true">
+                <div className="bg-white rounded-xl max-w-sm w-full p-5 text-left">
+                  <p className="text-base font-semibold text-gray-900">Are you sure you want to claim this job?</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    It will be assigned to you and appear in your Claimed tab. We&apos;ll check your approval, licence, qualifications and schedule first.
+                  </p>
+                  {claimError && <p className="text-sm text-red-600 mt-3 border border-red-200 bg-red-50 rounded-lg px-3 py-2">{claimError}</p>}
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setConfirmingClaim(false); setClaimError(null) }}
+                      disabled={loading}
+                      className="text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={claimJob}
+                      disabled={loading}
+                      className="text-sm bg-[#378ADD] text-white px-4 py-2 rounded-lg hover:bg-[#2d6ead] disabled:opacity-50"
+                    >
+                      {loading ? 'Claiming…' : 'Confirm claim'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
