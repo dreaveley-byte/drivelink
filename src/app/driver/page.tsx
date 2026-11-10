@@ -304,7 +304,7 @@ export default async function DriverPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
 
-        <div className="flex items-center gap-1 border-b border-gray-200 -mb-4">
+        <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
           {([
             { key: 'claimed', label: `Claimed (${pendingCount})` },
             { key: 'available', label: `Available (${openJobs.length})` },
