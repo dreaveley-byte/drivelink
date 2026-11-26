@@ -173,8 +173,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const originCandidates = rankedTerminals(originCoords).filter((t) => t.distanceKm <= 60).slice(0, 4)
-  const destCandidates = rankedTerminals(destCoords).filter((t) => t.distanceKm <= 60).slice(0, 4)
+  // A mainland-to-island trip (crossesWater) has to look further down the list:
+  // the terminals nearest a place like Duncan are small Gulf Island / Crofton
+  // ones that don't connect to the mainland at all, so the real crossing
+  // (Departure Bay, Duke Point, Swartz Bay) is further down the ranking.
+  const candidateLimit = crossesWater ? 14 : 4
+  const originCandidates = rankedTerminals(originCoords).filter((t) => t.distanceKm <= 60).slice(0, candidateLimit)
+  const destCandidates = rankedTerminals(destCoords).filter((t) => t.distanceKm <= 60).slice(0, candidateLimit)
 
   if (originCandidates.length === 0 || destCandidates.length === 0) {
     const nearestOrigin = rankedTerminals(originCoords)[0]
@@ -197,11 +202,9 @@ export async function POST(req: NextRequest) {
   const scheduleData = await scheduleRes.json()
   const routes: Route[] = scheduleData.routes ?? []
 
-  // Check every combination of candidate terminals (closest pairs first) and use
-  // the first one that's an actual connected route in the schedule.
-  let bestMatch: { origin: (typeof originCandidates)[number]; dest: (typeof destCandidates)[number]; route: Route } | null = null
-  let bestTotalDistance = Infinity
-
+  // Collect every connected pair of candidate terminals (closest pairs first).
+  type Match = { origin: (typeof originCandidates)[number]; dest: (typeof destCandidates)[number]; route: Route }
+  const matches: Match[] = []
   for (const o of originCandidates) {
     for (const d of destCandidates) {
       if (o.code === d.code) continue
@@ -209,12 +212,38 @@ export async function POST(req: NextRequest) {
         routes.find((r) => r.fromTerminalCode === o.code && r.toTerminalCode === d.code) ??
         routes.find((r) => r.fromTerminalCode === d.code && r.toTerminalCode === o.code)
       if (!route || route.sailings.some((s) => s.vesselStatus?.includes('No sailings'))) continue
-      const totalDistance = o.distanceKm + d.distanceKm
-      if (totalDistance < bestTotalDistance) {
-        bestTotalDistance = totalDistance
-        bestMatch = { origin: o, dest: d, route }
-      }
+      matches.push({ origin: o, dest: d, route })
     }
+  }
+  matches.sort((a, b) => a.origin.distanceKm + a.dest.distanceKm - (b.origin.distanceKm + b.dest.distanceKm))
+
+  let bestMatch: Match | null = matches[0] ?? null
+  let preloadedLegs: [Awaited<ReturnType<typeof drivingLeg>>, Awaited<ReturnType<typeof drivingLeg>>] | null = null
+
+  // Straight-line distance can't tell Horseshoe Bay - Departure Bay from
+  // Tsawwassen - Swartz Bay for a Duncan trip (Swartz Bay is close to Duncan
+  // as the crow flies, not by road). When crossing water, pick the pair with the
+  // shortest real driving to the two terminals.
+  if (crossesWater && matches.length > 1) {
+    const top = matches.slice(0, 3)
+    const legs = await Promise.all(
+      top.map((m) =>
+        Promise.all([
+          drivingLeg(originAddress, { lat: m.origin.lat, lng: m.origin.lng }),
+          drivingLeg(destinationAddress, { lat: m.dest.lat, lng: m.dest.lng }),
+        ])
+      )
+    )
+    let bestMinutes = Infinity
+    legs.forEach((pair, i) => {
+      if (!pair[0] || !pair[1]) return
+      const minutes = pair[0].durationMinutes + pair[1].durationMinutes
+      if (minutes < bestMinutes) {
+        bestMinutes = minutes
+        bestMatch = top[i]
+        preloadedLegs = pair
+      }
+    })
   }
 
   if (!bestMatch) {
@@ -247,9 +276,10 @@ export async function POST(req: NextRequest) {
   // a real driven distance, not a flat guess, since we know exactly where both ends are.
   // The other half of a walk-on return: the driver also has to get from the
   // drop-off address to the ferry terminal on that side first.
-  const [groundHome, groundToTerminal] = await Promise.all([
-    drivingLeg(originAddress, { lat: bestMatch.origin.lat, lng: bestMatch.origin.lng }),
-    drivingLeg(destinationAddress, { lat: bestMatch.dest.lat, lng: bestMatch.dest.lng }),
+  const chosen = bestMatch as Match
+  const [groundHome, groundToTerminal] = preloadedLegs ?? await Promise.all([
+    drivingLeg(originAddress, { lat: chosen.origin.lat, lng: chosen.origin.lng }),
+    drivingLeg(destinationAddress, { lat: chosen.dest.lat, lng: chosen.dest.lng }),
   ])
 
   return NextResponse.json({
