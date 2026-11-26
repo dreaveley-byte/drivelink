@@ -136,6 +136,9 @@ export type FerryLookupData = {
   sailingsPerDay: number
   sailingTimes: string[]
   /** departures in the opposite direction (destination terminal -> origin terminal), when the schedule lists that route */
+  /** departures origin terminal -> destination terminal (the vehicle's crossing) */
+  outboundSailingTimes: string[]
+  outboundSailingDurationMinutes: number | null
   returnSailingTimes: string[]
   returnSailingDurationMinutes: number | null
   groundHome: FerryLeg | null
@@ -281,6 +284,9 @@ export async function lookupFerry({ originAddress, destinationAddress, actualDri
   const fromTerminal = { code: bestMatch.origin.code, name: bestMatch.origin.name, distanceKm: bestMatch.origin.distanceKm }
   const toTerminal = { code: bestMatch.dest.code, name: bestMatch.dest.name, distanceKm: bestMatch.dest.distanceKm }
   const route = bestMatch.route
+  const outboundRoute =
+    routes.find((r) => r.fromTerminalCode === bestMatch!.origin.code && r.toTerminalCode === bestMatch!.dest.code &&
+      !r.sailings.some((x) => x.vesselStatus?.includes('No sailings'))) ?? null
   const returnRoute =
     routes.find((r) => r.fromTerminalCode === bestMatch!.dest.code && r.toTerminalCode === bestMatch!.origin.code &&
       !r.sailings.some((x) => x.vesselStatus?.includes('No sailings'))) ?? null
@@ -318,6 +324,8 @@ export async function lookupFerry({ originAddress, destinationAddress, actualDri
       avgGapMinutes,
       sailingsPerDay: sailingTimes.length,
       sailingTimes: route.sailings.map((s) => s.time),
+      outboundSailingTimes: outboundRoute ? outboundRoute.sailings.map((s) => s.time) : [],
+      outboundSailingDurationMinutes: outboundRoute ? parseDurationMinutes(outboundRoute.sailingDuration) || null : null,
       returnSailingTimes: returnRoute ? returnRoute.sailings.map((s) => s.time) : [],
       returnSailingDurationMinutes: returnRoute ? parseDurationMinutes(returnRoute.sailingDuration) || null : null,
       groundHome,

@@ -2,7 +2,7 @@ import { nearbyAirports, geocodeAddress } from '@/lib/airports'
 import { groundLegPricing, AVG_BUS_SPEED_KMH } from '@/lib/pricing'
 import { zonedLocalInputToUtcIso } from '@/lib/localDatetime'
 import { isFerryIsolated } from '@/lib/bcGeography'
-import { lookupFerry, parseTimeToMinutesSinceMidnight } from '@/lib/ferryLookup'
+import { lookupFerry, parseTimeToMinutesSinceMidnight, type FerryLookupData } from '@/lib/ferryLookup'
 
 // Builds one connected, chronological trip plan for a vehicle transport:
 // drive -> handover -> registry -> ground leg to airport -> flight -> ride home.
@@ -422,6 +422,16 @@ export async function buildItinerary(input: ItineraryInput): Promise<Itinerary> 
   const pTz = pickupTz ?? 'America/Vancouver'
   const dTz = dropoffTz ?? pTz
 
+  // A mainland <-> island trip crosses on BC Ferries with the vehicle: show the
+  // crossing as its own step (with its sailing time and fare) instead of hiding
+  // it inside Google's single driving time.
+  const crossesWater = isFerryIsolated(dropoff.lat, dropoff.lng) !== isFerryIsolated(pickup.lat, pickup.lng)
+  let ferryData: FerryLookupData | null = null
+  if (crossesWater) {
+    const fr = await lookupFerry({ originAddress: input.pickupAddress, destinationAddress: input.dropoffAddress }).catch(() => null)
+    if (fr && fr.ok && fr.data.groundHome && fr.data.groundToTerminal) ferryData = fr.data
+  }
+
   // 1. Dealership -> delivery
   const drive = await computeRoute({ address: input.pickupAddress }, { address: input.dropoffAddress }, 'DRIVE', startMs)
   if (!drive) throw new Error('Could not get driving directions between the pickup and delivery addresses.')
@@ -429,9 +439,51 @@ export async function buildItinerary(input: ItineraryInput): Promise<Itinerary> 
   const driveHours = drive.durationMin / 60
   const nBreaks = Math.min(driveHours < every ? 0 : Math.ceil(driveHours / every), num('meal_allowance_max_count', 5))
   const breakMin = nBreaks * num('break_duration_minutes', 15)
-  const driveEnd = startMs + (drive.durationMin + breakMin) * MIN
+  let driveEnd = startMs + (drive.durationMin + breakMin) * MIN
   const departedInPast = startMs <= Date.now() + 60_000
-  steps.push({
+  if (ferryData) {
+    const o = ferryData
+    const toMainTermMin = o.groundHome!.durationMinutes
+    const atMainTermMs = startMs + toMainTermMin * MIN
+    const vehicleBufferMin = Math.max(30, Math.round(num('ferry_wait_hours', 1) * 60))
+    const ns = nextSailing(o.outboundSailingTimes, atMainTermMs + vehicleBufferMin * MIN, pTz, Math.round(o.avgGapMinutes / 2))
+    const crossMin = o.outboundSailingDurationMinutes ?? o.sailingDurationMinutes
+    const arriveIslandMs = ns.departMs + crossMin * MIN
+    const fromIslandMin = o.groundToTerminal!.durationMinutes
+    driveEnd = arriveIslandMs + fromIslandMin * MIN
+    const vehicleFare = num('ferry_fare_cents', 0)
+    steps.push({
+      id: 'drive', kind: 'drive', title: `Drive the vehicle to the ferry terminal — ${o.fromTerminal.name}`, status: 'estimate',
+      source: 'Google Maps drive time', startUtc: iso(startMs), endUtc: iso(atMainTermMs), startTz: pTz, endTz: pTz,
+      from: input.pickupAddress, to: o.fromTerminal.name,
+      details: [`${o.groundHome!.distanceKm} km, about ${fmtDuration(toMainTermMin)}`],
+      costCents: null, warnings: [],
+    })
+    steps.push({
+      id: 'ferry-out', kind: 'ferry', title: `Ferry with the vehicle: ${o.fromTerminal.name} → ${o.toTerminal.name}`, status: 'estimate',
+      source: 'BC Ferries schedule (bcferriesapi.ca) for the sailing; fare from Drivflo ferry settings. Not booked.',
+      startUtc: iso(ns.departMs), endUtc: iso(arriveIslandMs), startTz: pTz, endTz: dTz,
+      from: o.fromTerminal.name, to: o.toTerminal.name,
+      details: [
+        `Arrive ${fmtDuration(vehicleBufferMin)} before sailing (vehicle check-in)`,
+        `Sailing time about ${fmtDuration(crossMin)}`,
+        ns.listed
+          ? `Next listed sailing: ${fmtLocal(ns.departMs, pTz)}. Times-of-day come from the BC Ferries schedule, not checked for this exact date.`
+          : `Sailing times were not available, so the wait assumes half of the average ${o.avgGapMinutes} min gap between sailings.`,
+        `Vehicle fare (estimate from Drivflo settings): $${(vehicleFare / 100).toFixed(2)}`,
+      ],
+      costCents: vehicleFare, costBasis: 'estimate',
+      warnings: ns.nextDay ? ['No more sailings are listed after the driver reaches the terminal — this crossing is the next day.'] : [],
+    })
+    steps.push({
+      id: 'drive-island', kind: 'drive', title: `Drive the vehicle from ${o.toTerminal.name} to the delivery location`, status: 'estimate',
+      source: 'Google Maps drive time', startUtc: iso(arriveIslandMs), endUtc: iso(driveEnd), startTz: dTz, endTz: dTz,
+      from: o.toTerminal.name, to: input.dropoffAddress,
+      details: [`${o.groundToTerminal!.distanceKm} km, about ${fmtDuration(fromIslandMin)}`, 'Arrival time is the planned arrival at the delivery address.'],
+      costCents: null, warnings: [],
+    })
+    if (vehicleFare > 0) costs.push({ label: 'Ferry vehicle crossing (on the delivery drive)', cents: vehicleFare, basis: 'estimate' })
+  } else steps.push({
     id: 'drive', kind: 'drive', title: 'Drive the vehicle to the delivery location', status: 'live',
     source: departedInPast ? 'Google Maps (departure is in the past, so no traffic forecast)' : 'Google Maps, traffic-aware for the planned departure',
     startUtc: iso(startMs), endUtc: iso(driveEnd), startTz: pTz, endTz: dTz,
@@ -542,8 +594,8 @@ export async function buildItinerary(input: ItineraryInput): Promise<Itinerary> 
 
   // Mainland <-> island trips can go home on a walk-on ferry instead of flying.
   const hourly = num('hourly_rate_cents', 0)
-  const ferryHome = isFerryIsolated(dropoff.lat, dropoff.lng) !== isFerryIsolated(pickup.lat, pickup.lng)
-    ? await planFerryHome({ pickupAddress: input.pickupAddress, dropoffAddress: input.dropoffAddress, readyMs: cursor, hereTz, homeTz: pTz, settings: { num, uberFare }, hourly }).catch(() => null)
+  const ferryHome = ferryData
+    ? await planFerryHome({ pickupAddress: input.pickupAddress, dropoffAddress: input.dropoffAddress, readyMs: cursor, hereTz, homeTz: pTz, d: ferryData, settings: { num, uberFare }, hourly }).catch(() => null)
     : null
   const useFerryHome = (alternatives: Itinerary['alternatives']) => {
     steps.push(...ferryHome!.steps)
@@ -704,6 +756,20 @@ export async function buildItinerary(input: ItineraryInput): Promise<Itinerary> 
 
 // ---------- helpers ----------
 
+// Next listed sailing at or after readyMs. Schedule entries are times of day in
+// the terminal's local time zone; if none is left that day, the first one next day.
+function nextSailing(timeStrings: string[], readyMs: number, tz: string, fallbackWaitMin: number): { departMs: number; listed: boolean; nextDay: boolean } {
+  const times = timeStrings
+    .map((t) => parseTimeToMinutesSinceMidnight(t))
+    .filter((t): t is number => t != null)
+    .sort((a, b) => a - b)
+  if (times.length === 0) return { departMs: readyMs + fallbackWaitMin * MIN, listed: false, nextDay: false }
+  const nowOfDay = localWeekMinute(readyMs, tz) % 1440
+  const next = times.find((t) => t >= nowOfDay)
+  const waitMin = next != null ? next - nowOfDay : times[0] + 1440 - nowOfDay
+  return { departMs: readyMs + waitMin * MIN, listed: true, nextDay: next == null }
+}
+
 type FerryHomePlan = {
   steps: ItineraryStep[]
   costs: CostLine[]
@@ -724,13 +790,11 @@ async function planFerryHome(args: {
   readyMs: number
   hereTz: string
   homeTz: string
+  d: FerryLookupData
   settings: { num: (k: string, d: number) => number; uberFare: (km: number, min: number) => number }
   hourly: number
 }): Promise<FerryHomePlan | null> {
-  const { pickupAddress, dropoffAddress, readyMs, hereTz, homeTz, settings, hourly } = args
-  const r = await lookupFerry({ originAddress: pickupAddress, destinationAddress: dropoffAddress })
-  if (!r.ok) return null
-  const d = r.data
+  const { pickupAddress, dropoffAddress, readyMs, hereTz, homeTz, d, settings, hourly } = args
   if (!d.groundToTerminal || !d.groundHome) return null
 
   const rideStartMs = readyMs + RIDE_REQUEST_BUFFER_MIN * MIN
@@ -738,25 +802,14 @@ async function planFerryHome(args: {
   const readyForSailingMs = atTerminalMs + WALK_ON_BUFFER_MIN * MIN
 
   // Next sailing from the island terminal (times of day, in the delivery time zone).
-  const times = d.returnSailingTimes
-    .map((t) => parseTimeToMinutesSinceMidnight(t))
-    .filter((t): t is number => t != null)
-    .sort((a, b) => a - b)
-  const readyMinOfDay = localWeekMinute(readyForSailingMs, hereTz) % 1440
-  let departMs: number
-  let sailingNote: string
-  let status: StepStatus = 'estimate'
+  const ns = nextSailing(d.returnSailingTimes, readyForSailingMs, hereTz, Math.round(d.avgGapMinutes / 2))
+  const departMs = ns.departMs
+  const status: StepStatus = 'estimate'
   const warns: string[] = []
-  if (times.length > 0) {
-    const next = times.find((t) => t >= readyMinOfDay)
-    const waitMin = next != null ? next - readyMinOfDay : times[0] + 1440 - readyMinOfDay
-    departMs = readyForSailingMs + waitMin * MIN
-    sailingNote = `Next listed sailing: ${fmtLocal(departMs, hereTz)}. Times-of-day come from the BC Ferries schedule, not checked for this exact date.`
-    if (next == null) warns.push('No more sailings are listed after the driver reaches the terminal — the trip home continues the next day.')
-  } else {
-    departMs = readyForSailingMs + Math.round(d.avgGapMinutes / 2) * MIN
-    sailingNote = `Sailing times for this direction were not available, so the wait assumes half of the average ${d.avgGapMinutes} min gap between sailings.`
-  }
+  const sailingNote = ns.listed
+    ? `Next listed sailing: ${fmtLocal(departMs, hereTz)}. Times-of-day come from the BC Ferries schedule, not checked for this exact date.`
+    : `Sailing times for this direction were not available, so the wait assumes half of the average ${d.avgGapMinutes} min gap between sailings.`
+  if (ns.nextDay) warns.push('No more sailings are listed after the driver reaches the terminal — the trip home continues the next day, so an overnight stay may be needed.')
   const sailMin = d.returnSailingDurationMinutes ?? d.sailingDurationMinutes
   const arriveMs = departMs + sailMin * MIN
   const homeStartMs = arriveMs + RIDE_REQUEST_BUFFER_MIN * MIN
@@ -765,7 +818,6 @@ async function planFerryHome(args: {
   const toTermFare = settings.uberFare(d.groundToTerminal.distanceKm, d.groundToTerminal.durationMinutes)
   const homeFare = settings.uberFare(d.groundHome.distanceKm, d.groundHome.durationMinutes)
   const walkOnFare = settings.num('ferry_walkon_fare_cents', 0)
-  const vehicleFare = settings.num('ferry_fare_cents', 0)
 
   const steps: ItineraryStep[] = [
     {
@@ -803,7 +855,6 @@ async function planFerryHome(args: {
     { label: 'Ferry walk-on ticket', cents: walkOnFare, basis: 'estimate' },
     { label: `Ride home from ${d.fromTerminal.name}`, cents: homeFare, basis: 'estimate' },
   ]
-  if (vehicleFare > 0) costs.unshift({ label: 'Ferry vehicle crossing (on the delivery drive)', cents: vehicleFare, basis: 'estimate' })
   const returnCents = toTermFare + walkOnFare + homeFare
   const elapsedH = (homeEndMs - readyMs) / 3_600_000
   return {
