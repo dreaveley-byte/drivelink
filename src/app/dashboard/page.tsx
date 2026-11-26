@@ -156,6 +156,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .eq('id', profile.organization_id)
     .single()
 
+  // Dealer credit earned from profit-share on completed drives (migration 188).
+  // Quietly empty if that migration hasn't been run yet.
+  const { data: creditRows } = await supabase
+    .from('dealer_credits')
+    .select('id, remaining_cents, expires_at')
+    .eq('organization_id', profile?.organization_id ?? '00000000-0000-0000-0000-000000000000')
+    .gt('remaining_cents', 0)
+    .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: true })
+  const dealerCredits = (creditRows ?? []) as { id: string; remaining_cents: number; expires_at: string }[]
+
   const { data: jobsRaw } = await supabase
     .from('jobs')
     .select('id, driver_id, status, scheduled_for, updated_at, archived_at, pickup_address, dropoff_address, recipient_name, vehicle_year, vehicle_make, vehicle_model, stock_number, vin, mileage, package_description, package_direction, package_size, special_instructions, customer_full_name, customer_phone, customer_address, estimated_distance_km, estimated_duration_minutes, estimated_dealer_cost_cents, pickup_gps_at, idle_since, created_at, job_types(name), driver:driver_id(full_name, photo_url)')
@@ -243,6 +254,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-medium text-gray-900">Jobs</h2>
         </div>
+
+        {dealerCredits.length > 0 && (
+          <div className="border border-green-200 bg-green-50 rounded-xl px-4 py-3 mb-4">
+            <p className="text-sm font-medium text-green-800">
+              You have {formatCents(dealerCredits.reduce((sum, c) => sum + c.remaining_cents, 0))} in credit toward your next drive
+            </p>
+            {dealerCredits.map((c) => (
+              <p key={c.id} className="text-xs text-green-700">
+                {formatCents(c.remaining_cents)} — use by {new Date(c.expires_at).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium' })}
+              </p>
+            ))}
+          </div>
+        )}
 
         <div className="space-y-3">
           {jobs?.length === 0 && (

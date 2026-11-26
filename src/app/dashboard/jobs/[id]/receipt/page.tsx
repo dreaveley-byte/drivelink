@@ -17,6 +17,7 @@ import PerformanceBonusOverride from '@/components/PerformanceBonusOverride'
 import AdminJobPhotos from '@/components/AdminJobPhotos'
 import AdminBillingCorrection from '@/components/AdminBillingCorrection'
 import AdminBaselineRestore from '@/components/AdminBaselineRestore'
+import AdminFinalBillReview from '@/components/AdminFinalBillReview'
 import { shortJobId } from '@/lib/shortId'
 
 export const dynamic = 'force-dynamic'
@@ -405,6 +406,33 @@ export default async function JobReceiptPage({
   // Idle hours (e.g. customer not home at delivery) are additive - on top of
   // whichever base pay/bill figure already applies, whether or not that base
   // figure is itself an admin override.
+  // Final-bill review: on drives completed under the new rules the dealer's
+  // overage/underage/idle charges stay hidden until an admin approves them.
+  const isNewBillRules = job.status === 'completed' && job.final_bill_legacy === false
+  const awaitingFinalApproval = isNewBillRules && !job.final_bill_approved_at
+  let finalBillPreview: {
+    net_six_cents: number; food_pool_cents: number; pool_cents: number; other_additions_cents: number
+    dealer_overage_cents: number; credit_issued_cents: number; credit_available_cents: number
+  } | null = null
+  let dealerCreditSharePercent = 50
+  if (isAdmin && isNewBillRules) {
+    const { data: ps } = await supabase.from('pricing_settings').select('dealer_credit_share_percent').eq('id', 1).single()
+    if (ps?.dealer_credit_share_percent != null) dealerCreditSharePercent = Number(ps.dealer_credit_share_percent)
+  }
+  if (isAdmin && isNewBillRules) {
+    const { data: previewRows } = await supabase.rpc('admin_final_bill_preview', { p_job_id: jobId })
+    finalBillPreview = Array.isArray(previewRows) ? previewRows[0] ?? null : previewRows ?? null
+  }
+  // What the dealer is billed on top of the estimate for approved expenses.
+  const dealerExtraCents = isNewBillRules && awaitingFinalApproval && finalBillPreview
+    ? finalBillPreview.dealer_overage_cents
+    : (job.approved_expenses_cents ?? 0)
+  const creditAppliedCents = job.final_bill_approved_at ? (job.final_bill_credit_applied_cents ?? 0) : 0
+  let creditEarned: { amount_cents: number; expires_at: string } | null = null
+  if (!isDriver && isNewBillRules && job.final_bill_approved_at && (job.final_bill_credit_issued_cents ?? 0) > 0) {
+    const { data: ce } = await supabase.from('dealer_credits').select('amount_cents, expires_at').eq('source_job_id', jobId).maybeSingle()
+    creditEarned = ce ?? null
+  }
   const idleHoursAdded = job.admin_idle_hours_added ?? 0
   const idleDealerCents = job.admin_idle_hours_dealer_cents ?? 0
   const idleDriverCents = job.admin_idle_hours_driver_cents ?? 0
@@ -427,7 +455,7 @@ export default async function JobReceiptPage({
   // regardless of eligibility).
   const potentialBonusCents = job.performance_bonus_cents ?? 0
   const performanceBonusCents = job.performance_bonus_override_cents ?? (job.performance_bonus_eligible ? potentialBonusCents : 0)
-  const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + approvedAdditionsTotalCents + idleDealerCents + timerIdleFeeCents
+  const revenueCents = (job.estimated_dealer_cost_cents ?? 0) + (isNewBillRules ? dealerExtraCents : approvedAdditionsTotalCents) + idleDealerCents + timerIdleFeeCents - creditAppliedCents
   const actualCostCents = effectiveDriverPayCents + approvedExpensesFullAmountCents + performanceBonusCents
   const profitCents = revenueCents - actualCostCents
 
@@ -717,10 +745,10 @@ export default async function JobReceiptPage({
                   <span className="text-gray-900 font-medium">{formatCents(job.estimated_dealer_cost_cents)}</span>
                 </div>
               )}
-              {job.approved_expenses_cents > 0 && (
+              {dealerExtraCents > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{approvedExpensesLabel}</span>
-                  <span className="text-gray-900 font-medium">+{formatCents(job.approved_expenses_cents)}</span>
+                  <span className="text-gray-900 font-medium">+{formatCents(dealerExtraCents)}</span>
                 </div>
               )}
               {idleDealerCents > 0 && (
@@ -731,11 +759,23 @@ export default async function JobReceiptPage({
                   <span className="text-gray-900 font-medium">+{formatCents(idleDealerCents)}</span>
                 </div>
               )}
-              {(job.approved_expenses_cents > 0 || idleDealerCents > 0 || timerIdleFeeCents > 0) && job.estimated_dealer_cost_cents != null && (
+              {(dealerExtraCents > 0 || idleDealerCents > 0 || timerIdleFeeCents > 0) && job.estimated_dealer_cost_cents != null && (
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
                   <span className="text-gray-900 font-medium">Final total</span>
-                  <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents + timerIdleFeeCents)}</span>
+                  <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + dealerExtraCents + idleDealerCents + timerIdleFeeCents)}</span>
                 </div>
+              )}
+              {creditAppliedCents > 0 && job.estimated_dealer_cost_cents != null && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Dealer credit applied (earned on a previous drive)</span>
+                    <span className="text-green-700 font-medium">-{formatCents(creditAppliedCents)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
+                    <span className="text-gray-900 font-medium">Amount due after credit</span>
+                    <span className="text-gray-900 font-semibold">{formatCents(job.estimated_dealer_cost_cents + dealerExtraCents + idleDealerCents + timerIdleFeeCents - creditAppliedCents)}</span>
+                  </div>
+                </>
               )}
               {effectiveDriverPayCents != null && (
                 <div className="flex justify-between text-sm">
@@ -869,43 +909,73 @@ export default async function JobReceiptPage({
               )}
             </div>
           ) : (
-            job.estimated_dealer_cost_cents != null && (
+            job.estimated_dealer_cost_cents != null && (() => {
+              // Until an admin approves the final bill, the dealer sees only the
+              // original estimate - no overage, underage or idle charges yet.
+              const showFinal = !awaitingFinalApproval
+              const extra = showFinal ? dealerExtraCents : 0
+              const idle = showFinal ? idleDealerCents : 0
+              const timerIdle = showFinal ? timerIdleFeeCents : 0
+              const hasAdditions = extra > 0 || idle > 0 || timerIdle > 0
+              const finalTotal = job.estimated_dealer_cost_cents + extra + idle + timerIdle
+              return (
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-base text-gray-700">{job.approved_expenses_cents > 0 ? 'Original estimate' : 'Total charged'}</span>
-                  <span className={job.approved_expenses_cents > 0 ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
+                  <span className="text-base text-gray-700">{hasAdditions ? 'Original estimate' : 'Total charged'}</span>
+                  <span className={hasAdditions ? 'text-base text-gray-700' : 'text-lg font-semibold text-gray-900'}>
                     {formatCents(job.estimated_dealer_cost_cents)}
                   </span>
                 </div>
                 {Number(job.admin_discount_percent ?? 0) > 0 && (
                   <p className="text-xs text-green-700">Includes a {Number(job.admin_discount_percent)}% discount</p>
                 )}
-                {job.approved_expenses_cents > 0 && (
+                {extra > 0 && (
                   <div className="flex justify-between">
                     <span className="text-base text-gray-700">{approvedExpensesLabel}</span>
-                    <span className="text-base text-gray-700">+{formatCents(job.approved_expenses_cents)}</span>
+                    <span className="text-base text-gray-700">+{formatCents(extra)}</span>
                   </div>
                 )}
-                {idleDealerCents > 0 && (
+                {idle > 0 && (
                   <div className="flex justify-between">
                     <span className="text-base text-gray-700">Idle time added ({idleHoursAdded}h)</span>
-                    <span className="text-base text-gray-700">+{formatCents(idleDealerCents)}</span>
+                    <span className="text-base text-gray-700">+{formatCents(idle)}</span>
                   </div>
                 )}
-                {timerIdleFeeCents > 0 && (
+                {timerIdle > 0 && (
                   <div className="flex justify-between">
                     <span className="text-base text-gray-700">Idle fee ({job.total_wait_minutes} min wait)</span>
-                    <span className="text-base text-gray-700">+{formatCents(timerIdleFeeCents)}</span>
+                    <span className="text-base text-gray-700">+{formatCents(timerIdle)}</span>
                   </div>
                 )}
-                {(job.approved_expenses_cents > 0 || idleDealerCents > 0 || timerIdleFeeCents > 0) && (
+                {hasAdditions && (
                   <div className="flex justify-between pt-1 border-t border-gray-200">
                     <span className="text-base text-gray-900 font-medium">Total charged</span>
-                    <span className="text-lg font-semibold text-gray-900">{formatCents(job.estimated_dealer_cost_cents + job.approved_expenses_cents + idleDealerCents + timerIdleFeeCents)}</span>
+                    <span className="text-lg font-semibold text-gray-900">{formatCents(finalTotal)}</span>
                   </div>
                 )}
+                {showFinal && creditAppliedCents > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-base text-gray-700">Credit applied (earned on a previous drive)</span>
+                      <span className="text-base text-green-700">-{formatCents(creditAppliedCents)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-gray-200">
+                      <span className="text-base text-gray-900 font-medium">Amount due</span>
+                      <span className="text-lg font-semibold text-gray-900">{formatCents(finalTotal - creditAppliedCents)}</span>
+                    </div>
+                  </>
+                )}
+                {showFinal && creditEarned && (
+                  <p className="text-sm text-green-700 pt-2">
+                    You earned a {formatCents(creditEarned.amount_cents)} credit on this drive. It comes off your next drive and expires {new Date(creditEarned.expires_at).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium' })}.
+                  </p>
+                )}
+                {awaitingFinalApproval && (
+                  <p className="text-xs text-gray-500 pt-2">Final bill is being reviewed. Any adjustments will appear here once it&apos;s approved.</p>
+                )}
               </div>
-            )
+              )
+            })()
           )}
           <p className="text-xs text-gray-400 mt-4">
             Status: {statusLabels[job.status] ?? job.status}
@@ -1024,6 +1094,19 @@ export default async function JobReceiptPage({
             <p className="text-sm text-gray-500">Expense receipts for this job are only visible to admin.</p>
           </div>
         </div>
+      )}
+
+      {isAdmin && isNewBillRules && (
+        <AdminFinalBillReview
+          jobId={job.id}
+          approvedAt={job.final_bill_approved_at ?? null}
+          preview={finalBillPreview}
+          estimateCents={job.estimated_dealer_cost_cents ?? 0}
+          idleCents={idleDealerCents + timerIdleFeeCents}
+          creditIssuedCents={job.final_bill_credit_issued_cents ?? 0}
+          creditAppliedCents={job.final_bill_credit_applied_cents ?? 0}
+          sharePercent={dealerCreditSharePercent}
+        />
       )}
 
       {isAdmin && (

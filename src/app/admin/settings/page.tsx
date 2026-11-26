@@ -52,6 +52,9 @@ type Settings = {
   quiet_hours_end_hour: number
   sms_window_end_hour: number
   license_transition_days: number
+  dealer_credit_share_percent: number
+  dealer_credit_expiry_days: number
+  driver_bonus_share_percent: number
   return_to_pickup_radius_km: number
   admin_alert_phone: string | null
   idle_alert_minutes: number
@@ -699,6 +702,36 @@ export default function PricingSettingsPage() {
             <p className="text-xs text-gray-400 mb-1">Set independently from the main markup above — these are quick shuttle rides, not vehicle deliveries</p>
             <input type="number" step="1" value={settings.customer_pickup_dropoff_markup_percent}
               onChange={(e) => updateNumberField('customer_pickup_dropoff_markup_percent', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold text-gray-900">Profit &amp; Overages</h2>
+          <p className="text-xs text-gray-400">
+            When a completed drive is approved, every accrued category (fuel, inspection, hotel, ferry, return transport, car wash) is netted
+            against what was actually spent. A net overage is billed to the dealer. A net underage, plus any unused meal budget left after the
+            driver&apos;s bonus, is the profit pool that these settings split.
+          </p>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Dealer credit — share of the profit pool (%)</label>
+            <p className="text-xs text-gray-400 mb-1">This share of the profit pool comes off the dealer&apos;s next drive as a credit</p>
+            <input type="number" step="1" min="0" max="100" value={settings.dealer_credit_share_percent ?? 50}
+              onChange={(e) => updateNumberField('dealer_credit_share_percent', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Dealer credit — days until it expires</label>
+            <p className="text-xs text-gray-400 mb-1">Counted from the day the final bill is approved. Applies to credits issued from now on</p>
+            <input type="number" step="1" min="1" value={settings.dealer_credit_expiry_days ?? 90}
+              onChange={(e) => updateNumberField('dealer_credit_expiry_days', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Driver bonus — share of unused meal budget (%)</label>
+            <p className="text-xs text-gray-400 mb-1">Paid only when every checklist item is done and the customer leaves 5 stars. Applies to bonuses calculated from now on</p>
+            <input type="number" step="1" min="0" max="100" value={settings.driver_bonus_share_percent ?? 50}
+              onChange={(e) => updateNumberField('driver_bonus_share_percent', e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </section>

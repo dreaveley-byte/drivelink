@@ -132,6 +132,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     return Date.now() < holdEndsAt
   }
 
+  // Completed drives whose final bill hasn't been signed off yet (migration 188).
+  const { data: billsAwaiting } = await supabase
+    .from('jobs')
+    .select('id, completed_at, stock_number, vehicle_year, vehicle_make, vehicle_model, organizations(name)')
+    .eq('status', 'completed')
+    .is('final_bill_approved_at', null)
+    .order('completed_at', { ascending: true })
+    .limit(50)
+
   const total = jobs?.length ?? 0
   const awaiting = jobs?.filter((j) => j.status === 'awaiting_driver').length ?? 0
   const active = jobs?.filter((j) => ['assigned', 'picked_up', 'in_progress'].includes(j.status)).length ?? 0
@@ -279,6 +288,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <p className="text-xs text-gray-400 truncate">{j.pickup_address} → {j.dropoff_address}</p>
                 </Link>
               ))}
+            </div>
+          </div>
+        )}
+        {(billsAwaiting?.length ?? 0) > 0 && (
+          <div className="border border-amber-300 bg-amber-50/50 rounded-xl p-4 mb-4">
+            <p className="text-sm font-medium text-gray-900 mb-2">Final bills awaiting your approval ({billsAwaiting?.length})</p>
+            <div className="space-y-1">
+              {(billsAwaiting ?? []).map((b) => {
+                const org = Array.isArray(b.organizations) ? b.organizations[0] : b.organizations
+                return (
+                  <Link key={b.id} href={`/dashboard/jobs/${b.id}/receipt`} className="block text-sm text-gray-800 hover:underline">
+                    {[org?.name, [b.vehicle_year, b.vehicle_make, b.vehicle_model].filter(Boolean).join(' '), b.stock_number && `Stk# ${b.stock_number}`].filter(Boolean).join(' · ') || b.id}
+                    {b.completed_at && <span className="text-xs text-gray-400"> — completed {new Date(b.completed_at).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium' })}</span>}
+                  </Link>
+                )
+              })}
             </div>
           </div>
         )}
