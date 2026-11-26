@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isFerryIsolated } from '@/lib/bcGeography'
 
 // Major BC Ferries terminals with coordinates, used to find the nearest
 // terminal to an address (same nearest-match approach as the airport lookup
@@ -153,7 +154,14 @@ export async function POST(req: NextRequest) {
   // multi-minute-per-km time penalty. Requires BOTH signals (a real
   // detour AND a speed consistent with lost ferry time) before trusting a
   // terminal match, rather than either alone.
-  if (typeof actualDrivingKm === 'number' && typeof actualDrivingMinutes === 'number' && actualDrivingMinutes > 0) {
+  // One end on an island / the Sunshine Coast and the other on the mainland
+  // always needs a ferry, however direct the driving route looks (a Vancouver
+  // to Duncan trip is only ~1.7x its straight-line distance because the ferry
+  // crosses the water almost in a straight line, which the check below
+  // wrongly read as "a normal drive"). Skip that check in this case.
+  const crossesWater = isFerryIsolated(originCoords.lat, originCoords.lng) !== isFerryIsolated(destCoords.lat, destCoords.lng)
+
+  if (!crossesWater && typeof actualDrivingKm === 'number' && typeof actualDrivingMinutes === 'number' && actualDrivingMinutes > 0) {
     const straightLineKm = haversineKm(originCoords.lat, originCoords.lng, destCoords.lat, destCoords.lng)
     const avgSpeedKmh = actualDrivingKm / (actualDrivingMinutes / 60)
     const looksLikeNormalDrive = avgSpeedKmh >= 45

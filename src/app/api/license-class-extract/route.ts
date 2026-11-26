@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       }),
     })
     const data = await res.json()
+    if (!res.ok) console.error('license-class-extract: Anthropic API error', res.status, JSON.stringify(data).slice(0, 500))
     const text: string = data?.content?.[0]?.text ?? ''
     const cleaned = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(cleaned)
@@ -62,7 +63,8 @@ export async function POST(req: NextRequest) {
     const expiryDate = typeof parsed.expiryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.expiryDate) ? parsed.expiryDate : null
 
     return NextResponse.json({ licenseClass, expiryDate, confident })
-  } catch {
+  } catch (err) {
+    console.error('license-class-extract failed', err)
     return NextResponse.json({ licenseClass: null, expiryDate: null, confident: false })
   }
 }

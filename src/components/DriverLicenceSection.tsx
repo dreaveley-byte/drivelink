@@ -55,11 +55,20 @@ export default function DriverLicenceSection({
     } catch {
       // reading the date is best-effort; admin can enter it when approving
     }
-    await supabase.from('driver_applications').update({ drivers_license_path: path }).eq('user_id', userId)
-    await supabase
+    const { data: appRows, error: appErr } = await supabase
+      .from('driver_applications')
+      .update({ drivers_license_path: path })
+      .eq('user_id', userId)
+      .select('id')
+    const { error: profErr } = await supabase
       .from('profiles')
       .update({ license_pending_expiry_date: extracted, license_pending_uploaded_at: new Date().toISOString() })
       .eq('id', userId)
+    if (appErr || profErr || !appRows || appRows.length === 0) {
+      setNote(`The photo uploaded but could not be saved to your profile (${appErr?.message ?? profErr?.message ?? 'no application record found'}). Please contact Drivflo support.`)
+      setBusy(false)
+      return
+    }
     setNote(extracted ? `Read expiry date ${extracted} from your photo. Waiting for admin approval.` : 'Uploaded. We could not read an expiry date from the photo - admin will enter it when approving.')
     setBusy(false)
     router.refresh()
