@@ -128,7 +128,7 @@ export default function AdminTripItinerary({
     if (!itinerary || !pricing) return null
     const itineraryFares = itinerary.costs.filter((c) => !/registry/i.test(c.label)).reduce((a, c) => a + c.cents, 0)
     const quoteFares = additionalCharges
-      .filter((c) => c.kind === 'flight' || c.kind === 'bus' || c.kind === 'ground-to-airport' || c.kind === 'ground-home')
+      .filter((c) => c.kind === 'flight' || c.kind === 'bus' || c.kind === 'ground-to-airport' || c.kind === 'ground-home' || c.kind === 'ferry')
       .reduce((a, c) => a + c.dealerAmountCents, 0)
     if (quoteFares === 0) return { itineraryFares, quoteFares, note: 'The quote has no flight, bus or ride-home charges, but this itinerary uses them.' }
     const diff = Math.abs(itineraryFares - quoteFares)
